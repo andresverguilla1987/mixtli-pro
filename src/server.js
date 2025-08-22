@@ -1,39 +1,57 @@
-const express = require("express");
-const { PrismaClient } = require("@prisma/client");
+// src/server.js
+const express = require('express');
+const cors = require('cors');
+const { PrismaClient } = require('@prisma/client');
 
 const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 10000;
 
+app.use(cors());
 app.use(express.json());
 
-// Ruta raíz para evitar el "Cannot GET /"
-app.get("/", (req, res) => {
+// raíz bonita para que no salga "Cannot GET /"
+app.get('/', (req, res) => {
   res.json({
-    mensaje: "🚀 Bienvenido a la API de Mixtli",
+    mensaje: '🚀 Bienvenido a la API de Mixtli',
     endpoints: {
-      salud: "/salud",
-      usuarios: "/api/users"
+      salud: '/salud',
+      usuarios: '/api/users'
     }
   });
 });
 
-// Ruta de salud
-app.get("/salud", (req, res) => {
-  res.json({ status: "Servidor funcionando 🔥", version: "1.0.0" });
+app.get('/salud', (_req, res) => {
+  res.json({ ok: true, status: 'Servidor funcionando 🔥', version: '1.0.1' });
 });
 
-// Ruta de usuarios (ejemplo básico)
-app.get("/api/users", async (req, res) => {
+// Listar usuarios
+app.get('/api/users', async (_req, res) => {
   try {
-    const users = await prisma.user.findMany();
+    const users = await prisma.user.findMany({ orderBy: { id: 'asc' } });
     res.json(users);
-  } catch (error) {
-    res.status(500).json({ error: "Error al obtener usuarios" });
+  } catch (err) {
+    console.error('GET /api/users error:', err);
+    res.status(500).json({ error: 'Error listando usuarios' });
   }
 });
 
-// Iniciar servidor
+// Crear usuario
+app.post('/api/users', async (req, res) => {
+  try {
+    const { name, email, password } = req.body || {};
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'name, email y password son obligatorios' });
+    }
+    const created = await prisma.user.create({ data: { name, email, password } });
+    res.status(201).json(created);
+  } catch (err) {
+    console.error('POST /api/users error:', err);
+    if (err?.code === 'P2002') return res.status(409).json({ error: 'Email ya existe' });
+    res.status(500).json({ error: 'Error creando usuario' });
+  }
+});
+
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+  console.log(`✅ API lista en puerto ${PORT}`);
 });
