@@ -1,0 +1,272 @@
+{
+  "info": {
+    "name": "Mixtli API - JWT CRUD",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Salud",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "https://mixtli-pro.onrender.com/salud",
+          "protocol": "https",
+          "host": [
+            "mixtli-pro",
+            "onrender",
+            "com"
+          ],
+          "path": [
+            "salud"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Juan Perez\",\n  \"email\": \"juan@mixtli.dev\",\n  \"password\": \"Secreta123\"\n}"
+            },
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/auth/register",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if(json.token){ pm.environment.set('token', json.token); }",
+                  "pm.test('status 201', ()=> pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@mixtli.local\",\n  \"password\": \"Admin123!\"\n}"
+            },
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/auth/login",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if(json.token){ pm.environment.set('token', json.token); }",
+                  "pm.test('status 200', ()=> pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users (protected)",
+      "item": [
+        {
+          "name": "Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/api/users",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear usuario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Nuevo\",\n  \"email\": \"nuevo@mixtli.dev\",\n  \"password\": \"Clave123!\"\n}"
+            },
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/api/users",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Obtener por ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/api/users/{{id}}",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Actualizar por ID",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Actualizado\",\n  \"email\": \"nuevo@mixtli.dev\",\n  \"password\": \"NuevaClave!123\"\n}"
+            },
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/api/users/{{id}}",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Eliminar por ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/api/users/{{id}}",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{id}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "id",
+      "value": "1"
+    }
+  ]
+}
