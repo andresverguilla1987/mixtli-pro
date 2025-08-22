@@ -1,21 +1,17 @@
-import { PrismaClient } from '@prisma/client';
+const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  const count = await prisma.user.count();
-  if (count === 0) {
-    await prisma.user.createMany({
-      data: [
-        { name: 'María', email: 'maria@example.com', password: '123456' },
-        { name: 'Luis',  email: 'luis@example.com',  password: '123456' }
-      ]
-    });
-    console.log('Seed: usuarios creados.');
-  } else {
-    console.log('Seed: ya había usuarios, no se insertó nada.');
-  }
+  await prisma.user.createMany({
+    data: [
+      { name: "Admin", email: "admin@example.com", password: "123456" },
+      { name: "User", email: "user@example.com", password: "abcdef" }
+    ],
+    skipDuplicates: true
+  });
 }
 
 main()
-  .catch((e) => { console.error(e); process.exit(1); })
-  .finally(async () => { await prisma.$disconnect(); });
+  .then(() => console.log("🌱 Database seeded"))
+  .catch(e => console.error(e))
+  .finally(async () => await prisma.$disconnect());

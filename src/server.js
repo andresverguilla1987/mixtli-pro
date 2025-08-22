@@ -1,53 +1,40 @@
-// src/server.js
-const express = require('express');
-const cors = require('cors');
-const { PrismaClient } = require('@prisma/client');
+const express = require("express");
+const bodyParser = require("body-parser");
+const cors = require("cors");
+const { PrismaClient } = require("@prisma/client");
 
-const app = express();
 const prisma = new PrismaClient();
+const app = express();
+const PORT = process.env.PORT || 10000;
 
 app.use(cors());
-app.use(express.json());
+app.use(bodyParser.json());
 
-app.get('/', (req, res) => {
-  res.json({ status: 'Servidor funcionando 🔥', version: '1.0.0' });
+// Salud
+app.get("/salud", (req, res) => {
+  res.json({ status: "Servidor funcionando 🔥", version: "1.0.0" });
 });
 
-app.get('/salud', (req, res) => {
-  res.json({ ok: true, ts: new Date().toISOString() });
+// Listar usuarios
+app.get("/api/users", async (req, res) => {
+  const users = await prisma.user.findMany();
+  res.json(users);
 });
 
-app.get('/api/users', async (req, res) => {
+// Crear usuario
+app.post("/api/users", async (req, res) => {
+  const { name, email, password } = req.body;
   try {
-    const users = await prisma.user.findMany({
-      select: { id: true, name: true, email: true, createdAt: true },
-      orderBy: { createdAt: 'desc' }
-    });
-    res.json(users);
-  } catch (err) {
-    console.error('GET /api/users error:', err);
-    res.status(500).json({ error: 'Error listando usuarios' });
-  }
-});
-
-app.post('/api/users', async (req, res) => {
-  try {
-    const { name, email, password } = req.body || {};
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'name, email y password son obligatorios' });
-    }
-    const created = await prisma.user.create({
+    const user = await prisma.user.create({
       data: { name, email, password }
     });
-    res.status(201).json({ id: created.id, name: created.name, email: created.email });
-  } catch (err) {
-    console.error('POST /api/users error:', err);
-    const msg = err?.meta?.target?.includes('email') ? 'Email ya registrado' : 'Error creando usuario';
-    res.status(400).json({ error: msg });
+    res.json(user);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 
-const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
+// Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`API lista en puerto ${PORT}`);
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
