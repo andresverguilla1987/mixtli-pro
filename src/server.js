@@ -1,15 +1,13 @@
 const express = require("express");
-const cors = require("cors");
-const dotenv = require("dotenv");
-
-dotenv.config();
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send("API de Mixtli Pro funcionando 🚀");
+// Ruta de prueba
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", message: "Servidor funcionando 🔥" });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+// Puerto desde variables de entorno o 10000
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
+});
