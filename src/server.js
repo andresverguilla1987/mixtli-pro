@@ -1,36 +1,35 @@
 const express = require("express");
-const bodyParser = require("body-parser");
-const cors = require("cors");
 const { PrismaClient } = require("@prisma/client");
 
-const prisma = new PrismaClient();
 const app = express();
+const prisma = new PrismaClient();
 const PORT = process.env.PORT || 10000;
 
-app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
-// Salud
+// Ruta raíz para evitar el "Cannot GET /"
+app.get("/", (req, res) => {
+  res.json({
+    mensaje: "🚀 Bienvenido a la API de Mixtli",
+    endpoints: {
+      salud: "/salud",
+      usuarios: "/api/users"
+    }
+  });
+});
+
+// Ruta de salud
 app.get("/salud", (req, res) => {
   res.json({ status: "Servidor funcionando 🔥", version: "1.0.0" });
 });
 
-// Listar usuarios
+// Ruta de usuarios (ejemplo básico)
 app.get("/api/users", async (req, res) => {
-  const users = await prisma.user.findMany();
-  res.json(users);
-});
-
-// Crear usuario
-app.post("/api/users", async (req, res) => {
-  const { name, email, password } = req.body;
   try {
-    const user = await prisma.user.create({
-      data: { name, email, password }
-    });
-    res.json(user);
+    const users = await prisma.user.findMany();
+    res.json(users);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(500).json({ error: "Error al obtener usuarios" });
   }
 });
 
