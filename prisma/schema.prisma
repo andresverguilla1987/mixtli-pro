@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,29 +8,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  USER
-}
-
 model User {
   id        Int      @id @default(autoincrement())
-  name      String
+  nombre    String
   email     String   @unique
   password  String
-  role      Role     @default(USER)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  files     File[]
-}
-
-model File {
-  id          Int      @id @default(autoincrement())
-  key         String   @unique
-  filename    String
-  size        Int
-  contentType String
-  ownerId     Int
-  createdAt   DateTime @default(now())
-  owner       User     @relation(fields: [ownerId], references: [id])
 }

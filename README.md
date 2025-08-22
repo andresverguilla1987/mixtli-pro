@@ -1,16 +1,14 @@
 
-# Mixtli Pro API (Final Package)
+# 🌐 Mixtli Pro API
 
-Incluye:
-- Backend completo (Express + Prisma + JWT + Roles)
-- Seed con admin (admin@mixtli.local / Admin123*)
-- CHECKLIST.md (guía de verificación en Postman)
+API construida con **Node.js + Express + Prisma + PostgreSQL**.
 
-## Variables de entorno
-- PORT=10000
-- DATABASE_URL=postgresql://usuario:password@host/dbname?sslmode=require
-- JWT_SECRET=<cadena-secreta>
+## 🚀 Scripts principales
+- `npm run dev` → iniciar en desarrollo con nodemon
+- `npm start` → iniciar en producción
+- `npm run migrate` → aplicar migraciones
+- `npm run seed` → insertar datos iniciales
 
-## Build & Start (Render)
-- Build: `npm install && npm run render-build && npm run seed`
-- Start: `node src/server.js`
+## 📌 Endpoints
+- `/salud` → estado del servidor
+- `/api/users` → gestión de usuarios
