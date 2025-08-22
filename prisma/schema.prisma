@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -21,4 +20,16 @@ model User {
   role      Role     @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  files     File[]
+}
+
+model File {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  filename    String
+  size        Int
+  contentType String
+  ownerId     Int
+  createdAt   DateTime @default(now())
+  owner       User     @relation(fields: [ownerId], references: [id])
 }
