@@ -1,14 +1,17 @@
-# Mixtli Pro (fix auto-migrate & seed)
+# Mixtli Pro (API)
 
-- `postinstall`: `prisma generate`
-- `migrate-deploy`: aplica migraciones en Render/producción
-- `seed`: crea 3 usuarios de ejemplo si la tabla está vacía
+API Express + Prisma + PostgreSQL.
 
-**Build Command (Render):**
-```bash
-npm install && npm run migrate-deploy && npm run seed
-```
-**Start Command (Render):**
-```bash
-node src/server.js
-```
+## Variables de entorno
+
+- `DATABASE_URL`  (URL de Postgres en Render)
+- `PORT`          (Render la inyecta)
+
+## Endpoints
+- `GET  /`                 -> health
+- `GET  /api/users`        -> lista usuarios
+- `POST /api/users`        -> crea usuario { name, email, password? }
+
+## Deploy en Render
+- Build Command: `npm install && npx prisma generate`
+- Start Command: `node src/server.js`

@@ -1,23 +1,21 @@
-import { PrismaClient } from '@prisma/client'
-const prisma = new PrismaClient()
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
 async function main() {
-  // Create a few demo users only if table is empty
-  const count = await prisma.user.count()
+  const count = await prisma.user.count();
   if (count === 0) {
     await prisma.user.createMany({
       data: [
-        { name: 'Andrés', email: 'andres@example.com' },
-        { name: 'Marta', email: 'marta@example.com' },
-        { name: 'Luis',  email: 'luis@example.com' }
+        { name: 'María', email: 'maria@example.com', password: '123456' },
+        { name: 'Luis',  email: 'luis@example.com',  password: '123456' }
       ]
-    })
-    console.log('Seed: usuarios creados.')
+    });
+    console.log('Seed: usuarios creados.');
   } else {
-    console.log('Seed: ya existen usuarios, no se crean duplicados.')
+    console.log('Seed: ya había usuarios, no se insertó nada.');
   }
 }
 
 main()
-  .then(async () => { await prisma.$disconnect() })
-  .catch(async (e) => { console.error(e); await prisma.$disconnect(); process.exit(1) })
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });
