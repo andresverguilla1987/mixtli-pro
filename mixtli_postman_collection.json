@@ -1,0 +1,76 @@
+{
+  "info": {
+    "name": "Mixtli API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Salud",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://mixtli-pro.onrender.com/salud",
+          "protocol": "https",
+          "host": [
+            "mixtli-pro",
+            "onrender",
+            "com"
+          ],
+          "path": [
+            "salud"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Crear Usuario",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Juan Perez\",\n  \"email\": \"juan@mixtli.dev\",\n  \"password\": \"12345678\"\n}"
+        },
+        "url": {
+          "raw": "https://mixtli-pro.onrender.com/api/users",
+          "protocol": "https",
+          "host": [
+            "mixtli-pro",
+            "onrender",
+            "com"
+          ],
+          "path": [
+            "api",
+            "users"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Listar Usuarios",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://mixtli-pro.onrender.com/api/users",
+          "protocol": "https",
+          "host": [
+            "mixtli-pro",
+            "onrender",
+            "com"
+          ],
+          "path": [
+            "api",
+            "users"
+          ]
+        }
+      }
+    }
+  ]
+}
