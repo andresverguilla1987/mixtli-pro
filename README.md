@@ -1,16 +1,12 @@
-# Mixtli Pro — Fake API (Express)
+# Mixitli Pro
 
-API mínima para probar despliegue en Render.
+Servidor Express con Prisma + PostgreSQL.
 
-## Endpoints
-- `GET /` → estado del servidor
-- `GET /usuarios` → lista de usuarios fake
-- `GET /productos` → lista de productos fake
+## Scripts
+- `npm start` → iniciar servidor
+- `npm run migrate` → aplicar migraciones
 
-## Despliegue en Render
-- Build Command: `npm install`
-- Start Command: `node src/server.js`
-- Environment → Variables:
-  - `PORT` (Render la define automáticamente)
-  - (Opcional) otras que ocupes
-
+## Deploy en Render
+Variables necesarias:
+- `PORT=10000`
+- `DATABASE_URL=...`
