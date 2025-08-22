@@ -1,0 +1,309 @@
+{
+  "info": {
+    "name": "Mixtli API - JWT + Roles",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Salud",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "https://mixtli-pro.onrender.com/salud",
+          "protocol": "https",
+          "host": [
+            "mixtli-pro",
+            "onrender",
+            "com"
+          ],
+          "path": [
+            "salud"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@mixtli.local\",\n  \"password\": \"Admin123!\"\n}"
+            },
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/auth/login",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j=pm.response.json(); if(j.token){ pm.environment.set('admin_token', j.token);}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@mixtli.local\",\n  \"password\": \"User123!\"\n}"
+            },
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/auth/login",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j=pm.response.json(); if(j.token){ pm.environment.set('user_token', j.token);}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users (ADMIN)",
+      "item": [
+        {
+          "name": "Listar (ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/api/users",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear (ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Nuevo\",\n  \"email\": \"nuevo@mixtli.dev\",\n  \"password\": \"Clave123!\"\n}"
+            },
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/api/users",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Actualizar (ADMIN)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Editado\",\n  \"email\": \"nuevo@mixtli.dev\",\n  \"password\": \"NuevaClave!999\",\n  \"role\": \"USER\"\n}"
+            },
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/api/users/{{id}}",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Eliminar (ADMIN)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/api/users/{{id}}",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users (USER solo lectura)",
+      "item": [
+        {
+          "name": "Listar (USER)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              }
+            ],
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/api/users",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Crear (USER debe fallar 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{user_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"NoDeberia\",\n  \"email\": \"nobody@mixtli.dev\",\n  \"password\": \"abc12345\"\n}"
+            },
+            "url": {
+              "raw": "https://mixtli-pro.onrender.com/api/users",
+              "protocol": "https",
+              "host": [
+                "mixtli-pro",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "admin_token",
+      "value": ""
+    },
+    {
+      "key": "user_token",
+      "value": ""
+    },
+    {
+      "key": "id",
+      "value": "1"
+    }
+  ]
+}

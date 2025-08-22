@@ -1,8 +1,8 @@
 {
   "name": "mixtli-pro",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
-  "description": "API Express + Prisma (PostgreSQL) con autenticaci\u00f3n JWT.",
+  "description": "API Express + Prisma (PostgreSQL) con JWT y roles (ADMIN/USER).",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

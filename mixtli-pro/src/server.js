@@ -8,7 +8,6 @@ import { z } from 'zod'
 const app = express()
 const prisma = new PrismaClient()
 
-// CORS (ajusta origins si tienes frontend)
 app.use(cors({ origin: true, credentials: true }))
 app.use(express.json())
 
@@ -27,8 +26,16 @@ function requireAuth(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET)
     req.user = decoded
     next()
-  } catch (e) {
+  } catch {
     return res.status(401).json({ error: 'Token inválido' })
+  }
+}
+
+function requireRole(role) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'No autenticado' })
+    if (req.user.role !== role) return res.status(403).json({ error: 'Prohibido: requiere rol ' + role })
+    next()
   }
 }
 
@@ -38,7 +45,6 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6)
 })
-
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6)
@@ -48,24 +54,15 @@ const loginSchema = z.object({
 app.get('/', (req, res) => {
   res.json({
     ok: true,
-    msg: 'Mixtli API + JWT 🚀',
-    endpoints: {
-      salud: '/salud',
-      register: '/auth/register',
-      login: '/auth/login',
-      users: '/api/users'
-    }
+    msg: 'Mixtli API + JWT + Roles 🚀',
+    endpoints: { salud: '/salud', register: '/auth/register', login: '/auth/login', users: '/api/users' }
   })
 })
 
-// Salud + chequeo DB
-app.get('/salud', async (req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`
-    res.json({ ok: true, db: 'ok' })
-  } catch (e) {
-    res.status(500).json({ ok: false, error: 'DB no responde', detail: String(e) })
-  }
+// Salud
+app.get('/salud', async (_req, res) => {
+  try { await prisma.$queryRaw`SELECT 1`; res.json({ ok: true, db: 'ok' }) }
+  catch (e) { res.status(500).json({ ok: false, error: 'DB no responde', detail: String(e) }) }
 })
 
 // --- Auth ---
@@ -77,7 +74,7 @@ app.post('/auth/register', async (req, res) => {
     const hash = await bcrypt.hash(data.password, 10)
     const user = await prisma.user.create({
       data: { name: data.name, email: data.email, password: hash, role: 'USER' },
-      select: { id: true, name: true, email: true, role: true, createdAt: true }
+      select: { id:true, name:true, email:true, role:true, createdAt:true }
     })
     const token = signToken({ sub: user.id, email: user.email, role: user.role })
     res.status(201).json({ user, token })
@@ -94,7 +91,7 @@ app.post('/auth/login', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Credenciales inválidas' })
     const ok = await bcrypt.compare(data.password, user.password)
     if (!ok) return res.status(401).json({ error: 'Credenciales inválidas' })
-    const publicUser = { id: user.id, name: user.name, email: user.email, role: user.role, createdAt: user.createdAt }
+    const publicUser = { id:user.id, name:user.name, email:user.email, role:user.role, createdAt:user.createdAt }
     const token = signToken({ sub: user.id, email: user.email, role: user.role })
     res.json({ user: publicUser, token })
   } catch (e) {
@@ -103,20 +100,21 @@ app.post('/auth/login', async (req, res) => {
   }
 })
 
-// --- Users CRUD (protegido) ---
+// --- Users ---
+// Lectura: cualquier usuario autenticado (USER o ADMIN)
 app.get('/api/users', requireAuth, async (_req, res) => {
-  const users = await prisma.user.findMany({ select: { id:true, name:true, email:true, role:true, createdAt:true }, orderBy: { id: 'asc' } })
+  const users = await prisma.user.findMany({ select:{id:true,name:true,email:true,role:true,createdAt:true}, orderBy:{id:'asc'} })
   res.json(users)
 })
-
 app.get('/api/users/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id)
-  const user = await prisma.user.findUnique({ where: { id }, select: { id:true, name:true, email:true, role:true, createdAt:true } })
+  const user = await prisma.user.findUnique({ where:{ id }, select:{id:true,name:true,email:true,role:true,createdAt:true} })
   if (!user) return res.status(404).json({ error: 'No encontrado' })
   res.json(user)
 })
 
-app.post('/api/users', requireAuth, async (req, res) => {
+// Escritura: solo ADMIN
+app.post('/api/users', requireAuth, requireRole('ADMIN'), async (req, res) => {
   try {
     const { name, email, password, role } = req.body ?? {}
     if (!name || !email || !password) return res.status(400).json({ error: 'name, email y password son obligatorios' })
@@ -127,8 +125,7 @@ app.post('/api/users', requireAuth, async (req, res) => {
     res.status(400).json({ error: 'No se pudo crear', detail: String(e) })
   }
 })
-
-app.put('/api/users/:id', requireAuth, async (req, res) => {
+app.put('/api/users/:id', requireAuth, requireRole('ADMIN'), async (req, res) => {
   const id = Number(req.params.id)
   const { name, email, password, role } = req.body ?? {}
   try {
@@ -140,8 +137,7 @@ app.put('/api/users/:id', requireAuth, async (req, res) => {
     res.status(400).json({ error: 'No se pudo actualizar', detail: String(e) })
   }
 })
-
-app.delete('/api/users/:id', requireAuth, async (req, res) => {
+app.delete('/api/users/:id', requireAuth, requireRole('ADMIN'), async (req, res) => {
   const id = Number(req.params.id)
   try {
     await prisma.user.delete({ where: { id } })
@@ -153,10 +149,7 @@ app.delete('/api/users/:id', requireAuth, async (req, res) => {
 
 // Arranque
 const PORT = process.env.PORT ? Number(process.env.PORT) : 10000
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`)
-})
+app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`))
 
-// Cierre limpio
 process.on('SIGTERM', async () => { await prisma.$disconnect(); process.exit(0) })
 process.on('SIGINT', async () => { await prisma.$disconnect(); process.exit(0) })
