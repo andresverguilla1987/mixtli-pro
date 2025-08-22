@@ -1,20 +1,23 @@
 {
   "name": "mixtli-pro",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "private": true,
   "type": "module",
   "engines": {
-    "node": ">=18"
+    "node": ">=18.x"
   },
   "scripts": {
     "start": "node src/server.js",
-    "seed": "node prisma/seed.js",
-    "postinstall": "prisma generate && npm run seed"
+    "postinstall": "prisma generate",
+    "migrate-deploy": "prisma migrate deploy",
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "@prisma/client": "^5.16.2"
+    "cors": "^2.8.5",
+    "@prisma/client": "^5.16.1"
   },
   "devDependencies": {
-    "prisma": "^5.16.2"
+    "prisma": "^5.16.1"
   }
 }

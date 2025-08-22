@@ -1,17 +1,29 @@
+import express from 'express'
+import cors from 'cors'
+import { PrismaClient } from '@prisma/client'
 
-import express from 'express';
+const app = express()
+const prisma = new PrismaClient()
 
-const app = express();
-app.use(express.json());
+app.use(cors())
+app.use(express.json())
+
+const PORT = process.env.PORT || 10000
 
 app.get('/', (req, res) => {
-  res.json({ status: 'Servidor funcionando 🔥', version: '1.0.0' });
-});
+  res.json({ status: 'Servidor funcionando 🔥', version: '1.0.1' })
+})
 
-// Puerto: usa el que provee el entorno o 10000 local
-const PORT = process.env.PORT || 10000;
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({ orderBy: { id: 'asc' } })
+    res.json(users)
+  } catch (err) {
+    console.error('Error /api/users:', err)
+    res.status(500).json({ error: 'DB error', detail: String(err) })
+  }
+})
+
 app.listen(PORT, () => {
-  console.log(`🚀 Server escuchando en puerto ${PORT}`);
-});
-
-export default app;
+  console.log(`✅ API lista en puerto ${PORT}`)
+})
