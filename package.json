@@ -3,9 +3,7 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "seed": "node prisma/seed.js",
-    "build:render": "npx prisma generate && npx prisma db push"
+    "start": "node server.js"
   },
   "dependencies": {
     "@prisma/client": "^5.2.0",
