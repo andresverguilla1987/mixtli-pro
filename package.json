@@ -2,11 +2,10 @@
   "name": "mixtli-api",
   "version": "1.0.0",
   "main": "server.js",
-  "type": "commonjs",
   "scripts": {
     "start": "node server.js",
     "seed": "node prisma/seed.js",
-    "postinstall": "prisma generate"
+    "build:render": "npx prisma generate && npx prisma db push"
   },
   "dependencies": {
     "@prisma/client": "^5.2.0",
