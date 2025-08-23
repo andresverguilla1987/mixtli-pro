@@ -70,3 +70,17 @@ app.delete('/api/users/:id', async (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+// Alternativa: eliminar usando POST
+app.post('/api/users/:id/delete', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'id inválido' });
+
+    const eliminado = await prisma.usuario.delete({ where: { id } });
+    res.json({ ok: true, data: eliminado });
+  } catch (e) {
+    if (e.code === 'P2025') return res.status(404).json({ error: 'Usuario no encontrado' });
+    console.error('Error eliminando (POST delete):', e);
+    res.status(500).json({ error: 'Error eliminando usuario' });
+  }
+});
