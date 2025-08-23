@@ -1,23 +1,24 @@
-
 {
   "name": "mixtli-pro",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "main": "src/server.js",
+  "type": "module",
   "scripts": {
-    "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
     "build": "npm install && npx prisma generate",
-    "migrate": "npx prisma migrate deploy",
-    "seed": "npx prisma db seed"
+    "migrate": "npx prisma migrate deploy"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "prisma": "^5.6.0",
-    "@prisma/client": "^5.6.0",
+    "express": "^4.19.2",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "@prisma/client": "^5.22.0",
+    "@aws-sdk/client-s3": "^3.637.0",
+    "@aws-sdk/s3-request-presigner": "^3.637.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "prisma": "^5.22.0",
+    "nodemon": "^3.1.0"
   }
 }

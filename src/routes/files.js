@@ -1,11 +1,10 @@
-const express = require('express');
+import express from "express";
+import { createPresign, downloadLink, listFiles } from "../controllers/filesController.js";
+
 const router = express.Router();
-const { authRequired } = require('../middlewares/auth'); // usa tu middleware existente
-const files = require('../controllers/filesController');
 
-// Todas requieren auth
-router.post('/presign', authRequired, files.createPresignedUpload);
-router.get('/', authRequired, files.listMyFiles);
-router.get('/:key/download', authRequired, files.createDownloadLink);
+router.post("/presign", createPresign);
+router.get("/", listFiles);
+router.get("/:key/download", downloadLink);
 
-module.exports = router;
+export default router;

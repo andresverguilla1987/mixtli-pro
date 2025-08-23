@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,4 +13,13 @@ model User {
   email     String   @unique
   password  String
   createdAt DateTime @default(now())
+}
+
+model File {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  filename    String
+  size        Int
+  contentType String
+  createdAt   DateTime @default(now())
 }
