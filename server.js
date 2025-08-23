@@ -1,4 +1,4 @@
-// server.js - Mixtli API CRUD (Express + Prisma)
+// server.js - Mixtli API CRUD (Express + Prisma) con create idempotente (upsert por email)
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
@@ -9,10 +9,7 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
-// Raíz y salud
-app.get('/', (req, res) => {
-  res.json({ mensaje: '✨ Bienvenido a la API de Mixtli', endpoints: { salud: '/salud', usuarios: '/api/users' } });
-});
+// Salud
 app.get('/salud', (_req, res) => res.json({ status: 'ok', mensaje: 'Servidor funcionando 🟢' }));
 
 // ===== CRUD Users =====
@@ -28,17 +25,21 @@ app.get('/api/users', async (_req, res) => {
   }
 });
 
-// Crear
+// Crear (idempotente): si email existe, actualiza nombre; si no, crea
 app.post('/api/users', async (req, res) => {
   const { nombre, email } = req.body || {};
   if (!nombre || !email) return res.status(400).json({ error: 'nombre y email son obligatorios' });
   try {
-    const nuevo = await prisma.usuario.create({ data: { nombre, email } });
-    res.status(201).json({ ok: true, data: nuevo });
+    const user = await prisma.usuario.upsert({
+      where: { email },
+      update: { nombre },
+      create: { nombre, email }
+    });
+    const created = user.createdAt === user.updatedAt; // heurística simple
+    res.status(created ? 201 : 200).json({ ok: true, data: user, info: created ? 'created' : 'updated_existing_by_email' });
   } catch (e) {
-    if (e.code === 'P2002') return res.status(409).json({ error: 'email ya existe' });
-    console.error('Error creando usuario:', e);
-    res.status(500).json({ error: 'Error creando usuario' });
+    console.error('Error upsert usuario:', e);
+    res.status(500).json({ error: 'Error creando/actualizando usuario' });
   }
 });
 
@@ -75,6 +76,5 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 });
 
-// Arranque
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
