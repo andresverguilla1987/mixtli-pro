@@ -82,3 +82,16 @@ app.post('/api/users/:id/delete', async (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+// --- DEBUG VERSION ---
+const VERSION = 'v-delete-alias-001';
+app.get('/__debug', (req, res) => {
+  res.json({
+    ok: true,
+    version: VERSION,
+    routes: [
+      'GET /salud', 'GET /api/users', 'POST /api/users',
+      'PUT /api/users/:id', 'DELETE /api/users/:id',
+      'POST /api/users/:id/delete'
+    ]
+  });
+});
