@@ -5,14 +5,12 @@ async function main() {
   const count = await prisma.usuario.count();
   if (count === 0) {
     await prisma.usuario.create({
-      data: { nombre: 'Usuario Demo', email: 'demo@example.com' }
+      data: { nombre: 'Usuario Demo', email: `demo_${Date.now()}@example.com` }
     });
-    console.log('Seed: usuario demo creado');
+    console.log('Seed: usuario demo creado.');
   } else {
-    console.log('Seed: ya hay usuarios, no se insertó nada');
+    console.log('Seed: ya existen usuarios, no se crean nuevos.');
   }
 }
 
-main()
-  .catch(e => { console.error(e); process.exit(1); })
-  .finally(async () => { await prisma.$disconnect(); });
+main().finally(() => prisma.$disconnect());

@@ -5,7 +5,6 @@ const { PrismaClient } = require('@prisma/client');
 const app = express();
 app.use(cors());
 app.use(express.json());
-
 const prisma = new PrismaClient();
 
 app.get('/', (req, res) => {
@@ -31,7 +30,7 @@ app.post('/api/users', async (req, res) => {
     const nuevo = await prisma.usuario.create({ data: { nombre, email } });
     res.status(201).json({ ok: true, data: nuevo });
   } catch (e) {
-    if (e.code == 'P2002') return res.status(409).json({ error: 'email ya existe' });
+    if (e.code === 'P2002') return res.status(409).json({ error: 'email ya existe' });
     console.error('Error creando usuario:', e);
     res.status(500).json({ error: 'Error creando usuario' });
   }
@@ -48,8 +47,8 @@ app.put('/api/users/:id', async (req, res) => {
     });
     res.json({ ok: true, data: actualizado });
   } catch (e) {
-    if (e.code == 'P2002') return res.status(409).json({ error: 'email ya existe' });
-    if (e.code == 'P2025') return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (e.code === 'P2002') return res.status(409).json({ error: 'email ya existe' });
+    if (e.code === 'P2025') return res.status(404).json({ error: 'Usuario no encontrado' });
     console.error('Error actualizando usuario:', e);
     res.status(500).json({ error: 'Error actualizando usuario' });
   }
@@ -62,25 +61,24 @@ app.delete('/api/users/:id', async (req, res) => {
     const eliminado = await prisma.usuario.delete({ where: { id } });
     res.json({ ok: true, data: eliminado });
   } catch (e) {
-    if (e.code == 'P2025') return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (e.code === 'P2025') return res.status(404).json({ error: 'Usuario no encontrado' });
     console.error('Error eliminando usuario:', e);
+    res.status(500).json({ error: 'Error eliminando usuario' });
+  }
+});
+
+app.post('/api/users/:id/delete', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'id inválido' });
+    const eliminado = await prisma.usuario.delete({ where: { id } });
+    res.json({ ok: true, data: eliminado });
+  } catch (e) {
+    if (e.code === 'P2025') return res.status(404).json({ error: 'Usuario no encontrado' });
+    console.error('Error eliminando usuario (POST alias):', e);
     res.status(500).json({ error: 'Error eliminando usuario' });
   }
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
-// Alternativa: eliminar usando POST
-app.post('/api/users/:id/delete', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: 'id inválido' });
-
-    const eliminado = await prisma.usuario.delete({ where: { id } });
-    res.json({ ok: true, data: eliminado });
-  } catch (e) {
-    if (e.code === 'P2025') return res.status(404).json({ error: 'Usuario no encontrado' });
-    console.error('Error eliminando (POST delete):', e);
-    res.status(500).json({ error: 'Error eliminando usuario' });
-  }
-});
