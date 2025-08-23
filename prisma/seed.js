@@ -2,25 +2,17 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  const data = [
-    { nombre: 'Ada Lovelace', email: 'ada@example.com' },
-    { nombre: 'Grace Hopper', email: 'grace@example.com' },
-    { nombre: 'Alan Turing', email: 'alan@example.com' }
-  ];
-  for (const user of data) {
-    await prisma.usuario.upsert({
-      where: { email: user.email },
-      update: {},
-      create: user
+  const count = await prisma.usuario.count();
+  if (count === 0) {
+    await prisma.usuario.create({
+      data: { nombre: 'Usuario Demo', email: 'demo@example.com' }
     });
+    console.log('Seed: usuario demo creado');
+  } else {
+    console.log('Seed: ya hay usuarios, no se insertó nada');
   }
-  console.log('Seed completado ✅');
 }
 
 main()
-  .then(() => prisma.$disconnect())
-  .catch(async (e) => {
-    console.error('Error en seed:', e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+  .catch(e => { console.error(e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });
