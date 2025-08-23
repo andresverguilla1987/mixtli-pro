@@ -1,24 +1,29 @@
 {
-  "name": "mixtli-pro",
-  "version": "2.0.0",
+  "name": "mixtli-api",
+  "version": "1.0.0",
+  "description": "API Express + Prisma (PostgreSQL) con endpoints /salud y /api/users",
   "main": "src/server.js",
-  "type": "module",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "build": "npm install && npx prisma generate",
-    "migrate": "npx prisma migrate deploy"
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed",
+    "build:deploy": "npm install && npx prisma generate && npx prisma db push && npx prisma db seed"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
     "@prisma/client": "^5.22.0",
-    "@aws-sdk/client-s3": "^3.637.0",
-    "@aws-sdk/s3-request-presigner": "^3.637.0"
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "prisma": "^5.22.0",
     "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

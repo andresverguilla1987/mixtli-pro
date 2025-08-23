@@ -1,0 +1,46 @@
+{
+  "info": {
+    "name": "Mixtli API",
+    "_postman_id": "mixtli-collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Salud",
+      "request": {
+        "method": "GET",
+        "url": "{{BASE_URL}}/salud"
+      }
+    },
+    {
+      "name": "Listar usuarios",
+      "request": {
+        "method": "GET",
+        "url": "{{BASE_URL}}/api/users"
+      }
+    },
+    {
+      "name": "Crear usuario",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"nombre\": \"Usuario Demo\", \"email\": \"demo@example.com\"}"
+        },
+        "url": "{{BASE_URL}}/api/users"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "https://mixtli-pro.onrender.com"
+    }
+  ]
+}

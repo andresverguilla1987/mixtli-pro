@@ -7,19 +7,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+model Usuario {
   id        Int      @id @default(autoincrement())
   nombre    String
   email     String   @unique
-  password  String
   createdAt DateTime @default(now())
-}
-
-model File {
-  id          Int      @id @default(autoincrement())
-  key         String   @unique
-  filename    String
-  size        Int
-  contentType String
-  createdAt   DateTime @default(now())
 }

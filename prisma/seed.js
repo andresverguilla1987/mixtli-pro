@@ -1,16 +1,26 @@
 const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = 'admin@mixtli.local';
-  const passwordHash = await bcrypt.hash('Admin123*', 10);
-  await prisma.user.upsert({
-    where: { email },
-    update: {},
-    create: { name: 'Administrador', email, password: passwordHash, role: 'ADMIN' }
-  });
-  console.log('✅ Seed OK: admin@mixtli.local / Admin123*');
+  const data = [
+    { nombre: 'Ada Lovelace', email: 'ada@example.com' },
+    { nombre: 'Grace Hopper', email: 'grace@example.com' },
+    { nombre: 'Alan Turing', email: 'alan@example.com' }
+  ];
+  for (const user of data) {
+    await prisma.usuario.upsert({
+      where: { email: user.email },
+      update: {},
+      create: user
+    });
+  }
+  console.log('Seed completado ✅');
 }
 
-main().finally(()=>prisma.$disconnect());
+main()
+  .then(() => prisma.$disconnect())
+  .catch(async (e) => {
+    console.error('Error en seed:', e);
+    await prisma.$disconnect();
+    process.exit(1);
+  });
