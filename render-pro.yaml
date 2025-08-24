@@ -1,0 +1,18 @@
+# render-pro.yaml – despliegue para el backend Node en Render (plan Starter/Pro)
+services:
+  - type: web
+    name: mixtli-pro
+    env: node
+    plan: starter   # cambia a 'pro' si tu plan es Pro
+    buildCommand: |
+      npm install
+    startCommand: node server.js
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false  # configúrala desde el panel de Render (Connections → External Database URL)
+    postDeployCommand: |
+      npx prisma migrate deploy || true
+      npx prisma db seed || true

@@ -1,29 +1,39 @@
-# Mixtli API (PROD) + SMOKE
-
-Repositorio listo para GitHub con la colección de Postman y documentación.
-
-## Contenido
-- `postman/mixtli-api-prod-smoke.postman_collection.json` → colección CRUD + flujo SMOKE (auto).
-- `README.md` → esta guía (ES/EN).
-
-## Uso rápido (Postman)
-1. Abre Postman → **Import → File**.
-2. Selecciona `postman/mixtli-api-prod-smoke.postman_collection.json`.
-3. Confirma que tu API en Render esté accesible en `https://mixtli-pro.onrender.com`.
-4. Ejecuta `Endpoints` de forma manual o corre el folder **SMOKE – Full flow (auto)** con el Runner.
 
 ---
 
-# Mixtli API (PROD) + SMOKE (English)
+## Scripts SQL (carpeta `sql/`)
+- `seed.sql` → inserta 3 usuarios de demo (idempotente).
+- `truncate.sql` → limpia la tabla y reinicia IDs.
+- `reset.sql` → limpia + repuebla.
+- `export.sql` → exporta usuarios a CSV (desde `psql`).
+- `import.sql` → importa usuarios desde CSV (desde `psql`).
 
-GitHub-ready repository with the Postman collection and documentation.
+### Cómo usarlos (con `psql`)
+1. Conéctate a tu DB de Render desde `psql` (usa la External Database URL).
+2. Ejecuta, por ejemplo:
+   ```sql
+   \i sql/reset.sql
+   ```
+3. Para exportar:
+   ```sql
+   \copy "Usuario" TO 'usuarios_backup.csv' WITH CSV HEADER;
+   ```
 
-## Contents
-- `postman/mixtli-api-prod-smoke.postman_collection.json` → CRUD + SMOKE (auto) collection.
-- `README.md` → this guide (ES/EN).
+## render.yaml
+Este archivo permite crear el servicio en Render directamente “From repo”.
+- Build: `npm install`
+- Start: `node server.js`
+> Configura `DATABASE_URL` en el panel (no dentro del repo).
 
-## Quick start (Postman)
-1. Open Postman → **Import → File**.
-2. Select `postman/mixtli-api-prod-smoke.postman_collection.json`.
-3. Make sure your API on Render is reachable at `https://mixtli-pro.onrender.com`.
-4. Run `Endpoints` manually, or run **SMOKE – Full flow (auto)** using the Runner.
+## Post-deploy automático (Render)
+Este pack ya incluye:
+- `prisma/seed.js` → inserta usuarios demo via Prisma.
+- `render.yaml` con `postDeployCommand`:
+  ```bash
+  npx prisma migrate deploy || true
+  npx prisma db seed || true
+  ```
+Con esto, después de cada deploy, Render aplicará migraciones pendientes y ejecutará el seed sin romper el despliegue si ya existen datos.
+
+## Prisma Schema
+Incluye `prisma/schema.prisma` con el modelo `Usuario`.
