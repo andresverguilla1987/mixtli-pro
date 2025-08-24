@@ -1,0 +1,313 @@
+{
+  "info": {
+    "name": "Mixtli API (PROD) + SMOKE",
+    "_postman_id": "mixtli-api-prod-smoke-final",
+    "description": "Colecci\u00f3n con endpoints CRUD + flujo automatizado con setNextRequest",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Endpoints",
+      "item": [
+        {
+          "name": "GET Salud",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/salud",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "salud"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK',()=>pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET Listar usuarios",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/users"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK',()=>pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST Crear usuario (email \u00fanico)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Usuario Demo\",\n  \"email\": \"demo_{{$timestamp}}@example.com\"\n}"
+            },
+            "url": "{{BASE_URL}}/api/users"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created',()=>pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "if(j && j.data && j.data.id){ pm.collectionVariables.set('userId', String(j.data.id)); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT Actualizar usuario",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Usuario Demo Actualizado\"\n}"
+            },
+            "url": "{{BASE_URL}}/api/users/{{userId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if(!pm.collectionVariables.get('userId')){ throw new Error('Falta userId, corre POST primero'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK',()=>pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE Eliminar usuario",
+          "request": {
+            "method": "DELETE",
+            "url": "{{BASE_URL}}/api/users/{{userId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if(!pm.collectionVariables.get('userId')){ throw new Error('Falta userId, corre POST primero'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK',()=>pm.response.to.have.status(200));",
+                  "pm.collectionVariables.unset('userId');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SMOKE \u2013 Flujo completo (auto)",
+      "item": [
+        {
+          "name": "Start \u2192 Salud",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/salud",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "salud"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK',()=>pm.response.to.have.status(200));",
+                  "postman.setNextRequest('SMOKE \u2013 Crear usuario');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SMOKE \u2013 Crear usuario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Usuario Smoke\",\n  \"email\": \"smoke_{{$timestamp}}@example.com\"\n}"
+            },
+            "url": "{{BASE_URL}}/api/users"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created',()=>pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "if(j && j.data && j.data.id){ pm.collectionVariables.set('userId', String(j.data.id)); }",
+                  "postman.setNextRequest('SMOKE \u2013 Actualizar usuario');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SMOKE \u2013 Actualizar usuario",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Usuario Smoke Actualizado\"\n}"
+            },
+            "url": "{{BASE_URL}}/api/users/{{userId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if(!pm.collectionVariables.get('userId')){ throw new Error('Falta userId en SMOKE'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK',()=>pm.response.to.have.status(200));",
+                  "postman.setNextRequest('SMOKE \u2013 Eliminar usuario');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SMOKE \u2013 Eliminar usuario",
+          "request": {
+            "method": "DELETE",
+            "url": "{{BASE_URL}}/api/users/{{userId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if(!pm.collectionVariables.get('userId')){ throw new Error('Falta userId en SMOKE'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK',()=>pm.response.to.have.status(200));",
+                  "pm.collectionVariables.unset('userId');",
+                  "postman.setNextRequest('SMOKE \u2013 Listar usuarios');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SMOKE \u2013 Listar usuarios",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/api/users"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK',()=>pm.response.to.have.status(200));",
+                  "postman.setNextRequest(null);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "https://mixtli-pro.onrender.com"
+    },
+    {
+      "key": "userId",
+      "value": ""
+    }
+  ]
+}

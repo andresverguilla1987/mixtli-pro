@@ -1,21 +1,29 @@
-# Mixtli Project (Mega FULL)
-Este pack incluye todo: backend, frontend, postman, despliegue automático y utilidades SQL.
+# Mixtli API (PROD) + SMOKE
 
-## SQL Helpers en backend/prisma/
-- seed.sql → inserta 3 usuarios iniciales (Juan, María, Carlos).
-- truncate.sql → elimina todos los usuarios y reinicia IDs.
-- reset.sql → limpia y repuebla de una.
-- export.sql → exporta todos los usuarios a CSV (psql).
-- import.sql → importa usuarios desde CSV (psql).
+Repositorio listo para GitHub con la colección de Postman y documentación.
 
-## Flujo típico
-1. Respaldar usuarios actuales → `export.sql`.
-2. Limpiar tabla → `truncate.sql` o `reset.sql`.
-3. Importar desde CSV si lo necesitas → `import.sql`.
+## Contenido
+- `postman/mixtli-api-prod-smoke.postman_collection.json` → colección CRUD + flujo SMOKE (auto).
+- `README.md` → esta guía (ES/EN).
 
-## Deploy
-- Render detecta `render.yaml` (backend).
-- Netlify detecta `netlify.toml` (frontend).
-- Postman colección lista en `postman/`.
+## Uso rápido (Postman)
+1. Abre Postman → **Import → File**.
+2. Selecciona `postman/mixtli-api-prod-smoke.postman_collection.json`.
+3. Confirma que tu API en Render esté accesible en `https://mixtli-pro.onrender.com`.
+4. Ejecuta `Endpoints` de forma manual o corre el folder **SMOKE – Full flow (auto)** con el Runner.
 
-Este es el combo final todo en uno 🚀.
+---
+
+# Mixtli API (PROD) + SMOKE (English)
+
+GitHub-ready repository with the Postman collection and documentation.
+
+## Contents
+- `postman/mixtli-api-prod-smoke.postman_collection.json` → CRUD + SMOKE (auto) collection.
+- `README.md` → this guide (ES/EN).
+
+## Quick start (Postman)
+1. Open Postman → **Import → File**.
+2. Select `postman/mixtli-api-prod-smoke.postman_collection.json`.
+3. Make sure your API on Render is reachable at `https://mixtli-pro.onrender.com`.
+4. Run `Endpoints` manually, or run **SMOKE – Full flow (auto)** using the Runner.
