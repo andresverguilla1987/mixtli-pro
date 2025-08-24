@@ -1,21 +1,32 @@
-# Mixtli CI – Slack + Metrics
+# Mixtli – Mega Pack 01
 
-Este paquete actualiza el workflow para:
-- Ejecutar Postman/Newman y **guardar reportes HTML y JSON**
-- **Subir artifacts** con los reportes
-- Hacer **deploy a Render** si todo pasa
-- **Healthcheck** a `/salud`
-- Enviar **notificación a Slack** con métricas: *tests totales, pasados, fallados* y *duración*
+Incluye CI/CD (Newman + Deploy Render + Healthcheck + Slack + métricas), Auth básico (register/login/JWT),
+migración Prisma para `passwordHash`, colección Postman y `.env.example` listo.
 
-## Instalar
-1. Sube los archivos a la raíz del repo, respetando rutas:
-   - `.github/workflows/ci.yml`
-   - `guiones/run-tests.sh`
-2. Asegúrate de tener estos *Secrets* en GitHub (Settings → Secrets → Actions):
-   - `DATABASE_URL`
-   - `RENDER_API_KEY`
-   - `RENDER_SERVICE_ID`
-   - `SLACK_WEBHOOK_URL`
-3. Haz un push a `main` o ejecuta **Actions → Run workflow**.
+## Estructura
+```
+.github/workflows/ci.yml
+guiones/run-tests.sh
+.env.example
+server.js
+prisma/schema.prisma
+prisma/migrations/2025-08-24_add_passwordhash/migration.sql
+cartero/mixtli-auth-basic.postman_collection.json
+cartero/mixtli-auth-basic.postman_environment.json
+```
 
-Listo. Verás el reporte en *Artifacts* y un mensaje con métricas en Slack.
+## Pasos
+1) Sube todo a la raíz del repo (reemplaza `server.js` y `prisma/schema.prisma` si te pregunta).
+2) Render → servicio → **Environment**: define `JWT_SECRET`, `DATABASE_URL`, `PORT=10000`.
+3) Render → servicio → **Manual Deploy** (Clear build cache & deploy).
+4) Render → **Shell**:
+```
+npx prisma generate
+npx prisma migrate deploy
+```
+5) Postman: importa `cartero/*.json` y prueba Auth (register/login/me).
+6) GitHub → Settings → Secrets:
+   - `DATABASE_URL`, `RENDER_API_KEY`, `RENDER_SERVICE_ID`, `SLACK_WEBHOOK_URL`.
+7) GitHub → Actions: correr workflow. Ver métricas en Slack y reportes en Artifacts.
+
+Listo. ¡A producir!

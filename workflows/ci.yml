@@ -123,7 +123,7 @@ jobs:
           MSG="✅ *Mixtli* deploy OK + *healthcheck* ✅
 • Repo: $GITHUB_REPOSITORY
 • Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
-• Endpoint: ${{ env.BASE_URL }}/salud (HTTP 200 en ${ { steps.ping.outputs.duration } }s)
+• Endpoint: ${{ env.BASE_URL }}/salud (HTTP 200 en ${{ steps.ping.outputs.duration }}s)
 • ${METRICS}"
           payload=$(jq -n --arg text "$MSG" '{text: $text}')
           curl -s -X POST -H 'Content-type: application/json'             --data "$payload" "${{ secrets.SLACK_WEBHOOK_URL }}"
