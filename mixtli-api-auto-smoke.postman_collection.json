@@ -1,34 +1,31 @@
 {
   "info": {
-    "name": "Mixtli API (PROD) + SMOKE",
-    "_postman_id": "mixtli-api-prod-pack",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    "name": "Mixtli API \u2013 Auto Smoke",
+    "_postman_id": "mixtli-api-auto-smoke",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Flujo encadenado: lista usuarios \u2192 crea \u2192 actualiza \u2192 elimina"
   },
   "item": [
     {
       "name": "GET Salud",
       "request": {
         "method": "GET",
-        "url": {
-          "raw": "{{BASE_URL}}/salud",
-          "host": [
-            "{{BASE_URL}}"
-          ],
-          "path": [
-            "salud"
-          ]
+        "url": "{{BASE_URL}}/salud"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));"
+            ]
+          }
         }
-      }
+      ]
     },
     {
-      "name": "GET Listar usuarios",
-      "request": {
-        "method": "GET",
-        "url": "{{BASE_URL}}/api/users"
-      }
-    },
-    {
-      "name": "POST Crear usuario (email \u00fanico)",
+      "name": "POST Crear usuario",
       "request": {
         "method": "POST",
         "header": [
@@ -39,7 +36,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"nombre\": \"Usuario Demo\",\n  \"email\": \"demo_{{$timestamp}}@example.com\"\n}"
+          "raw": "{\n  \"nombre\": \"Smoke User\",\n  \"email\": \"smoke_{{$timestamp}}@example.com\"\n}"
         },
         "url": "{{BASE_URL}}/api/users"
       },
@@ -49,8 +46,9 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "const j = pm.response.json();",
-              "if(j && j.data && j.data.id){ pm.collectionVariables.set('userId', String(j.data.id)); }"
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const data = pm.response.json();",
+              "pm.collectionVariables.set('userId', data.data.id);"
             ]
           }
         }
@@ -68,10 +66,21 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"nombre\": \"Usuario Demo Actualizado\"\n}"
+          "raw": "{\n  \"nombre\": \"Smoke User Updated\"\n}"
         },
         "url": "{{BASE_URL}}/api/users/{{userId}}"
-      }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "DELETE Eliminar usuario",
@@ -85,6 +94,7 @@
           "script": {
             "type": "text/javascript",
             "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
               "pm.collectionVariables.unset('userId');"
             ]
           }
