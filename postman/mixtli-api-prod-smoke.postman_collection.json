@@ -1,0 +1,105 @@
+{
+  "info": {
+    "name": "Mixtli API (PROD) + SMOKE",
+    "_postman_id": "mixtli-api-prod-pack",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET Salud",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{BASE_URL}}/salud",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "salud"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET Listar usuarios",
+      "request": {
+        "method": "GET",
+        "url": "{{BASE_URL}}/api/users"
+      }
+    },
+    {
+      "name": "POST Crear usuario (email \u00fanico)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Usuario Demo\",\n  \"email\": \"demo_{{$timestamp}}@example.com\"\n}"
+        },
+        "url": "{{BASE_URL}}/api/users"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const j = pm.response.json();",
+              "if(j && j.data && j.data.id){ pm.collectionVariables.set('userId', String(j.data.id)); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "PUT Actualizar usuario",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Usuario Demo Actualizado\"\n}"
+        },
+        "url": "{{BASE_URL}}/api/users/{{userId}}"
+      }
+    },
+    {
+      "name": "DELETE Eliminar usuario",
+      "request": {
+        "method": "DELETE",
+        "url": "{{BASE_URL}}/api/users/{{userId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.unset('userId');"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "https://mixtli-pro.onrender.com"
+    },
+    {
+      "key": "userId",
+      "value": ""
+    }
+  ]
+}

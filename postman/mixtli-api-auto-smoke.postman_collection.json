@@ -1,0 +1,115 @@
+{
+  "info": {
+    "name": "Mixtli API \u2013 Auto Smoke",
+    "_postman_id": "mixtli-api-auto-smoke",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Flujo encadenado: lista usuarios \u2192 crea \u2192 actualiza \u2192 elimina"
+  },
+  "item": [
+    {
+      "name": "GET Salud",
+      "request": {
+        "method": "GET",
+        "url": "{{BASE_URL}}/salud"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST Crear usuario",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Smoke User\",\n  \"email\": \"smoke_{{$timestamp}}@example.com\"\n}"
+        },
+        "url": "{{BASE_URL}}/api/users"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const data = pm.response.json();",
+              "pm.collectionVariables.set('userId', data.data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "PUT Actualizar usuario",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Smoke User Updated\"\n}"
+        },
+        "url": "{{BASE_URL}}/api/users/{{userId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "DELETE Eliminar usuario",
+      "request": {
+        "method": "DELETE",
+        "url": "{{BASE_URL}}/api/users/{{userId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.unset('userId');"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "https://mixtli-pro.onrender.com"
+    },
+    {
+      "key": "userId",
+      "value": ""
+    }
+  ]
+}
