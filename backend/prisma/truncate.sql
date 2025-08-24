@@ -1,0 +1,2 @@
+-- truncate.sql
+TRUNCATE TABLE "Usuario" RESTART IDENTITY CASCADE;

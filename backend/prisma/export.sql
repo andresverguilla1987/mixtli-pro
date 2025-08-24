@@ -1,0 +1,4 @@
+-- export.sql
+-- Exporta todos los usuarios de la tabla Usuario a un CSV
+-- Uso en psql:
+-- \copy "Usuario" TO 'usuarios_backup.csv' WITH CSV HEADER;

@@ -1,0 +1,5 @@
+-- import.sql
+-- Importa usuarios desde un CSV a la tabla Usuario
+-- Asegúrate de tener columnas: nombre, email, createdAt
+-- Uso en psql:
+-- \copy "Usuario"(nombre, email, "createdAt") FROM 'usuarios_backup.csv' WITH CSV HEADER;
