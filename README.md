@@ -1,21 +1,17 @@
-# 🔑 Secrets y Variables de MIXTLI
+# Mixtli CI – Slack
 
-Este archivo explica dónde debes poner cada cosa.
+Este paquete agrega el workflow de GitHub Actions con:
+- Tests de Postman/Newman
+- Deploy a Render
+- Healthcheck a `/salud`
+- Notificación a Slack (éxito y falla)
 
-## 🚀 En GitHub (Settings → Secrets and Variables → Actions)
-- DATABASE_URL  → Copia la URL externa de tu base de datos en Render
-- RENDER_API_KEY → Genera una API Key en Render (Settings → API Keys)
-- RENDER_SERVICE_ID → Copia el Service ID de tu Web Service en Render
-- JWT_SECRET → Una cadena alfanumérica fuerte para firmar tokens
+## Instalación
+1. Descomprime en la raíz del repo. Debe crear `.github/workflows/ci.yml`.
+2. Crea los *Secrets*:
+   - `DATABASE_URL` (obligatorio para los tests/backend)
+   - `RENDER_API_KEY` (si usas deploy a Render)
+   - `RENDER_SERVICE_ID` (si usas deploy a Render)
+   - `SLACK_WEBHOOK_URL` (para notificar)
 
-## 💻 Local (tu computadora en desarrollo)
-Crea un archivo `.env` con las mismas claves que están en `.env.example`.
-
-Ejemplo:
-```
-DATABASE_URL=postgresql://user:pass@host:5432/db
-JWT_SECRET=1234567890abcdef
-PORT=3000
-```
-
-Así GitHub Actions y Render tendrán lo mismo y no habrá bronca con los despliegues.
+¡Listo!

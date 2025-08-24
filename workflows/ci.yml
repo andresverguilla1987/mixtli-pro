@@ -1,17 +1,20 @@
-
-name: Mixtli CI + CD (cartero)
+name: Mixtli – CI (Postman/Newman) + Deploy + Healthcheck + Slack
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches: [ main, principal ]
   workflow_dispatch:
+
+env:
+  BASE_URL: https://mixtli-pro.onrender.com
+  COLLECTION_PATH: cartero/mixtli-api-prod.postman_collection.json
+  ENV_PATH: cartero/mixtli-prod.postman_environment.json
 
 jobs:
   test:
     name: Run Postman tests (Newman)
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,76 +22,82 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: '20'
 
-      - name: Install Newman (Postman CLI)
-        run: npm i -g newman newman-reporter-htmlextra
-
-      - name: Run collection (from cartero/)
+      - name: Install Newman
         run: |
-          mkdir -p reports
-          newman run "cartero/mixtli-api-prod.postman_collection.json"             -e "cartero/mixtli-prod.postman_environment.json"             --reporters cli,htmlextra,junit             --reporter-htmlextra-export reports/mixtli-report.html             --reporter-junit-export reports/mixtli-report.junit.xml             --timeout-request 60000             --delay-request 100
+          npm i -g newman@6 newman-reporter-htmlextra@1
 
-      - name: Upload HTML report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: newman-html
-          path: reports/mixtli-report.html
-
-      - name: Upload JUnit report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: newman-junit
-          path: reports/mixtli-report.junit.xml
+      - name: Run Newman
+        id: newman
+        run: |
+          bash guiones/run-tests.sh "${{ env.COLLECTION_PATH }}" "${{ env.ENV_PATH }}"
 
   deploy:
-    name: Deploy to Render (after green tests)
+    name: Deploy to Render
     needs: test
-    if: ${{ needs.test.result == 'success' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    steps:
-      - name: Install tools
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y jq curl
+    if: ${{ success() }}
 
+    steps:
       - name: Trigger Render deploy
         id: trigger
-        env:
-          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: |
-          if [ -z "$RENDER_SERVICE_ID" ] || [ -z "$RENDER_API_KEY" ]; then
-            echo "Missing RENDER_SERVICE_ID or RENDER_API_KEY"; exit 1
-          fi
-          RESP=$(curl -s -X POST             -H "Authorization: Bearer ${RENDER_API_KEY}"             -H "Content-Type: application/json"             https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys             -d '{"clearCache": true}')
-          echo "$RESP"
-          ID=$(echo "$RESP" | jq -r '.id // empty')
-          if [ -z "$ID" ]; then
-            echo "Could not trigger deploy"; exit 1
-          fi
-          echo "deploy_id=$ID" >> $GITHUB_OUTPUT
+          set -e
+          DEPLOY=$(curl -s -X POST             -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}"             -H "Content-Type: application/json"             "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys")
+          echo "Deploy triggered: $DEPLOY"
 
-      - name: Wait for Render deploy to finish
-        env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          DEPLOY_ID: ${{ steps.trigger.outputs.deploy_id }}
+      - name: Wait for Render deploy to be live (poll)
         run: |
-          echo "Polling Render deploy: $DEPLOY_ID"
-          MAX=90
-          i=0
-          while [ $i -lt $MAX ]; do
-            STATUS=$(curl -s -H "Authorization: Bearer ${RENDER_API_KEY}"               https://api.render.com/v1/deploys/${DEPLOY_ID} | jq -r '.status // empty')
-            echo "Status: $STATUS"
-            if [ "$STATUS" = "live" ]; then
-              echo "Deploy live ✅"
+          set -e
+          ATTEMPTS=20
+          SLEEP=15
+          for i in $(seq 1 $ATTEMPTS); do
+            if curl -fsS "${{ env.BASE_URL }}/salud" >/dev/null 2>&1; then
+              echo "Service answering /salud ✅"
               exit 0
-            elif [ "$STATUS" = "build_failed" ] || [ "$STATUS" = "update_failed" ] || [ "$STATUS" = "deactivated" ]; then
-              echo "Deploy failed with status: $STATUS"; exit 1
             fi
-            sleep 10
-            i=$((i+1))
+            sleep $SLEEP
           done
-          echo "Timeout waiting for deploy"; exit 1
+          echo "Service not healthy after wait ❌"
+          exit 1
+
+  healthcheck:
+    name: Post-deploy Healthcheck
+    needs: deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check /salud
+        id: ping
+        run: |
+          set -e
+          start=$(date +%s)
+          HTTP_CODE=$(curl -s -o /tmp/resp.json -w "%{http_code}" "${{ env.BASE_URL }}/salud")
+          end=$(date +%s)
+          echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+          echo "duration=$((end-start))" >> $GITHUB_OUTPUT
+          cat /tmp/resp.json || true
+          test "$HTTP_CODE" = "200"
+
+      - name: Notify Slack on success
+        if: ${{ success() }}
+        run: |
+          DURATION="${{ steps.ping.outputs.duration }}"
+          MSG="✅ *Mixtli* deploy OK y *healthcheck* ✅
+• Repo: $GITHUB_REPOSITORY
+• Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+• Endpoint: ${{ env.BASE_URL }}/salud
+• Healthcheck: ${DURATION}s"
+          payload=$(jq -n --arg text "$MSG" '{text: $text}')
+          curl -s -X POST -H 'Content-type: application/json'             --data "$payload" "${{ secrets.SLACK_WEBHOOK_URL }}"
+
+      - name: Notify Slack on failure
+        if: ${{ failure() }}
+        run: |
+          MSG="❌ *Mixtli* post-deploy *healthcheck* FALLÓ
+• Repo: $GITHUB_REPOSITORY
+• Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+• Endpoint: ${{ env.BASE_URL }}/salud"
+          payload=$(jq -n --arg text "$MSG" '{text: $text}')
+          curl -s -X POST -H 'Content-type: application/json'             --data "$payload" "${{ secrets.SLACK_WEBHOOK_URL }}"
