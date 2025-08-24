@@ -1,0 +1,54 @@
+name: Mixtli – CI (Postman/Newman)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: {}  # permitir correrlo manual
+
+jobs:
+  smoke:
+    name: Smoke tests (Postman)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # Si tu proyecto tiene package.json y necesitas instalar deps, descomenta:
+      # - name: Install project deps
+      #   run: npm ci
+
+      - name: Install Newman CLI
+        run: npm i -g newman newman-reporter-htmlextra
+
+      # ⚠️ Ajusta las rutas si tu carpeta difiere
+      - name: Run Postman collection (Newman)
+        run: |
+          newman run postman/mixtli-api-prod.postman_collection.json \
+            -e postman/mixtli-prod.postman_environment.json \
+            --reporters cli,htmlextra,junit \
+            --reporter-htmlextra-export reports/mixtli-report.html \
+            --reporter-junit-export reports/mixtli-report.junit.xml \
+            --timeout-request 60000 \
+            --delay-request 100
+
+      - name: Publish HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-html
+          path: reports/mixtli-report.html
+
+      - name: Publish JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-junit
+          path: reports/mixtli-report.junit.xml
