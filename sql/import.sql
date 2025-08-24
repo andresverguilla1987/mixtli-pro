@@ -1,0 +1,3 @@
+-- sql/import.sql
+-- Importa usuarios desde un CSV (en psql)
+-- \copy "Usuario"(nombre, email, "createdAt") FROM 'usuarios_backup.csv' WITH CSV HEADER;
