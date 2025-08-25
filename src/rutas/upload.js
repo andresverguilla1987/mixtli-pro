@@ -1,23 +1,28 @@
 const express = require("express");
-const router = express.Router();
 const multer = require("multer");
+const { putObject } = require("../servicios/s3");
 
-// Guardado en memoria (no escribe a disco)
+const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-const { uploadBufferToS3 } = require("../servicios/s3");
-
-// POST /api/upload  (form-data con 'file')
+// POST /api/upload (campo esperado: "file")
 router.post("/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: "Falta el archivo (form-data 'file')" });
+      return res.status(400).json({ ok: false, error: "Falta el archivo (form-data 'file')" });
     }
-    const result = await uploadBufferToS3(req.file);
-    res.json({ mensaje: "Archivo subido con éxito ✅", ...result });
+    const filename = `${Date.now()}-${req.file.originalname.replace(/\s+/g, "_")}`;
+
+    const result = await putObject({
+      key: filename,
+      body: req.file.buffer,
+      contentType: req.file.mimetype || "application/octet-stream",
+    });
+
+    return res.json({ ok: true, key: filename, location: result.location });
   } catch (err) {
-    console.error("[/api/upload] Error:", err);
-    res.status(500).json({ error: "Error al subir el archivo a S3" });
+    console.error("Error en /api/upload:", err);
+    return res.status(500).json({ ok: false, error: err.message || "Error interno" });
   }
 });
 
