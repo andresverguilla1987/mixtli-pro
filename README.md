@@ -1,27 +1,29 @@
-# Mixtli – Uploads con URLs pre-firmadas (S3/R2/MinIO)
+# Mixtli – Direct Upload (multer + aws-sdk v2) + Presigned (v3)
 
-Este paquete agrega endpoints para subir archivos **directo al storage** sin pasar por el servidor:
-- `POST /api/uploads/presign` → genera URL de subida (PUT) válida por 5 min.
-- `GET /api/uploads/verify?key=...` → verifica si el objeto existe (HEAD).
+Este paquete agrega **/api/upload** (multipart form-data) para subir archivos al bucket S3 **vía servidor**.
+Mantiene también los endpoints de presign (`/api/uploads/presign` y `/api/uploads/verify`).
 
-## Variables de entorno (Render)
-- `S3_REGION` (ej. `us-east-1`)
-- `S3_BUCKET` (nombre del bucket)
-- `S3_ACCESS_KEY_ID` y `S3_SECRET_ACCESS_KEY`
-- `S3_ENDPOINT` (opcional, para R2 o MinIO; si usas AWS puro, déjalo vacío)
+## Variables (Render)
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+- `S3_BUCKET` (ej. mixtli-pro-bucket)
+- `S3_REGION` (ej. us-east-1)
+- (Opcional) `S3_ENDPOINT` si usas R2/MinIO
 
 ## Pasos
-1. Reemplaza `server.js` por el de este paquete (o integra las rutas si ya tienes lógica propia).
-2. Reemplaza/actualiza `package.json` para incluir `@aws-sdk/*` (ya viene en este zip).
-3. En **Render → Environment** define las variables S3 y **Save**.
-4. **Manual Deploy → Clear build cache & Deploy**.
-5. En **Postman**, importa `cartero/mixtli-uploads-s3.postman_collection.json` y su environment.
-6. Flujo de prueba:
-   - `Register` → `Login` (guarda token)
-   - `Presign upload` → te da `{ url, method, headers, key }`
-   - Con esa `url` haces `PUT` del archivo (desde frontend o Postman)
-   - `Verify upload` para confirmar que existe.
+1. Reemplaza `server.js` por el de este paquete.
+2. Reemplaza/actualiza `package.json` (incluye aws-sdk y multer).
+3. Render → Manual Deploy → Clear build cache & Deploy.
+4. Postman: importa `cartero/*.postman_collection.json`.
 
-## Nota
-- El presign es por 5 minutos.
-- Si usas Cloudflare R2/MinIO, define `S3_ENDPOINT` y activa `forcePathStyle` (ya está en el código).
+## Prueba (Upload Direct)
+- `Register` → `Login` (guarda token automáticamente).
+- `Upload Direct`: POST {{BASE_URL}}/api/upload con form-data `file` (elige archivo).
+
+Respuesta esperada:
+```
+{ "ok": true, "key": "uploads/2025/08/...", "location": "https://...s3.amazonaws.com/..." }
+```
+
+## Notas
+- Direct upload consume ancho de banda del servidor; para alto volumen, preferir presigned.
+- Tamaño límite actual: 50MB (ajustable en `multer`).

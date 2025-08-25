@@ -1,12 +1,16 @@
+// MIXTLI API – Auth + CRUD + Uploads (presigned & direct)
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// === AWS SDK v3 for S3 presigned URLs ===
+// AWS SDK v3 (presigned)
 const { S3Client, HeadObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+// AWS SDK v2 (direct upload via server)
+const AWSv2 = require('aws-sdk');
+const multer = require('multer');
 
 const app = express();
 app.use(cors());
@@ -32,14 +36,16 @@ function auth(req, res, next) {
   }
 }
 
-// ===== S3 client =====
-const S3_REGION   = process.env.S3_REGION   || 'us-east-1';
-const S3_BUCKET   = process.env.S3_BUCKET   || '';
-const S3_ENDPOINT = process.env.S3_ENDPOINT || null; // opcional: R2/MinIO
+// ===== S3 config (compartido) =====
+const S3_REGION   = process.env.S3_REGION || process.env.AWS_REGION || 'us-east-1';
+const S3_BUCKET   = process.env.S3_BUCKET || process.env.S3_BUCKET_NAME || '';
+const S3_ENDPOINT = process.env.S3_ENDPOINT || null; // opcional para R2/MinIO
+
 const S3_ACCESS_KEY_ID = process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || '';
 const S3_SECRET_ACCESS_KEY = process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY || '';
 
-const s3Client = new S3Client({
+// v3 client (presigned)
+const s3v3 = new S3Client({
   region: S3_REGION,
   endpoint: S3_ENDPOINT || undefined,
   forcePathStyle: !!S3_ENDPOINT,
@@ -48,6 +54,19 @@ const s3Client = new S3Client({
     secretAccessKey: S3_SECRET_ACCESS_KEY
   }
 });
+
+// v2 client (direct)
+const s3v2 = new AWSv2.S3({
+  region: S3_REGION,
+  accessKeyId: S3_ACCESS_KEY_ID,
+  secretAccessKey: S3_SECRET_ACCESS_KEY,
+  endpoint: S3_ENDPOINT || undefined,
+  s3ForcePathStyle: !!S3_ENDPOINT,
+  signatureVersion: 'v4'
+});
+
+// Multer en memoria (direct upload)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB
 
 // ===== Raíz y salud =====
 app.get('/', (req, res) => {
@@ -64,7 +83,8 @@ app.get('/', (req, res) => {
       login: "/auth/login",
       yo: "/me (Bearer token)",
       presign: "/api/uploads/presign (POST)",
-      verify: "/api/uploads/verify?key=... (GET)"
+      verify: "/api/uploads/verify?key=... (GET)",
+      uploadDirect: "/api/upload (POST form-data file=...)"
     }
   });
 });
@@ -169,8 +189,7 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 });
 
-// ===== UPLOADS Presigned =====
-// POST /api/uploads/presign  { filename, contentType }
+// ===== UPLOADS: Presigned (cliente sube directo) =====
 app.post('/api/uploads/presign', auth, async (req, res) => {
   try {
     if (!S3_BUCKET || !S3_ACCESS_KEY_ID || !S3_SECRET_ACCESS_KEY) {
@@ -183,7 +202,7 @@ app.post('/api/uploads/presign', auth, async (req, res) => {
     const key = `uploads/${new Date().getUTCFullYear()}/${String(new Date().getUTCMonth()+1).padStart(2,'0')}/${ts}-${filename}`;
 
     const putCmd = new PutObjectCommand({ Bucket: S3_BUCKET, Key: key, ContentType: contentType });
-    const url = await getSignedUrl(s3Client, putCmd, { expiresIn: 60 * 5 }); // 5 min
+    const url = await getSignedUrl(s3v3, putCmd, { expiresIn: 60 * 5 }); // 5 min
 
     res.json({ ok: true, upload: { url, method: 'PUT', headers: { 'Content-Type': contentType }, key } });
   } catch (e) {
@@ -192,12 +211,11 @@ app.post('/api/uploads/presign', auth, async (req, res) => {
   }
 });
 
-// GET /api/uploads/verify?key=...
 app.get('/api/uploads/verify', auth, async (req, res) => {
   try {
     const key = req.query.key;
     if (!key) return res.status(400).json({ error: 'key requerido' });
-    const head = await s3Client.send(new HeadObjectCommand({ Bucket: S3_BUCKET, Key: key }));
+    const head = await s3v3.send(new HeadObjectCommand({ Bucket: S3_BUCKET, Key: key }));
     res.json({ ok: true, exists: true, size: head.ContentLength, contentType: head.ContentType });
   } catch (e) {
     if (e && e.$metadata && e.$metadata.httpStatusCode === 404) {
@@ -208,10 +226,34 @@ app.get('/api/uploads/verify', auth, async (req, res) => {
   }
 });
 
+// ===== UPLOADS: Direct (archivo via servidor) =====
+app.post('/api/upload', auth, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No se envió ningún archivo (form-data file=...)' });
+    if (!S3_BUCKET) return res.status(500).json({ error: 'S3_BUCKET no configurado' });
+
+    const key = `uploads/${new Date().getUTCFullYear()}/${String(new Date().getUTCMonth()+1).padStart(2,'0')}/${Date.now()}-${req.file.originalname}`;
+
+    const params = {
+      Bucket: S3_BUCKET,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+      ACL: 'private'
+    };
+
+    const data = await s3v2.upload(params).promise();
+    res.json({ ok: true, key, location: data.Location });
+  } catch (e) {
+    console.error('Error subiendo archivo a S3:', e);
+    res.status(500).json({ error: 'Error subiendo archivo' });
+  }
+});
+
 // Catch-all 404 (para debug rápido)
 app.use((req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada', path: req.url });
 });
 
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
