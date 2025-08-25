@@ -1,25 +1,18 @@
-// src/rutas/upload.js
 const express = require("express");
 const multer = require("multer");
-const {
-  S3Client,
-  PutObjectCommand,
-  ListObjectsV2Command,
-  GetObjectCommand,
-  DeleteObjectCommand,
-} = require("@aws-sdk/client-s3");
-const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 
 const router = express.Router();
 
-// Multer (memoria) con límites
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: (Number(process.env.UPLOAD_MAX_MB || 5)) * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
+  limits: {
+    fileSize: (process.env.UPLOAD_MAX_MB || 5) * 1024 * 1024
+  },
+  fileFilter: (req, file, cb) => {
     const allowed = (process.env.ALLOWED_MIME || "image/jpeg,image/png,image/webp,image/gif,image/svg+xml,application/pdf")
-      .split(",").map(s => s.trim());
+      .split(",");
     if (!allowed.includes(file.mimetype)) {
       return cb(new Error("Tipo de archivo no permitido"));
     }
@@ -27,76 +20,57 @@ const upload = multer({
   }
 });
 
-// Cliente S3
 const s3 = new S3Client({
   region: process.env.S3_REGION,
-  endpoint: process.env.S3_ENDPOINT || undefined, // vacío para AWS nativo
+  endpoint: process.env.S3_ENDPOINT || undefined,
   credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY,
+    accessKeyId: process.env.S3_ACCESS_KEY_ID,
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
   },
-  forcePathStyle: !!process.env.S3_ENDPOINT, // true en MinIO/R2
+  forcePathStyle: !!process.env.S3_ENDPOINT
 });
 
-const bucket = process.env.S3_BUCKET;
-
-// POST /api/upload (campo 'file')
-router.post("/upload", upload.single("file"), async (req, res, next) => {
+router.post("/upload", upload.single("file"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ ok: false, error: "No se envió archivo" });
-    if (!bucket) return res.status(500).json({ ok: false, error: "Falta variable S3_BUCKET" });
+    if (!req.file) {
+      return res.status(400).json({ ok: false, error: "No se envió archivo" });
+    }
 
-    const prefix = (process.env.UPLOAD_PREFIX || "uploads").replace(/^\/+|\/+$/g, "");
-    const safe = (req.file.originalname || "archivo").replace(/[^\w.\-]/g, "_");
-    const key = `${prefix}/${Date.now()}_${safe}`;
+    const bucket = process.env.S3_BUCKET;
+    const prefix = process.env.UPLOAD_PREFIX || "uploads";
+    const key = `${prefix}/${Date.now()}_${req.file.originalname}`;
 
-    await s3.send(new PutObjectCommand({
+    const putCmd = new PutObjectCommand({
       Bucket: bucket,
       Key: key,
       Body: req.file.buffer,
-      ContentType: req.file.mimetype,
-      // Sin ACL (los buckets modernos bloquean ACLs)
-    }));
+      ContentType: req.file.mimetype
+    });
 
-    const url = process.env.S3_ENDPOINT
-      ? `${process.env.S3_ENDPOINT.replace(/\/$/, "")}/${bucket}/${encodeURIComponent(key)}`
-      : `https://${bucket}.s3.${process.env.S3_REGION}.amazonaws.com/${encodeURIComponent(key)}`;
+    await s3.send(putCmd);
 
-    res.json({ ok: true, bucket, key, url, size: req.file.size, mimetype: req.file.mimetype });
-  } catch (err) { next(err); }
-});
+    // FIX: encode solo el nombre, no el slash
+    const encodedKey = key.split('/').map(encodeURIComponent).join('/');
+    let url;
+    if (process.env.S3_ENDPOINT) {
+      url = `${process.env.S3_ENDPOINT.replace(/\/$/, "")}/${bucket}/${encodedKey}`;
+    } else {
+      url = `https://${bucket}.s3.${process.env.S3_REGION}.amazonaws.com/${encodedKey}`;
+    }
 
-// GET /api/files  (lista)
-router.get("/files", async (_req, res, next) => {
-  try {
-    const prefix = (process.env.UPLOAD_PREFIX || "uploads").replace(/^\/+|\/+$/g, "");
-    const out = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 50 }));
-    const files = (out.Contents || []).map(o => ({
-      key: o.Key, size: o.Size, lastModified: o.LastModified
-    }));
-    res.json({ ok: true, count: files.length, files });
-  } catch (err) { next(err); }
-});
+    res.json({
+      ok: true,
+      bucket,
+      key,
+      url,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+    });
 
-// GET /api/file-url?key=...
-router.get("/file-url", async (req, res, next) => {
-  try {
-    const key = req.query.key;
-    if (!key) return res.status(400).json({ ok: false, error: "Falta query ?key=" });
-    const cmd = new GetObjectCommand({ Bucket: bucket, Key: key });
-    const url = await getSignedUrl(s3, cmd, { expiresIn: 60 * 5 });
-    res.json({ ok: true, key, url, expiresInSec: 300 });
-  } catch (err) { next(err); }
-});
-
-// DELETE /api/file?key=...
-router.delete("/file", async (req, res, next) => {
-  try {
-    const key = req.query.key;
-    if (!key) return res.status(400).json({ ok: false, error: "Falta query ?key=" });
-    await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-    res.json({ ok: true, deleted: key });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error("❌ Error en subida:", err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 module.exports = router;
