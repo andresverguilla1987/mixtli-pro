@@ -1,7 +1,7 @@
 {
   "name": "mixtli-api",
-  "version": "1.0.0",
-  "description": "MIXTLI API - server package manifest with JWT and lock",
+  "version": "1.1.0",
+  "description": "Mixtli API with Auth + CRUD + S3 presigned uploads",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -14,7 +14,9 @@
     "cors": "^2.8.5",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
-    "@prisma/client": "^5.2.0"
+    "@prisma/client": "^5.2.0",
+    "@aws-sdk/client-s3": "^3.637.0",
+    "@aws-sdk/s3-request-presigner": "^3.637.0"
   },
   "devDependencies": {
     "prisma": "^5.2.0"

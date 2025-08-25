@@ -1,32 +1,27 @@
-# Mixtli – Mega Pack 01
+# Mixtli – Uploads con URLs pre-firmadas (S3/R2/MinIO)
 
-Incluye CI/CD (Newman + Deploy Render + Healthcheck + Slack + métricas), Auth básico (register/login/JWT),
-migración Prisma para `passwordHash`, colección Postman y `.env.example` listo.
+Este paquete agrega endpoints para subir archivos **directo al storage** sin pasar por el servidor:
+- `POST /api/uploads/presign` → genera URL de subida (PUT) válida por 5 min.
+- `GET /api/uploads/verify?key=...` → verifica si el objeto existe (HEAD).
 
-## Estructura
-```
-.github/workflows/ci.yml
-guiones/run-tests.sh
-.env.example
-server.js
-prisma/schema.prisma
-prisma/migrations/2025-08-24_add_passwordhash/migration.sql
-cartero/mixtli-auth-basic.postman_collection.json
-cartero/mixtli-auth-basic.postman_environment.json
-```
+## Variables de entorno (Render)
+- `S3_REGION` (ej. `us-east-1`)
+- `S3_BUCKET` (nombre del bucket)
+- `S3_ACCESS_KEY_ID` y `S3_SECRET_ACCESS_KEY`
+- `S3_ENDPOINT` (opcional, para R2 o MinIO; si usas AWS puro, déjalo vacío)
 
 ## Pasos
-1) Sube todo a la raíz del repo (reemplaza `server.js` y `prisma/schema.prisma` si te pregunta).
-2) Render → servicio → **Environment**: define `JWT_SECRET`, `DATABASE_URL`, `PORT=10000`.
-3) Render → servicio → **Manual Deploy** (Clear build cache & deploy).
-4) Render → **Shell**:
-```
-npx prisma generate
-npx prisma migrate deploy
-```
-5) Postman: importa `cartero/*.json` y prueba Auth (register/login/me).
-6) GitHub → Settings → Secrets:
-   - `DATABASE_URL`, `RENDER_API_KEY`, `RENDER_SERVICE_ID`, `SLACK_WEBHOOK_URL`.
-7) GitHub → Actions: correr workflow. Ver métricas en Slack y reportes en Artifacts.
+1. Reemplaza `server.js` por el de este paquete (o integra las rutas si ya tienes lógica propia).
+2. Reemplaza/actualiza `package.json` para incluir `@aws-sdk/*` (ya viene en este zip).
+3. En **Render → Environment** define las variables S3 y **Save**.
+4. **Manual Deploy → Clear build cache & Deploy**.
+5. En **Postman**, importa `cartero/mixtli-uploads-s3.postman_collection.json` y su environment.
+6. Flujo de prueba:
+   - `Register` → `Login` (guarda token)
+   - `Presign upload` → te da `{ url, method, headers, key }`
+   - Con esa `url` haces `PUT` del archivo (desde frontend o Postman)
+   - `Verify upload` para confirmar que existe.
 
-Listo. ¡A producir!
+## Nota
+- El presign es por 5 minutos.
+- Si usas Cloudflare R2/MinIO, define `S3_ENDPOINT` y activa `forcePathStyle` (ya está en el código).
