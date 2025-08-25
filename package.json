@@ -1,7 +1,7 @@
 {
-  "name": "mixtli-s3-api-min",
+  "name": "mixtli-s3-api",
   "version": "1.0.0",
-  "description": "API mínima Express con integración a S3",
+  "description": "API mínima Express con subida a S3",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
