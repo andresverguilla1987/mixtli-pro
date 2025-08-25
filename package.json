@@ -1,12 +1,14 @@
 {
-  "name": "mixtli-api",
-  "version": "1.2.0",
-  "description": "Mixtli API with Auth + CRUD + S3 presigned & direct uploads",
+  "name": "mixtli-full-api",
+  "version": "1.0.0",
+  "description": "Mixtli API (Auth + CRUD + S3 uploads direct/presigned)",
   "main": "server.js",
   "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js",
-    "seed": "node prisma/seed.js",
     "postinstall": "prisma generate || true"
   },
   "dependencies": {
@@ -22,8 +24,5 @@
   },
   "devDependencies": {
     "prisma": "^5.2.0"
-  },
-  "engines": {
-    "node": ">=18"
   }
 }

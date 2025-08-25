@@ -1,29 +1,35 @@
-# Mixtli – Direct Upload (multer + aws-sdk v2) + Presigned (v3)
+# Mixtli Full API (Auth + CRUD + S3 Uploads)
 
-Este paquete agrega **/api/upload** (multipart form-data) para subir archivos al bucket S3 **vía servidor**.
-Mantiene también los endpoints de presign (`/api/uploads/presign` y `/api/uploads/verify`).
+## Requisitos en Render
+Variables **Environment** (ya las tienes):
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `S3_REGION`
+- `S3_BUCKET`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- (Opcional) `S3_ENDPOINT`
 
-## Variables (Render)
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
-- `S3_BUCKET` (ej. mixtli-pro-bucket)
-- `S3_REGION` (ej. us-east-1)
-- (Opcional) `S3_ENDPOINT` si usas R2/MinIO
+## Scripts
+- `start`: `node server.js`
+- `postinstall`: `prisma generate`
 
-## Pasos
-1. Reemplaza `server.js` por el de este paquete.
-2. Reemplaza/actualiza `package.json` (incluye aws-sdk y multer).
-3. Render → Manual Deploy → Clear build cache & Deploy.
-4. Postman: importa `cartero/*.postman_collection.json`.
+## Despliegue
+1. Sube este proyecto a GitHub.
+2. En Render, conecta el repo. Build automático.
+3. Manual Deploy → Clear build cache & Deploy.
 
-## Prueba (Upload Direct)
-- `Register` → `Login` (guarda token automáticamente).
-- `Upload Direct`: POST {{BASE_URL}}/api/upload con form-data `file` (elige archivo).
+## Endpoints
+- GET `/salud`
+- GET `/__debug`
+- POST `/auth/register` { nombre, email, password }
+- POST `/auth/login` { email, password }
+- GET `/me` (Bearer)
+- CRUD Usuarios: GET/POST/PUT/DELETE `/api/users`
+- S3 Presign: POST `/api/uploads/presign`
+- S3 Verify: GET `/api/uploads/verify?key=...`
+- S3 Direct: POST `/api/upload` (form-data `file`)
 
-Respuesta esperada:
-```
-{ "ok": true, "key": "uploads/2025/08/...", "location": "https://...s3.amazonaws.com/..." }
-```
+## Postman
+Importa los archivos en `cartero/`
 
-## Notas
-- Direct upload consume ancho de banda del servidor; para alto volumen, preferir presigned.
-- Tamaño límite actual: 50MB (ajustable en `multer`).
