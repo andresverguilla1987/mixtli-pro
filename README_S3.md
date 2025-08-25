@@ -1,26 +1,15 @@
-# Mixtli S3 API (mínima)
+# Mixtli S3 Patch (API mínima)
 
-## Endpoints
-- `GET /salud` – ping
-- `POST /api/upload` – Subir archivo al bucket S3 (campo form-data: **file**)
+Endpoints:
+- `GET /salud` → ping
+- `POST /api/upload` → form-data con **file** (imagen o archivo) → sube a S3
 
-## Variables de entorno requeridas (Render -> Environment)
+Variables de entorno necesarias en Render:
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
-- `S3_BUCKET`  (p.ej. `mixtli-pro-bucket`)
-- `S3_REGION`  (p.ej. `us-east-1`)
+- `S3_BUCKET`  (ej: mixtli-pro-bucket)
+- `S3_REGION`  (ej: us-east-1)
 
-## Ejecución local
-```bash
-npm install
-npm start
-# http://localhost:10000/salud
-```
-
-## Postman
-- POST `https://<tu-app>.onrender.com/api/upload`
-- Body -> form-data -> key: **file** (tipo File) -> selecciona una imagen
-- Respuesta:
-```json
-{ "ok": true, "key": "1692912345678-foto.png", "location": "https://<bucket>.s3.<region>.amazonaws.com/1692912345678-foto.png" }
-```
+## Probar en Postman
+- Body → form-data → key: **file** (Type: File) → selecciona una imagen
+- URL: `https://<tu-app>.onrender.com/api/upload`

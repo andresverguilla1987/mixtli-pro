@@ -1,9 +1,8 @@
 {
-  "name": "mixtli-s3-api",
+  "name": "mixtli-s3-api-min",
   "version": "1.0.0",
-  "description": "API m\u00ednima Express + S3 (upload)",
+  "description": "API m\u00ednima Express con /salud y /api/upload hacia S3",
   "main": "server.js",
-  "type": "commonjs",
   "scripts": {
     "start": "node server.js"
   },
@@ -11,6 +10,6 @@
     "express": "^4.19.2",
     "cors": "^2.8.5",
     "multer": "^1.4.5-lts.1",
-    "@aws-sdk/client-s3": "^3.624.0"
+    "@aws-sdk/client-s3": "^3.637.0"
   }
 }

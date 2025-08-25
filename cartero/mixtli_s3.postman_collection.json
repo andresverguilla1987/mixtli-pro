@@ -1,0 +1,85 @@
+{
+  "info": {
+    "name": "Mixtli S3 - Smoke",
+    "_postman_id": "a2b9d9f1-8f64-4a1d-9b22-000000000001",
+    "description": "Smoke de la API m\u00ednima: /salud y /api/upload (form-data file)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET /salud",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/salud",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "salud"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.code === 200);",
+              "const js = pm.response.json();",
+              "pm.test('ok true', () => js && js.ok === true);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST /api/upload (file)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "tests/fixture.png"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/upload",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "upload"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.code === 200);",
+              "const js = pm.response.json();",
+              "pm.test('tiene url', () => js && js.url);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://mixtli-pro.onrender.com"
+    }
+  ]
+}

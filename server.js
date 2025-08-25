@@ -19,5 +19,5 @@ app.use("/api", uploadRoutes);
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Mixtli API escuchando en puerto ${PORT}`);
-  console.log("URL principal:", process.env.RENDER_EXTERNAL_URL || "(local)");
+  console.log("URL principal:", process.env.RENDER_EXTERNAL_URL || "local");
 });
