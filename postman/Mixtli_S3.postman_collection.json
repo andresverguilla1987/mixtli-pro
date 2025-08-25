@@ -1,0 +1,60 @@
+{
+  "info": {
+    "name": "Mixtli S3",
+    "_postman_id": "8f0b6a00-0000-0000-0000-mixtli-s3",
+    "description": "Colección para probar endpoints de subida a S3",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Upload (multipart)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{BASE_URL}}/api/upload",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "upload"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Presigned URL",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{BASE_URL}}/api/upload-url?filename=logo.png&contentType=image/png",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "upload-url"
+          ],
+          "query": [
+            {
+              "key": "filename",
+              "value": "logo.png"
+            },
+            {
+              "key": "contentType",
+              "value": "image/png"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "https://mixtli-pro.onrender.com"
+    }
+  ]
+}
