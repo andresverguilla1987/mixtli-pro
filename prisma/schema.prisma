@@ -8,8 +8,10 @@ datasource db {
 }
 
 model Usuario {
-  id        Int      @id @default(autoincrement())
-  nombre    String
-  email     String   @unique
-  createdAt DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  nombre       String
+  email        String   @unique
+  passwordHash String?  // <- opcional (por ahora no lo usamos pero el client lo espera)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt   // <- Prisma la gestiona automáticamente
 }
