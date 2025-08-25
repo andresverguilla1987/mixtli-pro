@@ -1,21 +1,30 @@
-# Mixtli S3 API (mínima, pro y limpia)
+# Mixtli S3 API (drop-in)
 
-Endpoints:
-- `GET /salud` → ping
-- `POST /api/upload` → form-data con clave **file** (tipo File). Sube a S3.
+API mínima para subir, listar, obtener URL presignada y borrar archivos en S3.
 
-## Variables de entorno requeridas (Render)
-- `S3_REGION` = `us-east-1` (tu región)
-- `S3_BUCKET` = `mixtli-pro-bucket` (tu bucket)
-- `S3_ACCESS_KEY_ID` = (del CSV de IAM)
-- `S3_SECRET_ACCESS_KEY` = (del CSV de IAM)
+## Endpoints
+- GET `/salud` → ping
+- POST `/api/upload` → form-data (key `file` tipo *File*)
+- GET `/api/files` → lista hasta 50 objetos (prefijo `UPLOAD_PREFIX`)
+- GET `/api/file-url?key=...` → URL presignada (5 min)
+- DELETE `/api/file?key=...` → elimina el objeto
+
+## Variables (Render → Environment)
+- `S3_REGION` = us-east-1
+- `S3_BUCKET` = <tu bucket>
+- `S3_ACCESS_KEY_ID` = <Access Key ID>
+- `S3_SECRET_ACCESS_KEY` = <Secret Access Key>
 
 Opcionales:
-- `PORT` (Render la inyecta automáticamente)
+- `UPLOAD_MAX_MB` = 5
+- `ALLOWED_MIME` = image/jpeg,image/png,image/webp,image/gif,image/svg+xml,application/pdf
+- `UPLOAD_PREFIX` = uploads
+- `S3_ENDPOINT` = (solo si usas R2/MinIO)
 
-## Instrucciones (Render)
-1. Sube estos archivos al repo (reemplaza *server.js* y agrega la carpeta `src/`).
-2. Verifica las variables en **Environment**.
-3. Deploy. Probar con:
-   - `GET https://<tu-app>.onrender.com/salud`
-   - `POST https://<tu-app>.onrender.com/api/upload` (Body > form-data > file)
+## Deploy
+1) Sube estos archivos a tu repo (reemplaza los actuales).
+2) Render hará deploy al hacer commit.
+3) Prueba:
+   - GET `https://<tu-app>.onrender.com/salud`
+   - POST `https://<tu-app>.onrender.com/api/upload` (form-data → file)
+

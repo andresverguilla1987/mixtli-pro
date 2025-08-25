@@ -1,0 +1,90 @@
+{
+  "info": {
+    "name": "Mixtli S3 \u2013 Smoke",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base",
+      "value": "https://mixtli-pro.onrender.com"
+    },
+    {
+      "key": "key",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Salud",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/salud"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const js = pm.response.json();",
+              "pm.test('ok true', () => js.ok === true);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - Subir archivo",
+      "request": {
+        "method": "POST",
+        "url": "{{base}}/api/upload",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": []
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const js = pm.response.json();",
+              "pm.test('ok true', () => js.ok === true);",
+              "if (js && js.key) pm.collectionVariables.set('key', js.key);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "20 - Listar archivos",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/api/files"
+      }
+    },
+    {
+      "name": "30 - URL presignada",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/api/file-url?key={{key}}"
+      }
+    },
+    {
+      "name": "40 - Borrar archivo",
+      "request": {
+        "method": "DELETE",
+        "url": "{{base}}/api/file?key={{key}}"
+      }
+    }
+  ]
+}
