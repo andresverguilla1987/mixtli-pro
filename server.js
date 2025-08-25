@@ -230,3 +230,5 @@ app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada', path: 
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Mixtli API escuchando en puerto ${PORT}`));
+const uploadRoutes = require("./src/rutas/upload");
+app.use("/api", uploadRoutes);
