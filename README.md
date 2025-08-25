@@ -1,35 +1,21 @@
-# Mixtli Full API (Auth + CRUD + S3 Uploads)
+# Mixtli S3 API (mínima, pro y limpia)
 
-## Requisitos en Render
-Variables **Environment** (ya las tienes):
-- `DATABASE_URL`
-- `JWT_SECRET`
-- `S3_REGION`
-- `S3_BUCKET`
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- (Opcional) `S3_ENDPOINT`
+Endpoints:
+- `GET /salud` → ping
+- `POST /api/upload` → form-data con clave **file** (tipo File). Sube a S3.
 
-## Scripts
-- `start`: `node server.js`
-- `postinstall`: `prisma generate`
+## Variables de entorno requeridas (Render)
+- `S3_REGION` = `us-east-1` (tu región)
+- `S3_BUCKET` = `mixtli-pro-bucket` (tu bucket)
+- `S3_ACCESS_KEY_ID` = (del CSV de IAM)
+- `S3_SECRET_ACCESS_KEY` = (del CSV de IAM)
 
-## Despliegue
-1. Sube este proyecto a GitHub.
-2. En Render, conecta el repo. Build automático.
-3. Manual Deploy → Clear build cache & Deploy.
+Opcionales:
+- `PORT` (Render la inyecta automáticamente)
 
-## Endpoints
-- GET `/salud`
-- GET `/__debug`
-- POST `/auth/register` { nombre, email, password }
-- POST `/auth/login` { email, password }
-- GET `/me` (Bearer)
-- CRUD Usuarios: GET/POST/PUT/DELETE `/api/users`
-- S3 Presign: POST `/api/uploads/presign`
-- S3 Verify: GET `/api/uploads/verify?key=...`
-- S3 Direct: POST `/api/upload` (form-data `file`)
-
-## Postman
-Importa los archivos en `cartero/`
-
+## Instrucciones (Render)
+1. Sube estos archivos al repo (reemplaza *server.js* y agrega la carpeta `src/`).
+2. Verifica las variables en **Environment**.
+3. Deploy. Probar con:
+   - `GET https://<tu-app>.onrender.com/salud`
+   - `POST https://<tu-app>.onrender.com/api/upload` (Body > form-data > file)
