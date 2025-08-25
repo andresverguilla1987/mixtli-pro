@@ -1,7 +1,7 @@
 {
   "name": "mixtli-s3-api-min",
   "version": "1.0.0",
-  "description": "API m\u00ednima Express con /salud y /api/upload hacia S3",
+  "description": "API mínima Express con integración a S3",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
