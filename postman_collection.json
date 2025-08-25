@@ -1,12 +1,16 @@
 {
   "info": {
-    "name": "Mixtli S3 \u2013 Quick Smoke",
+    "name": "Mixtli \u2013 CRUD + S3",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "base",
       "value": "https://mixtli-pro.onrender.com"
+    },
+    {
+      "key": "id",
+      "value": ""
     },
     {
       "key": "key",
@@ -22,7 +26,7 @@
       }
     },
     {
-      "name": "10 - Subir archivo",
+      "name": "10 - Upload",
       "request": {
         "method": "POST",
         "url": "{{base}}/api/upload",
@@ -39,24 +43,72 @@
       }
     },
     {
-      "name": "20 - Listar archivos",
+      "name": "20 - Files",
       "request": {
         "method": "GET",
         "url": "{{base}}/api/files"
       }
     },
     {
-      "name": "30 - URL presignada",
+      "name": "30 - Presigned",
       "request": {
         "method": "GET",
         "url": "{{base}}/api/file-url?key={{key}}"
       }
     },
     {
-      "name": "40 - Borrar archivo",
+      "name": "40 - Delete File",
       "request": {
         "method": "DELETE",
         "url": "{{base}}/api/file?key={{key}}"
+      }
+    },
+    {
+      "name": "Users - List",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/api/users"
+      }
+    },
+    {
+      "name": "Users - Create",
+      "request": {
+        "method": "POST",
+        "url": "{{base}}/api/users",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Demo\",\n  \"email\": \"demo_{{$timestamp}}@example.com\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Users - Update",
+      "request": {
+        "method": "PUT",
+        "url": "{{base}}/api/users/{{id}}",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Demo Edit\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Users - Delete",
+      "request": {
+        "method": "DELETE",
+        "url": "{{base}}/api/users/{{id}}"
       }
     }
   ]

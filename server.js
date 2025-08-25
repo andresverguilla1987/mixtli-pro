@@ -10,7 +10,7 @@ app.get("/salud", (_req, res) => {
   res.json({ ok: true, msg: "Mixtli API viva 🟢" });
 });
 
-// DEBUG: ver si Render lee las vars S3 (no imprime secretos)
+// DEBUG S3 (no imprime secretos)
 app.get("/debug/env-s3", (_req, res) => {
   res.json({
     ok: true,
@@ -22,9 +22,9 @@ app.get("/debug/env-s3", (_req, res) => {
   });
 });
 
-// Rutas de upload
-const uploadRoutes = require("./src/rutas/upload");
-app.use("/api", uploadRoutes);
+// Rutas
+app.use("/api", require("./src/rutas/upload"));
+app.use("/api/users", require("./src/rutas/users"));
 
 // 404 JSON
 app.use((req, res) => {
@@ -45,3 +45,5 @@ app.use((err, _req, res, _next) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`🚀 Mixtli API corriendo en puerto ${PORT}`));
+
+module.exports = app;
