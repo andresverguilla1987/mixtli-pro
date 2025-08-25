@@ -1,0 +1,63 @@
+{
+  "info": {
+    "name": "Mixtli S3 \u2013 Quick Smoke",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base",
+      "value": "https://mixtli-pro.onrender.com"
+    },
+    {
+      "key": "key",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Salud",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/salud"
+      }
+    },
+    {
+      "name": "10 - Subir archivo",
+      "request": {
+        "method": "POST",
+        "url": "{{base}}/api/upload",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "20 - Listar archivos",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/api/files"
+      }
+    },
+    {
+      "name": "30 - URL presignada",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/api/file-url?key={{key}}"
+      }
+    },
+    {
+      "name": "40 - Borrar archivo",
+      "request": {
+        "method": "DELETE",
+        "url": "{{base}}/api/file?key={{key}}"
+      }
+    }
+  ]
+}

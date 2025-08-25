@@ -5,10 +5,24 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Salud
 app.get("/salud", (_req, res) => {
   res.json({ ok: true, msg: "Mixtli API viva 🟢" });
 });
 
+// DEBUG: ver si Render lee las vars S3 (no imprime secretos)
+app.get("/debug/env-s3", (_req, res) => {
+  res.json({
+    ok: true,
+    S3_REGION: process.env.S3_REGION || null,
+    S3_BUCKET: process.env.S3_BUCKET || null,
+    ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID ? "set" : "missing",
+    SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY ? "set" : "missing",
+    S3_ENDPOINT: process.env.S3_ENDPOINT ? "set" : "empty"
+  });
+});
+
+// Rutas de upload
 const uploadRoutes = require("./src/rutas/upload");
 app.use("/api", uploadRoutes);
 
