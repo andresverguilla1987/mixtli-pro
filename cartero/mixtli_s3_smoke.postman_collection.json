@@ -1,0 +1,63 @@
+{
+  "info": {
+    "name": "Mixtli S3 - Smoke",
+    "_postman_id": "b2a6c3ac-5ad8-4c0a-9f64-xxxxxx",
+    "description": "Smoke minimal: GET /salud y POST /api/upload (multipart/form-data).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://mixtli-pro.onrender.com" },
+    { "key": "FILE", "value": "./fixtures/hello.txt" }
+  ],
+  "item": [
+    {
+      "name": "GET /salud",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{baseUrl}}/salud", "host": ["{{baseUrl}}"], "path": ["salud"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+              "const js = pm.response.json();",
+              "pm.test(\"ok=true\", () => js && js.ok === true);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST /api/upload (multipart)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "file", "src": "{{FILE}}" }
+          ]
+        },
+        "url": { "raw": "{{baseUrl}}/api/upload", "host": ["{{baseUrl}}"], "path": ["api", "upload"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Acepta 200 o 201",
+              "pm.test(\"2xx\", () => pm.expect(pm.response.code).to.be.within(200, 299));",
+              "let js; try { js = pm.response.json(); } catch(e) {}",
+              "pm.test(\"respuesta JSON\", () => !!js);",
+              "pm.test(\"tiene key o url\", () => js && (js.key || js.url || js.Location));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}
