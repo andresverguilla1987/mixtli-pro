@@ -1,18 +1,19 @@
 {
   "name": "mixtli-api",
   "version": "1.0.0",
-  "description": "MIXTLI API - server package manifest",
+  "description": "MIXTLI API - server package manifest with JWT and lock",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js",
+    "seed": "node prisma/seed.js",
     "postinstall": "prisma generate || true"
   },
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
     "@prisma/client": "^5.2.0"
   },
   "devDependencies": {
