@@ -1,57 +1,63 @@
 const express = require("express");
+const bcrypt = require("bcryptjs");
 const { PrismaClient } = require("@prisma/client");
-const router = express.Router();
+
 const prisma = new PrismaClient();
+const router = express.Router();
 
-// Lista
-router.get("/", async (_req, res, next) => {
+/**
+ * POST /api/users
+ * body: { nombre, email, password }
+ */
+router.post("/users", async (req, res) => {
   try {
-    const data = await prisma.usuario.findMany({ orderBy: { id: "asc" } });
-    res.json({ ok: true, data });
-  } catch (err) { next(err); }
-});
+    const { nombre, email, password } = req.body || {};
 
-// Crear
-router.post("/", async (req, res, next) => {
-  try {
-    const { nombre, email } = req.body || {};
-    if (!nombre || !email) return res.status(400).json({ ok: false, error: "nombre y email son requeridos" });
-    const out = await prisma.usuario.create({ data: { nombre, email } });
-    res.status(201).json({ ok: true, data: out });
-  } catch (err) {
-    if (err.code === "P2002") return res.status(409).json({ ok: false, error: "email ya existe" });
-    next(err);
-  }
-});
+    if (!nombre || !email || !password) {
+      return res.status(400).json({
+        ok: false,
+        error: "nombre, email y password son requeridos"
+      });
+    }
 
-// Actualizar
-router.put("/:id", async (req, res, next) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ ok: false, error: "id inválido" });
-    const { nombre, email } = req.body || {};
-    const out = await prisma.usuario.update({
-      where: { id },
-      data: { ...(nombre && { nombre }), ...(email && { email }) }
+    // email único (opcional, pero recomendable)
+    const existente = await prisma.usuario.findUnique({ where: { email } });
+    if (existente) {
+      return res.status(409).json({ ok: false, error: "Email ya registrado" });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const nuevo = await prisma.usuario.create({
+      data: {
+        nombre,
+        email,
+        passwordHash, // <- lo que pedía Prisma
+      },
+      select: { id: true, nombre: true, email: true, createdAt: true, updatedAt: true }
     });
-    res.json({ ok: true, data: out });
+
+    return res.status(201).json({ ok: true, data: nuevo });
   } catch (err) {
-    if (err.code === "P2002") return res.status(409).json({ ok: false, error: "email ya existe" });
-    if (err.code === "P2025") return res.status(404).json({ ok: false, error: "Usuario no encontrado" });
-    next(err);
+    console.error("❌ users.create:", err);
+    return res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-// Eliminar
-router.delete("/:id", async (req, res, next) => {
+/**
+ * GET /api/users
+ * Lista sin exponer passwordHash
+ */
+router.get("/users", async (_req, res) => {
   try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ ok: false, error: "id inválido" });
-    const out = await prisma.usuario.delete({ where: { id } });
-    res.json({ ok: true, data: out });
+    const lista = await prisma.usuario.findMany({
+      orderBy: { id: "desc" },
+      select: { id: true, nombre: true, email: true, createdAt: true, updatedAt: true }
+    });
+    res.json({ ok: true, data: lista });
   } catch (err) {
-    if (err.code === "P2025") return res.status(404).json({ ok: false, error: "Usuario no encontrado" });
-    next(err);
+    console.error("❌ users.list:", err);
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
