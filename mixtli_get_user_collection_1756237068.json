@@ -1,0 +1,60 @@
+{
+  "info": {
+    "name": "Mixtli API - Get User by ID",
+    "_postman_id": "f2a7d7d1-6c2c-4c3e-9e9e-1756237068",
+    "description": "Single endpoint to fetch a user by ID from Mixtli API.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get User by ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/users/{{userId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "users",
+            "{{userId}}"
+          ]
+        },
+        "description": "Returns a single user by numeric ID."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 or 404', function () {",
+              "  pm.expect([200,404]).to.include(pm.response.code);",
+              "});",
+              "",
+              "if (pm.response.code === 200) {",
+              "  const json = pm.response.json();",
+              "  pm.test('Body has ok=true and data', function () {",
+              "    pm.expect(json).to.have.property('ok', true);",
+              "    pm.expect(json).to.have.property('data');",
+              "  });",
+              "} else if (pm.response.code === 404) {",
+              "  const json = pm.response.json();",
+              "  pm.test('Not found structure', function () {",
+              "    pm.expect(json).to.have.property('ok', false);",
+              "  });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}
