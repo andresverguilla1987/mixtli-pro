@@ -1,15 +1,20 @@
-// server.js (referencia: solo úsalo si tu server.js es distinto)
 require('dotenv').config();
 const express = require('express');
-const app = express();
 const cors = require('cors');
 
-app.use(cors());
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
 app.use(express.json());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || "*"
+}));
 
-app.get('/salud', (_req, res) => res.json({ ok: true, msg: 'ok' }));
-
+// Rutas
 app.use('/api/users', require('./src/rutas/users'));
+app.use('/api/upload', require('./src/rutas/upload'));
 
-const PORT = process.env.PORT || 10000;
+app.get('/salud', (req, res) => res.json({ ok: true, msg: "API viva" }));
+
 app.listen(PORT, () => console.log(`🚀 Mixtli API corriendo en puerto ${PORT}`));
