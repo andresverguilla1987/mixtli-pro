@@ -1,27 +1,23 @@
-# Mixtli API — Fix Pack
 
-Incluye:
-- `package.json` con dependencias necesarias (Prisma, S3 presigner, bcrypt)
-- `prisma/schema.prisma` con `Usuario` (passwordHash, createdAt, updatedAt)
-- `src/rutas/users.js` creando password hash
-- `src/rutas/upload.js` para subir archivos a S3 (POST /api/upload, campo `file`)
+# Mixtli API (fix)
+API Express con Prisma (PostgreSQL) y subida a S3.
 
-## Pasos rápidos
+## Endpoints
+- `GET /salud`
+- `GET /api/users`
+- `POST /api/users` body: `{ "name": "Demo", "email": "demo@mixtli.app", "password": "opcional" }`
+- `PUT /api/users/:id`
+- `DELETE /api/users/:id`
+- `POST /api/upload` (form-data, key `file`)
 
-1. Sube estos archivos al repo (respeta rutas).
-2. En Render: **Clear build cache & deploy**.
-3. En Render → Shell:
-   ```bash
-   npx prisma generate
-   npx prisma db push --force-reset
-   ```
-4. Probar en Postman:
-   - GET `https://TU_URL/salud`
-   - POST `https://TU_URL/api/users` (JSON: nombre, email, password)
-   - GET `https://TU_URL/api/users`
-   - POST `https://TU_URL/api/upload` (form-data, key: `file`)
+## Setup local
+1) `cp .env.example .env` y rellena `DATABASE_URL` y S3
+2) `npm install`
+3) `npx prisma db push`
+4) `npm start`
 
-Variables necesarias:
-- `DATABASE_URL`
-- `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`
-- (opcional) `S3_ENDPOINT`, `UPLOAD_MAX_MB`, `ALLOWED_MIME`, `UPLOAD_PREFIX`
+## Postman ejemplo
+`POST /api/users`
+```json
+{ "name": "Demo User", "email": "demo{{timestamp}}@mixtli.app", "password": "123456" }
+```
