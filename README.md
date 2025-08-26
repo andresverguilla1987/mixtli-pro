@@ -1,21 +1,34 @@
-# Mixtli API (limpia)
+# Mixtli API (autosend)
 
-Endpoints:
-- `GET /salud` -> health check
-- `GET /api/users` -> lista usuarios (id, email, createdAt, updatedAt)
-- `POST /api/users` -> crea usuario (acepta `email` o `correoElectronico` + `password`), hashea el password
+API mínima lista para **mandar y que funcione** con Postman.
 
-## .env requerido
-- `DATABASE_URL` (Postgres)
-- `PORT` (opcional, por defecto 10000)
-- `CORS_ORIGENES` (opcional, CSV de orígenes permitidos; Postman funciona sin origin)
+## Variables de entorno
+- `DATABASE_URL` (obligatoria, PostgreSQL de Render)
+- `CORS_ORIGENES` (opcional, CSV de orígenes; si no existe, CORS abierto)
+- `PORT` (opcional, por defecto `10000`)
 
-## Instalación local
-```bash
-npm install
-npx prisma db push
-npm start
+## Build / Deploy (Render)
+**Build Command**
+```
+npm install --no-audit --no-fund && npx prisma generate && npx prisma db push
 ```
 
+**Start Command**
+```
+node server.js
+```
+
+## Endpoints
+- `GET /salud` → `{ ok: true, ... }`
+- `GET /api/users` → lista usuarios
+- `POST /api/users` → crea usuario
+  ```json
+  { "email": "demo_{{timestamp}}@example.com", "password": "123456" }
+  ```
+  También acepta `"correo"` o `"correoElectronico"` para el email y `"clave"` para password.
+- `PUT /api/users/:id` → actualiza `email` y/o `password`
+- `DELETE /api/users/:id` → elimina usuario
+
 ## Postman
-Importa `mixtli-api.postman_collection.json` y usa `BASE_URL` con tu Render URL.
+Importa la colección `mixtli-api.postman_collection.json` y el ambiente `mixtli-api.postman_environment.json`.
+La petición **Create user** trae un pre-request que genera un email único automáticamente.

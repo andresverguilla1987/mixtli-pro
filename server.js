@@ -4,40 +4,34 @@ const cors = require('cors');
 
 const app = express();
 
-// Parse JSON
+// --- CORS ---
+const origenes = (process.env.CORS_ORIGENES || '').split(',').map(s => s.trim()).filter(Boolean);
+if (origenes.length === 0) {
+  app.use(cors()); // permitir todo si no se define
+} else {
+  app.use(cors({
+    origin: function (origin, cb) {
+      if (!origin) return cb(null, true); // Postman / curl
+      const ok = origenes.includes(origin);
+      cb(ok ? null : new Error('Origen no permitido por CORS'), ok);
+    },
+    credentials: true
+  }));
+}
+
 app.use(express.json());
 
-// CORS allowed origins (comma-separated list in CORS_ORIGENES)
-const allowed = (process.env.CORS_ORIGENES || '').split(',').map(s => s.trim()).filter(Boolean);
-app.use(cors({
-  origin: function(origin, cb) {
-    if (!origin) return cb(null, true); // allow server-to-server / Postman
-    if (allowed.length === 0 || allowed.includes(origin)) return cb(null, true);
-    return cb(new Error('Bloqueado por CORS: ' + origin));
-  }
-}));
-
-// Health
+// --- Salud ---
 app.get('/salud', (_req, res) => {
-  res.json({ ok: true, timestamp: new Date().toISOString() });
+  res.json({ ok: true, servicio: 'mixtli-api', timestamp: new Date().toISOString() });
 });
 
-// Rutas
+// --- Rutas ---
 const usersRouter = require('./src/rutas/users');
 app.use('/api/users', usersRouter);
 
-// 404
-app.use((_req, res) => {
-  res.status(404).json({ error: 'Ruta no encontrada' });
-});
-
-// Error handler
-app.use((err, _req, res, _next) => {
-  console.error('❌ Error handler:', err);
-  res.status(err.status || 500).json({ error: err.message || 'Error interno' });
-});
-
+// --- Arranque ---
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`🚀 Mixtli API corriendo en puerto ${PORT}`);
+  console.log(`🚀 API lista en puerto ${PORT}`);
 });
