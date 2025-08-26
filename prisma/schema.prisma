@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  // Let Prisma choose the right binary. Avoid custom envs that break (enableTracing, etc.).
 }
 
 datasource db {
