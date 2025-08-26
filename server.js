@@ -1,27 +1,36 @@
-
-const express = require("express");
-const cors = require("cors");
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Rutas
-const usersRouter = require("./src/rutas/users");
-const uploadRouter = require("./src/rutas/upload");
+// Salud
+app.get('/salud', (_req, res) => res.json({ ok: true, mensaje: 'Servidor funcionando 🟢'}));
 
-app.get("/", (_req, res) => {
+// Rutas
+app.use('/api/users', require('./src/rutas/users'));
+app.use('/api', require('./src/rutas/upload')); // POST /api/upload
+
+// Debug env S3 (no imprime secretos)
+app.get('/debug/env-s3', (_req, res) => {
   res.json({
     ok: true,
-    name: "Mixtli API",
-    endpoints: ["/salud", "/api/users", "/api/upload", "/api/upload/presign", "/api/debug/env-s3"]
+    S3_REGION: process.env.S3_REGION || null,
+    S3_BUCKET: process.env.S3_BUCKET || null,
+    ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID ? "set" : "missing",
+    SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY ? "set" : "missing",
+    S3_ENDPOINT: process.env.S3_ENDPOINT ? "set" : "empty"
   });
 });
 
-app.get("/salud", (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
-
-app.use("/api/users", usersRouter);   // GET/POST sobre /api/users
-app.use("/api", uploadRouter);        // POST /api/upload, GET /api/upload/presign, GET /api/debug/env-s3
+// Error handler JSON
+app.use((err, _req, res, _next) => {
+  console.error('❌ Error handler:', err);
+  const status = err.status || 500;
+  res.status(status).json({ ok: false, error: err.message || 'Error interno' });
+});
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Mixtli API en puerto ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Mixtli API corriendo en puerto ${PORT}`));

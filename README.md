@@ -1,21 +1,27 @@
-# Mixtli API (Express + Prisma + S3)
+# Mixtli API — Fix Pack
 
-API mínima y **limpia** lista para Render.
+Incluye:
+- `package.json` con dependencias necesarias (Prisma, S3 presigner, bcrypt)
+- `prisma/schema.prisma` con `Usuario` (passwordHash, createdAt, updatedAt)
+- `src/rutas/users.js` creando password hash
+- `src/rutas/upload.js` para subir archivos a S3 (POST /api/upload, campo `file`)
 
-## Endpoints
-- `GET /salud` → ping
-- `GET /api/users` → lista usuarios (sin exponer `passwordHash`)
-- `POST /api/users` → crea usuario `{ nombre, email, password }`
-- `POST /api/upload` → sube archivo (multipart, campo **file**)
-- `GET /api/upload/presign?key=...&contentType=...` → URL firmada PUT
-- `GET /api/debug/env-s3` → verificación de variables S3 (sin imprimir secretos)
+## Pasos rápidos
 
-## Variables de entorno
-Ver `.env.example` y configura en **Render → Environment**.
+1. Sube estos archivos al repo (respeta rutas).
+2. En Render: **Clear build cache & deploy**.
+3. En Render → Shell:
+   ```bash
+   npx prisma generate
+   npx prisma db push --force-reset
+   ```
+4. Probar en Postman:
+   - GET `https://TU_URL/salud`
+   - POST `https://TU_URL/api/users` (JSON: nombre, email, password)
+   - GET `https://TU_URL/api/users`
+   - POST `https://TU_URL/api/upload` (form-data, key: `file`)
 
-## Prisma
-1. `npm install`
-2. `npx prisma generate`
-3. `npx prisma db push`  (o `--force-reset` si cambiaste columnas y quieres limpiar)
-
-> En Render, el `postinstall` ya corre `prisma generate` automáticamente.
+Variables necesarias:
+- `DATABASE_URL`
+- `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`
+- (opcional) `S3_ENDPOINT`, `UPLOAD_MAX_MB`, `ALLOWED_MIME`, `UPLOAD_PREFIX`
