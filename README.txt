@@ -1,32 +1,25 @@
-# Mixtli – Seed de Admin (Prisma)
+# Mixtli Users Patch
 
-Este paquete agrega `prisma/seed.js` que crea/actualiza un usuario **admin** por email usando Prisma.
-Lee estas variables de entorno (Render → Environment):
-- `ADMIN_NAME`
-- `ADMIN_EMAIL`
-- `ADMIN_PASSWORD`
+Archivos para reemplazar en tu proyecto:
 
-Si no las defines, usa valores de fallback (solo para desarrollo).
+- `src/rutas/users.js`
+- (Opcional) `server.js` si quieres el ejemplo mínimo de cómo montar la ruta
 
-## Requisitos
-- Tu `package.json` debe tener el script:
-  ```json
-  "scripts": { "seed": "node prisma/seed.js" }
-  ```
-
-## Cómo correr el seed
-### Opción A) Desde Render → Shell
-1. Abre tu servicio en Render.
-2. Ve a **Shell** y ejecuta:
+## Cómo aplicar
+1. Descomprime y copia `src/rutas/users.js` encima del archivo existente.
+2. Asegúrate de tener instalados:
+   - `bcryptjs`
+   - `dotenv` (si tu server.js lo usa)
+3. Ejecuta:
    ```bash
-   npm run seed
+   npm install bcryptjs dotenv
+   npm start
    ```
 
-### Opción B) Local (si trabajas en tu máquina)
-1. Define variables de entorno (o crea `.env` solo para local).
-2. Ejecuta:
-   ```bash
-   npm run seed
-   ```
+## Endpoints
 
-Al terminar, verás en consola los datos del admin creado/actualizado.
+- GET    /api/users
+- GET    /api/users/:id
+- POST   /api/users    { name, email, password }
+- PUT    /api/users/:id   { name?, email?, password? }
+- DELETE /api/users/:id
