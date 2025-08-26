@@ -1,12 +1,12 @@
 {
   "name": "mixtli-s3-api-min",
   "version": "1.0.0",
-  "description": "API mínima Express con S3 y usuarios",
+  "description": "API Express con Prisma y S3 (Mixtli)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "postinstall": "npx prisma generate"
-{
+  },
   "dependencies": {
     "express": "^4.19.2",
     "cors": "^2.8.5",
