@@ -1,16 +1,18 @@
 require('dotenv').config();
 const express = require('express');
-const app = express();
-const PORT = process.env.PORT || 10000;
+const cors = require('cors');
 
+const app = express();
+app.use(cors());
 app.use(express.json());
 
 // Rutas
-const userRoutes = require('./src/rutas/users');
-app.use('/api/users', userRoutes);
+const usersRouter = require('./src/rutas/users');
+app.use('/api/users', usersRouter);
 
-app.get('/', (_req, res) => res.status(404).json({ ok: false, message: 'Not Found' }));
+app.get('/salud', (req, res) => res.json({ ok: true, status: 'healthy' }));
 
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`🚀 Mixtli API corriendo en puerto ${PORT}`);
 });
