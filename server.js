@@ -1,35 +1,35 @@
+// server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
 const app = express();
 
-// CORS
-const originsEnv = process.env.CORS_ORIGINS || '';
-const allowedOrigins = originsEnv
+const allowed = (process.env.CORS_ORIGIN || '*')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
-      return cb(null, true);
-    }
-    return cb(new Error('Not allowed by CORS'));
+    if (!origin || allowed.includes('*') || allowed.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS: ' + origin));
   },
   credentials: true
 }));
 
 app.use(express.json());
 
-// healthcheck
-app.get('/salud', (_req, res) => res.json({ ok: true }));
+app.get('/salud', (_req, res) => res.json({ ok: true, msg: 'API OK' }));
 
-// routes
 app.use('/api/users', require('./src/rutas/users'));
 
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`🚀 API en puerto ${PORT}`);
+app.use((_req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
+
+app.use((err, _req, res, _next) => {
+  console.error('❌ Error handler:', err);
+  res.status(500).json({ error: 'Error inesperado' });
 });
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`🚀 API en puerto ${PORT}`));
