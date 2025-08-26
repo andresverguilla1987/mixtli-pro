@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  // Let Prisma choose the right binary. Avoid custom envs that break (enableTracing, etc.).
 }
 
 datasource db {
@@ -9,7 +10,7 @@ datasource db {
 
 model Usuario {
   id           Int      @id @default(autoincrement())
-  nombre       String
+  name         String
   email        String   @unique
   passwordHash String
   createdAt    DateTime @default(now())

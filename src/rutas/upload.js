@@ -21,32 +21,21 @@ const upload = multer({
   }
 });
 
-function hasS3Env() {
-  const required = ['S3_REGION','S3_BUCKET','S3_ACCESS_KEY_ID','S3_SECRET_ACCESS_KEY'];
-  const missing = required.filter(k => !process.env[k]);
-  return { ok: missing.length === 0, missing };
-}
-
 const s3 = new S3Client({
   region: process.env.S3_REGION,
   endpoint: process.env.S3_ENDPOINT || undefined,
   credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID,
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   },
   forcePathStyle: !!process.env.S3_ENDPOINT
 });
 
 router.post("/upload", upload.single("file"), async (req, res) => {
   try {
-    const check = hasS3Env();
-    if (!check.ok) {
-      return res.status(500).json({ ok:false, error:`Faltan variables S3: ${check.missing.join(', ')}` });
-    }
     if (!req.file) {
       return res.status(400).json({ ok: false, error: "No se envió archivo" });
     }
-
     const bucket = process.env.S3_BUCKET;
     const prefix = process.env.UPLOAD_PREFIX || "uploads";
     const key = `${prefix}/${Date.now()}_${req.file.originalname}`;
@@ -57,7 +46,6 @@ router.post("/upload", upload.single("file"), async (req, res) => {
       Body: req.file.buffer,
       ContentType: req.file.mimetype
     });
-
     await s3.send(putCmd);
 
     let url;
@@ -67,15 +55,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
       url = `https://${bucket}.s3.${process.env.S3_REGION}.amazonaws.com/${key}`;
     }
 
-    res.json({
-      ok: true,
-      bucket,
-      key,
-      url,
-      size: req.file.size,
-      mimetype: req.file.mimetype,
-    });
-
+    res.json({ ok: true, bucket, key, url, size: req.file.size, mimetype: req.file.mimetype });
   } catch (err) {
     console.error("❌ Error en subida:", err);
     res.status(500).json({ ok: false, error: err.message });
