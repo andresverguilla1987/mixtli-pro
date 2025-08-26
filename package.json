@@ -1,11 +1,12 @@
 {
   "name": "mixtli-api",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "private": true,
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "build": "npm install --no-audit --no-fund && npx prisma generate && npx prisma db push"
+    "postinstall": "npx prisma generate"
   },
   "dependencies": {
     "@prisma/client": "5.22.0",
@@ -16,6 +17,6 @@
   },
   "devDependencies": {
     "prisma": "5.22.0",
-    "nodemon": "^3.1.4"
+    "nodemon": "^3.1.0"
   }
 }
