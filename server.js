@@ -1,37 +1,21 @@
-require('dotenv').config();
+
+// server.js
 const express = require('express');
 const cors = require('cors');
+const { PrismaClient } = require('@prisma/client');
+require('dotenv').config();
 
 const app = express();
+const prisma = new PrismaClient();
 
-// --- CORS ---
-const origenes = (process.env.CORS_ORIGENES || '').split(',').map(s => s.trim()).filter(Boolean);
-if (origenes.length === 0) {
-  app.use(cors()); // permitir todo si no se define
-} else {
-  app.use(cors({
-    origin: function (origin, cb) {
-      if (!origin) return cb(null, true); // Postman / curl
-      const ok = origenes.includes(origin);
-      cb(ok ? null : new Error('Origen no permitido por CORS'), ok);
-    },
-    credentials: true
-  }));
-}
-
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json());
 
-// --- Salud ---
-app.get('/salud', (_req, res) => {
-  res.json({ ok: true, servicio: 'mixtli-api', timestamp: new Date().toISOString() });
-});
+// Rutas
+app.use('/api/users', require('./src/rutas/users'));
 
-// --- Rutas ---
-const usersRouter = require('./src/rutas/users');
-app.use('/api/users', usersRouter);
+// Health check
+app.get('/salud', (req, res) => res.json({ ok: true, mensaje: "API viva ✅" }));
 
-// --- Arranque ---
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`🚀 API lista en puerto ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 API en puerto ${PORT}`));
