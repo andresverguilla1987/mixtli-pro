@@ -1,28 +1,22 @@
-# Mixtli API - Zip funcional
+# Mixtli API (base limpia)
+API en Express + Prisma para usuarios, con manejo de errores P2002 (email duplicado) y P2025 (registro inexistente).
 
-Incluye rutas con CRUD completo de usuarios (GET lista, GET por ID, POST, PUT, DELETE).
+## Requisitos
+- Node 18+
+- PostgreSQL
+- Variables en `.env` basadas en `.env.example`
 
-## Uso
-1. Instala dependencias (asegúrate de tener prisma configurado con tu BD):
-   ```bash
-   npm install express @prisma/client
-   ```
+## Pasos locales
+```bash
+npm install
+cp .env.example .env   # edita DATABASE_URL y CORS_ORIGINS
+npx prisma db push     # crear/actualizar tablas
+npm start
+```
 
-2. Corre migraciones (si aplica):
-   ```bash
-   npx prisma generate
-   npx prisma db push
-   ```
-
-3. Inicia el servidor:
-   ```bash
-   node app.js
-   ```
-
-4. Endpoints disponibles:
-   - GET `/api/salud`
-   - GET `/api/users`
-   - GET `/api/users/:id`
-   - POST `/api/users`
-   - PUT `/api/users/:id`
-   - DELETE `/api/users/:id`
+Endpoints:
+- `GET /salud`
+- `GET /api/users`
+- `POST /api/users` (body: `{ "email": "x@x.com", "password": "1234" }` o `passwordHash`)
+- `PUT /api/users/:id` (body opcional: `email`, `password` o `passwordHash`)
+- `DELETE /api/users/:id`
