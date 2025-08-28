@@ -1,25 +1,24 @@
-# Mixtli Users Patch
+MIXTLI API — PATCH (validación + errores consistentes)
 
-Archivos para reemplazar en tu proyecto:
+Qué incluye
+-----------
+1) src/rutas/users.js  -> Reemplazo completo, usa express-validator y corrige campos.
+2) server.inject.js    -> Fragmento listo para pegar al final de tu server.js (404 + error handler + morgan).
+3) package.additions.json -> Solo las dependencias que debes agregar a tu package.json.
+4) NOTAS.txt           -> Cosas a tener en cuenta.
 
-- `src/rutas/users.js`
-- (Opcional) `server.js` si quieres el ejemplo mínimo de cómo montar la ruta
+Pasos rápidos (GitHub)
+----------------------
+1) Copia y reemplaza el archivo:  src/rutas/users.js
+2) Abre tu server.js y pega el CONTENIDO de server.inject.js:
+   - Si ya tienes morgan dev y handlers parecidos, no dupliques; deja solo una versión.
+3) Abre package.json y AGREGA las dependencias de package.additions.json dentro de "dependencies".
+   (No borres lo que ya tengas. Es un merge: agrega express-validator y morgan).
+4) Haz commit y push. Render hará el build y tomará las deps nuevas.
+5) Prueba en Postman tus endpoints /api/users ... (no cambias nada ahí).
 
-## Cómo aplicar
-1. Descomprime y copia `src/rutas/users.js` encima del archivo existente.
-2. Asegúrate de tener instalados:
-   - `bcryptjs`
-   - `dotenv` (si tu server.js lo usa)
-3. Ejecuta:
-   ```bash
-   npm install bcryptjs dotenv
-   npm start
-   ```
+Atajos (si prefieres NPM en local antes del push)
+-------------------------------------------------
+npm install express-validator morgan
 
-## Endpoints
-
-- GET    /api/users
-- GET    /api/users/:id
-- POST   /api/users    { name, email, password }
-- PUT    /api/users/:id   { name?, email?, password? }
-- DELETE /api/users/:id
+Listo.

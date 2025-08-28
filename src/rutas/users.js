@@ -1,99 +1,127 @@
-// src/rutas/users.js
-const { Router } = require('express');
+const express = require('express');
 const { PrismaClient } = require('@prisma/client');
+const { body, param, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 
+const router = express.Router();
 const prisma = new PrismaClient();
-const router = Router();
 
-// Normalizador de payload
-function pickUserPayload(body) {
-  const email = body.email || body.correo || body.correoElectronico;
-  const password = body.password || body.clave;
-  return { email, password };
+function assertValid(req) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const err = new Error('Solicitud inválida');
+    err.status = 400;
+    err.code = 'BAD_REQUEST';
+    err.details = errors.array();
+    throw err;
+  }
 }
 
 // GET /api/users
-router.get('/', async (_req, res) => {
+router.get('/users', async (req, res, next) => {
   try {
-    const usuarios = await prisma.usuario.findMany({
+    const skip = Number(req.query.skip || 0);
+    const take = Number(req.query.take || 100);
+    const users = await prisma.usuario.findMany({
       orderBy: { id: 'asc' },
-      select: { id: true, email: true, createdAt: true, updatedAt: true }
+      skip,
+      take,
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+        updatedAt: true
+      }
     });
-    res.json({ ok: true, data: usuarios });
+    res.json({ ok: true, data: users });
   } catch (err) {
-    console.error('Error listando usuarios:', err);
-    res.status(500).json({ ok: false, error: 'Error listando usuarios' });
+    next(err);
   }
 });
 
 // POST /api/users
-// Body JSON: { "email": "demo_{{timestamp}}@example.com", "password": "123456" }
-router.post('/', async (req, res) => {
-  try {
-    const { email, password } = pickUserPayload(req.body);
-    if (!email || !password) {
-      return res.status(400).json({ ok: false, error: 'email y password son requeridos' });
-    }
-    const passwordHash = bcrypt.hashSync(password, 10);
-    const nuevo = await prisma.usuario.create({
-      data: { email, passwordHash },
-      select: { id: true, email: true, createdAt: true, updatedAt: true }
-    });
-    res.status(201).json({ ok: true, data: nuevo });
-  } catch (err) {
-    console.error('Error creando usuario:', err);
-    if (err && err.code === 'P2002') {
-      return res.status(409).json({ ok: false, error: 'email ya existe' });
-    }
-    res.status(500).json({ ok: false, error: 'Error creando usuario' });
-  }
-});
+router.post(
+  '/users',
+  [
+    body('email').isEmail().withMessage('email inválido'),
+    body('password').isString().isLength({ min: 6 }).withMessage('password mínimo 6 caracteres')
+  ],
+  async (req, res, next) => {
+    try {
+      assertValid(req);
+      const { email, password } = req.body;
+      const passwordHash = await bcrypt.hash(password, 10);
 
-// PUT /api/users/:id  (cambia email y/o password)
-router.put('/:id', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ ok: false, error: 'id inválido' });
-    const { email, password } = pickUserPayload(req.body);
-    if (!email && !password) {
-      return res.status(400).json({ ok: false, error: 'nada que actualizar (email/password)' });
+      const created = await prisma.usuario.create({
+        data: { email, passwordHash },
+        select: { id: true, email: true, createdAt: true, updatedAt: true }
+      });
+
+      res.status(201).json({ ok: true, data: created });
+    } catch (err) {
+      if (err.code === 'P2002') {
+        err.status = 409;
+        err.message = 'Email ya existe';
+        err.code = 'DUPLICATE';
+      }
+      next(err);
     }
-    const data = {};
-    if (email) data.email = email;
-    if (password) data.passwordHash = bcrypt.hashSync(password, 10);
-    const actualizado = await prisma.usuario.update({
-      where: { id },
-      data,
-      select: { id: true, email: true, createdAt: true, updatedAt: true }
-    });
-    res.json({ ok: true, data: actualizado });
-  } catch (err) {
-    console.error('Error actualizando usuario:', err);
-    if (err && err.code === 'P2002') {
-      return res.status(409).json({ ok: false, error: 'email ya existe' });
-    }
-    if (err && err.code === 'P2025') {
-      return res.status(404).json({ ok: false, error: 'usuario no encontrado' });
-    }
-    res.status(500).json({ ok: false, error: 'Error actualizando usuario' });
   }
-});
+);
+
+// PUT /api/users/:id
+router.put(
+  '/users/:id',
+  [
+    param('id').isInt().withMessage('id debe ser entero'),
+    body('email').optional().isEmail().withMessage('email inválido'),
+    body('password').optional().isString().isLength({ min: 6 }).withMessage('password mínimo 6 caracteres')
+  ],
+  async (req, res, next) => {
+    try {
+      assertValid(req);
+      const id = Number(req.params.id);
+      const data = {};
+      if (req.body.email) data.email = req.body.email;
+      if (req.body.password) data.passwordHash = await bcrypt.hash(req.body.password, 10);
+
+      const updated = await prisma.usuario.update({
+        where: { id },
+        data,
+        select: { id: true, email: true, createdAt: true, updatedAt: true }
+      });
+
+      res.json({ ok: true, data: updated });
+    } catch (err) {
+      if (err.code === 'P2025') {
+        err.status = 404;
+        err.message = 'Usuario no encontrado';
+        err.code = 'NOT_FOUND';
+      }
+      next(err);
+    }
+  }
+);
 
 // DELETE /api/users/:id
-router.delete('/:id', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ ok: false, error: 'id inválido' });
-    await prisma.usuario.delete({ where: { id } });
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('Error eliminando usuario:', err);
-    if (err && err.code === 'P2025') {
-      return res.status(404).json({ ok: false, error: 'usuario no encontrado' });
+router.delete(
+  '/users/:id',
+  [param('id').isInt().withMessage('id debe ser entero')],
+  async (req, res, next) => {
+    try {
+      assertValid(req);
+      const id = Number(req.params.id);
+      await prisma.usuario.delete({ where: { id } });
+      res.json({ ok: true, message: 'Usuario eliminado' });
+    } catch (err) {
+      if (err.code === 'P2025') {
+        err.status = 404;
+        err.message = 'Usuario no encontrado';
+        err.code = 'NOT_FOUND';
+      }
+      next(err);
     }
-    res.status(500).json({ ok: false, error: 'Error eliminando usuario' });
   }
-});
+);
 
 module.exports = router;

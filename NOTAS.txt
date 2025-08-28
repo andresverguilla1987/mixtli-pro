@@ -1,0 +1,7 @@
+NOTAS
+-----
+- El modelo Prisma `Usuario` no tiene 'nombre'/'name'. Solo usamos: id, email, passwordHash, createdAt, updatedAt.
+- POST /api/users ahora valida email y password (>=6). Hashea con bcrypt.
+- PUT /api/users/:id permite cambiar email y/o password (ambos opcionales).
+- No exponemos passwordHash en respuestas.
+- 404 y errores Prisma devuelven JSON coherente { ok:false, code, message }.
