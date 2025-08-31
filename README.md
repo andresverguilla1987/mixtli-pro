@@ -1,39 +1,31 @@
-# Mixtli Master Bundle
+# Mixtli CORS + Postman Prod
 
-Todo junto para desplegar de un solo madrazo, pero con orden. Dentro tienes:
+Este paquete incluye:
 
-1) `01-backend-clean/mixtli-pro-clean.zip`
-   - API limpia (Express + Prisma) con CRUD de usuarios y `/salud`.
-   - Colección Postman incluida.
-   - Ideal si solo quieres arreglar lo actual rápido.
+- **server-cors.js** → ejemplo de servidor Express con CORS dinámico y Helmet seguro para producción.
+- **Mixtli-Prod.postman_environment.json** → Environment de Postman listo para Producción.
 
-2) `02-backend-clean-render/mixtli-pro-clean-with-render.zip`
-   - Mismo backend limpio + `render.yaml`.
-   - Para levantar el servicio vía Blueprints.
+## Uso rápido
 
-3) `03-backend-clean-render-variants/mixtli-pro-clean-with-render-variants.zip`
-   - Incluye `render-starter.yaml` (plan starter, `autoDeploy: false`).
+### Backend (Render)
+1. Sube `server-cors.js` o integra las líneas a tu `server.js`.
+2. En Render agrega env var:
+   ```
+   ALLOWED_ORIGINS=https://tu-frontend.com,https://app.tu-frontend.com
+   ```
+3. Verifica con:
+   ```bash
+   curl -i -X OPTIONS "https://mixtli-pro.onrender.com/api/users"      -H "Origin: https://tu-frontend.com"      -H "Access-Control-Request-Method: POST"
+   ```
 
-4) `04-backend-multiservice/mixtli-pro-multiservice.zip`
-   - Web + Worker (BullMQ/Redis) + subidas **multipart S3**.
-   - `render-multi.yaml` para crear ambos servicios en Render.
-   - Postman de flujo multipart.
+### Postman
+1. Importa `Mixtli-Prod.postman_environment.json`.
+2. Selecciona **Mixtli Producción** como environment.
+3. Cambia `baseUrl` a tu dominio real de prod (Render custom domain o la URL pública).
+4. Corre la colección Mixtli-PRO.
 
-5) `05-frontend-uploader/mixtli-uploader-frontend.zip`
-   - Front estático con **Uppy** (Dashboard + AwsS3Multipart).
-   - Conéctalo al backend: pon tu `Base URL` y sube a toda máquina.
+## Tips
+- Solo se permiten orígenes definidos en `ALLOWED_ORIGINS`.
+- En dev, se aceptan automáticamente `localhost` y `127.0.0.1`.
+- Helmet añade headers de seguridad extra.
 
-## Ruta recomendada (cero sustos)
-- Staging: despliega **04-backend-multiservice** con `render-multi.yaml`.
-- Configura `.env`/Env Vars en Render:
-  - `DATABASE_URL`, `REDIS_URL`
-  - `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION=auto`, `S3_FORCE_PATH_STYLE=true`
-  - `PORT=10000`, `NODE_ENV=production`, `JWT_SECRET`
-- Prueba con Postman (`Mixtli-Uploads.postman_collection.json`).
-- Frontend: sube **05-frontend-uploader** a Netlify/Render Static y apunta al backend de staging.
-- Cuando jale chingón → promueve a producción (apuntar dominio).
-
-## Nota de seguridad
-- `passwordHash` jamás se expone en respuestas.
-- Usa HTTPS en backend y bucket/CDN.
-- Ajusta CORS al dominio de tu front al pasar a producción.
