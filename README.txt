@@ -1,24 +1,19 @@
-MIXTLI API — PATCH (validación + errores consistentes)
+# Snippet para server.js / app.js
 
-Qué incluye
------------
-1) src/rutas/users.js  -> Reemplazo completo, usa express-validator y corrige campos.
-2) server.inject.js    -> Fragmento listo para pegar al final de tu server.js (404 + error handler + morgan).
-3) package.additions.json -> Solo las dependencias que debes agregar a tu package.json.
-4) NOTAS.txt           -> Cosas a tener en cuenta.
+Este archivo (`server-snippet.js`) contiene utilidades para ayudarte a descubrir tus rutas reales y tener un health check:
 
-Pasos rápidos (GitHub)
-----------------------
-1) Copia y reemplaza el archivo:  src/rutas/users.js
-2) Abre tu server.js y pega el CONTENIDO de server.inject.js:
-   - Si ya tienes morgan dev y handlers parecidos, no dupliques; deja solo una versión.
-3) Abre package.json y AGREGA las dependencias de package.additions.json dentro de "dependencies".
-   (No borres lo que ya tengas. Es un merge: agrega express-validator y morgan).
-4) Haz commit y push. Render hará el build y tomará las deps nuevas.
-5) Prueba en Postman tus endpoints /api/users ... (no cambias nada ahí).
+1. Endpoints de salud en `/health`, `/api/health`, `/api/v1/health`.
+2. Endpoint de introspección en `/__routes` que lista todas las rutas que Express tiene registradas.
+3. Middleware al final que loguea los 404 y responde con un JSON útil.
 
-Atajos (si prefieres NPM en local antes del push)
--------------------------------------------------
-npm install express-validator morgan
+## Uso
 
-Listo.
+- Copia y pega el contenido de `server-snippet.js` dentro de tu `server.js` o `app.js` **después de crear `app`** y antes de `app.listen(...)`.
+- Redeploya tu servicio en Render.
+- Visita en el navegador:
+  - `https://<tu-app>.onrender.com/health`
+  - `https://<tu-app>.onrender.com/api/health`
+  - `https://<tu-app>.onrender.com/api/v1/health`
+  - `https://<tu-app>.onrender.com/__routes`
+
+Con `__routes` obtendrás un JSON con todas las rutas reales. Usa eso para ajustar Postman.
