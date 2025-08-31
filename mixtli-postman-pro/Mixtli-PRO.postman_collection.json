@@ -1,0 +1,427 @@
+{
+  "info": {
+    "name": "Mixtli PRO (Users + Uploads)",
+    "_postman_id": "4a4a1111-2222-3333-4444-555555555555",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Colección pro lista para staging/producción con scripts, asserts y variables."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "{{baseUrl}}"
+    },
+    {
+      "key": "userId",
+      "value": "{{userId}}"
+    },
+    {
+      "key": "filename",
+      "value": "{{filename}}"
+    },
+    {
+      "key": "contentType",
+      "value": "{{contentType}}"
+    },
+    {
+      "key": "uploadId",
+      "value": "{{uploadId}}"
+    },
+    {
+      "key": "key",
+      "value": "{{key}}"
+    },
+    {
+      "key": "partNumber",
+      "value": "{{partNumber}}"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /salud",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/salud",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "salud"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.code === 200);",
+                  "const json = pm.response.json();",
+                  "pm.test('ok true', () => json.ok === true);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "POST /api/users (crear)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const ts = Date.now();",
+                  "const envEmail = pm.environment.get('email') || `andres+${ts}@test.com`;",
+                  "pm.variables.set('emailUse', envEmail);",
+                  "pm.variables.set('passwordUse', pm.environment.get('password') || '123456');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.code === 201);",
+                  "const json = pm.response.json();",
+                  "pm.test('tiene id y correo', function () {",
+                  "  pm.expect(json).to.have.property('id');",
+                  "  pm.expect(json).to.have.property('correo');",
+                  "});",
+                  "pm.environment.set('userId', String(json.id));",
+                  "console.log('userId guardado:', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{emailUse}}\", \"password\": \"{{passwordUse}}\", \"nombre\": \"Andr\\u00e9s\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.code === 200);",
+                  "const arr = pm.response.json();",
+                  "pm.test('es arreglo', () => Array.isArray(arr));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/users/:id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.code === 200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /api/users/:id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"nuevo+{{userId}}@test.com\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.code === 200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /api/users/:id",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.code === 204);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Uploads (Multipart)",
+      "item": [
+        {
+          "name": "POST init",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"filename\": \"{{filename}}\", \"contentType\": \"{{contentType}}\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads/multipart/init",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "uploads",
+                "multipart",
+                "init"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.code === 200);",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('uploadId', json.uploadId);",
+                  "pm.environment.set('key', json.key);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET sign-part",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads/multipart/sign-part?key={{key}}&uploadId={{uploadId}}&partNumber={{partNumber}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "uploads",
+                "multipart",
+                "sign-part"
+              ],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{key}}"
+                },
+                {
+                  "key": "uploadId",
+                  "value": "{{uploadId}}"
+                },
+                {
+                  "key": "partNumber",
+                  "value": "{{partNumber}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.code === 200);",
+                  "const json = pm.response.json();",
+                  "pm.test('tiene url firmada', () => typeof json.url === 'string');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST complete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"key\": \"{{key}}\", \"uploadId\": \"{{uploadId}}\", \"parts\": [{\"ETag\": \"<etag>\", \"PartNumber\": 1}]}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads/multipart/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "uploads",
+                "multipart",
+                "complete"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.code === 200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST abort",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"key\": \"{{key}}\", \"uploadId\": \"{{uploadId}}\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads/multipart/abort",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "uploads",
+                "multipart",
+                "abort"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.code === 200);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
