@@ -1,9 +1,11 @@
+// src/rutas/users.js (HOTFIX rutas con id numérico + validaciones claras)
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const Joi = require('joi');
 const bcrypt = require('bcryptjs');
 
+// ===== Schemas =====
 const userCreateSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required()
@@ -14,6 +16,18 @@ const userUpdateSchema = Joi.object({
   password: Joi.string().min(6).optional()
 }).min(1);
 
+// ===== Helpers =====
+const parseId = (req) => {
+  const raw = req.params.id ?? req.query.id ?? req.body?.id;
+  const id = Number(raw);
+  if (!raw) { const e = new Error('Falta id en la URL (usa /api/users/:id)'); e.status = 400; throw e; }
+  if (Number.isNaN(id) || id <= 0) { const e = new Error('id inválido: debe ser numérico positivo'); e.status = 400; throw e; }
+  return id;
+};
+
+// ===== Rutas =====
+
+// Listar
 router.get('/', async (req, res, next) => {
   try {
     const usuarios = await prisma.usuario.findMany({
@@ -30,10 +44,10 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/:id', async (req, res, next) => {
+// Obtener por id (solo numérico)
+router.get('/:id(\d+)', async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    if (Number.isNaN(id)) return res.status(400).json({ error: 'id inválido' });
+    const id = parseId(req);
     const u = await prisma.usuario.findUnique({
       where: { id },
       select: { id: true, email: true, createdAt: true, updatedAt: true },
@@ -43,6 +57,7 @@ router.get('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Crear
 router.post('/', async (req, res, next) => {
   try {
     const { error, value } = userCreateSchema.validate(req.body);
@@ -60,10 +75,10 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-router.put('/:id', async (req, res, next) => {
+// Actualizar por id (solo numérico)
+router.put('/:id(\d+)', async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    if (Number.isNaN(id)) return res.status(400).json({ error: 'id inválido' });
+    const id = parseId(req);
     const { error, value } = userUpdateSchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.message });
     const data = {};
@@ -78,10 +93,10 @@ router.put('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/:id', async (req, res, next) => {
+// Borrar por id (solo numérico)
+router.delete('/:id(\d+)', async (req, res, next) => {
   try {
-    const id = Number(req.params.id);
-    if (Number.isNaN(id)) return res.status(400).json({ error: 'id inválido' });
+    const id = parseId(req);
     await prisma.usuario.delete({ where: { id } });
     res.status(204).end();
   } catch (err) { next(err); }

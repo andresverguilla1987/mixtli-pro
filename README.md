@@ -1,30 +1,16 @@
-# Mixtli Pro HOTFIX
+# HOTFIX: routes de usuarios con `:id` numérico y validaciones claras
 
-Este hotfix corrige:
+## Cómo aplicar
+1. Copia `src/rutas/users.js` de este zip y reemplaza el de tu proyecto.
+2. Reinicia el servidor.
 
-1. **Prisma**: elimina `nombre/correo` del `select` (causaba `Unknown field nombre`).
-2. **Raíz** `/` con respuesta (adiós 404 en root).
-3. **Uploads**: expone `/api/uploads/multipart/*` pero responde **501** si S3 no está configurado (en lugar de 404).
+## Qué corrige
+- Evita `/api/users/undefined` (solo acepta `:id` numérico).
+- Mensajes 400 claros si falta `id` o está mal.
+- Selects de Prisma válidos (usa `email` real y lo expone como `correo`).
 
-## Variables
-- `DATABASE_URL`, `PORT=10000`, `NODE_ENV=production`, `JWT_SECRET`
-- (Opcional) `S3_*` para no ver 501 en uploads
-
-## Comandos
-```
-npm install
-npx prisma generate
-npx prisma db push
-npm start
-```
-
-## Endpoints
-- `GET /` → info
-- `GET /salud`
-- `GET /api/users`
-- `POST /api/users` → body: `{ "email":"...", "password":"..." }`
-- `GET /api/users/:id` / `PUT /api/users/:id` / `DELETE /api/users/:id`
-- `POST /api/uploads/multipart/init` → 501 si sin S3
-- `GET  /api/uploads/multipart/sign-part` → 501 si sin S3
-- `POST /api/uploads/multipart/complete` → 501 si sin S3
-- `POST /api/uploads/multipart/abort` → 501 si sin S3
+## Pruebas rápidas
+1) POST /api/users  (JSON) → 201 → toma `id`  
+2) GET /api/users/:id  → 200  
+3) PUT /api/users/:id  (JSON con email/password) → 200  
+4) DELETE /api/users/:id → 204
