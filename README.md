@@ -1,30 +1,31 @@
-# Mixtli Pro HOTFIX
+# Mixtli CORS + Postman Prod
 
-Este hotfix corrige:
+Este paquete incluye:
 
-1. **Prisma**: elimina `nombre/correo` del `select` (causaba `Unknown field nombre`).
-2. **Raíz** `/` con respuesta (adiós 404 en root).
-3. **Uploads**: expone `/api/uploads/multipart/*` pero responde **501** si S3 no está configurado (en lugar de 404).
+- **server-cors.js** → ejemplo de servidor Express con CORS dinámico y Helmet seguro para producción.
+- **Mixtli-Prod.postman_environment.json** → Environment de Postman listo para Producción.
 
-## Variables
-- `DATABASE_URL`, `PORT=10000`, `NODE_ENV=production`, `JWT_SECRET`
-- (Opcional) `S3_*` para no ver 501 en uploads
+## Uso rápido
 
-## Comandos
-```
-npm install
-npx prisma generate
-npx prisma db push
-npm start
-```
+### Backend (Render)
+1. Sube `server-cors.js` o integra las líneas a tu `server.js`.
+2. En Render agrega env var:
+   ```
+   ALLOWED_ORIGINS=https://tu-frontend.com,https://app.tu-frontend.com
+   ```
+3. Verifica con:
+   ```bash
+   curl -i -X OPTIONS "https://mixtli-pro.onrender.com/api/users"      -H "Origin: https://tu-frontend.com"      -H "Access-Control-Request-Method: POST"
+   ```
 
-## Endpoints
-- `GET /` → info
-- `GET /salud`
-- `GET /api/users`
-- `POST /api/users` → body: `{ "email":"...", "password":"..." }`
-- `GET /api/users/:id` / `PUT /api/users/:id` / `DELETE /api/users/:id`
-- `POST /api/uploads/multipart/init` → 501 si sin S3
-- `GET  /api/uploads/multipart/sign-part` → 501 si sin S3
-- `POST /api/uploads/multipart/complete` → 501 si sin S3
-- `POST /api/uploads/multipart/abort` → 501 si sin S3
+### Postman
+1. Importa `Mixtli-Prod.postman_environment.json`.
+2. Selecciona **Mixtli Producción** como environment.
+3. Cambia `baseUrl` a tu dominio real de prod (Render custom domain o la URL pública).
+4. Corre la colección Mixtli-PRO.
+
+## Tips
+- Solo se permiten orígenes definidos en `ALLOWED_ORIGINS`.
+- En dev, se aceptan automáticamente `localhost` y `127.0.0.1`.
+- Helmet añade headers de seguridad extra.
+
