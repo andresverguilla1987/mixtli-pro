@@ -1,34 +1,40 @@
-require('dotenv').config();
+// server.js (HOTFIX combinado)
 const express = require('express');
-const morgan = require('morgan');
 const cors = require('cors');
 const helmet = require('helmet');
-const errorHandler = require('./src/middlewares/error');
+require('dotenv').config();
 
 const app = express();
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
-app.use(morgan('dev'));
+const PORT = process.env.PORT || 10000;
 
-// Bienvenida para evitar 404 en '/'
+app.use(helmet());
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+}));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // soporta formularios además de JSON
+
+// Root
 app.get('/', (req, res) => {
-  res.send({
-    name: 'Mixtli API (hotfix)',
-    status: 'ok',
-    docs: ['/salud','/api/users','/api/uploads/*'],
-    time: new Date().toISOString(),
-  });
+  res.send({ name: 'Mixtli API', ok: true, docs: '/api/users' });
 });
 
-app.get('/salud', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+// Salud
+app.get('/salud', (req, res) => {
+  res.json({ ok: true });
+});
 
-// Rutas
+// Rutas API
 app.use('/api/users', require('./src/rutas/users'));
 app.use('/api/uploads', require('./src/rutas/uploads'));
 
 // Error handler
-app.use(errorHandler);
+app.use((err, req, res, next) => {
+  console.error('Error global:', err);
+  const status = err.status || 500;
+  res.status(status).json({ error: err.message || 'Error inesperado' });
+});
 
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 API en puerto ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 API en puerto ${PORT}`);
+});

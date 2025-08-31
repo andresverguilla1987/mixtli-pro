@@ -1,11 +1,10 @@
-// src/rutas/users.js (HOTFIX rutas con id numérico + validaciones claras)
+// src/rutas/users.js (HOTFIX combinado)
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const Joi = require('joi');
 const bcrypt = require('bcryptjs');
 
-// ===== Schemas =====
 const userCreateSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required()
@@ -16,7 +15,6 @@ const userUpdateSchema = Joi.object({
   password: Joi.string().min(6).optional()
 }).min(1);
 
-// ===== Helpers =====
 const parseId = (req) => {
   const raw = req.params.id ?? req.query.id ?? req.body?.id;
   const id = Number(raw);
@@ -24,8 +22,6 @@ const parseId = (req) => {
   if (Number.isNaN(id) || id <= 0) { const e = new Error('id inválido: debe ser numérico positivo'); e.status = 400; throw e; }
   return id;
 };
-
-// ===== Rutas =====
 
 // Listar
 router.get('/', async (req, res, next) => {
@@ -44,7 +40,7 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Obtener por id (solo numérico)
+// Obtener por id
 router.get('/:id(\d+)', async (req, res, next) => {
   try {
     const id = parseId(req);
@@ -75,7 +71,7 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// Actualizar por id (solo numérico)
+// Actualizar
 router.put('/:id(\d+)', async (req, res, next) => {
   try {
     const id = parseId(req);
@@ -93,7 +89,7 @@ router.put('/:id(\d+)', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Borrar por id (solo numérico)
+// Borrar
 router.delete('/:id(\d+)', async (req, res, next) => {
   try {
     const id = parseId(req);
