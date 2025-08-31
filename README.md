@@ -1,22 +1,19 @@
-# Mixtli API (base limpia)
-API en Express + Prisma para usuarios, con manejo de errores P2002 (email duplicado) y P2025 (registro inexistente).
+# Mixtli Backend
 
-## Requisitos
-- Node 18+
-- PostgreSQL
-- Variables en `.env` basadas en `.env.example`
+## Pasos rápidos
 
-## Pasos locales
-```bash
-npm install
-cp .env.example .env   # edita DATABASE_URL y CORS_ORIGINS
-npx prisma db push     # crear/actualizar tablas
-npm start
-```
+1. Configura `.env` a partir de `.env.ejemplo` con tu `DATABASE_URL` de Render y `CORS_ORIGIN`.
+2. Instala dependencias: `npm install`
+3. Genera cliente Prisma: `npx prisma generate`
+4. Sincroniza DB: `npx prisma db push`
+5. Inserta datos de prueba: `npm run seed`
+6. Arranca el servidor: `npm start`
 
-Endpoints:
-- `GET /salud`
-- `GET /api/users`
-- `POST /api/users` (body: `{ "email": "x@x.com", "password": "1234" }` o `passwordHash`)
-- `PUT /api/users/:id` (body opcional: `email`, `password` o `passwordHash`)
-- `DELETE /api/users/:id`
+### Endpoints principales
+
+- GET `/salud`
+- GET `/api/users`
+- GET `/api/users/:id`
+- POST `/api/users` { name, email, password }
+- PUT `/api/users/:id`
+- DELETE `/api/users/:id`

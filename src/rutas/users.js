@@ -1,100 +1,97 @@
 const express = require('express');
-const router = express.Router();
+const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
+
 const prisma = new PrismaClient();
+const router = express.Router();
 
-function toIntId(param) {
-  const n = Number(param);
-  if (!Number.isInteger(n) || n <= 0) return null;
-  return n;
-}
-
-router.get('/', async (req, res) => {
+// Listar usuarios
+router.get('/', async (req, res, next) => {
   try {
     const usuarios = await prisma.usuario.findMany({
       orderBy: { id: 'asc' },
-      select: { id: true, email: true, createdAt: true, updatedAt: true }
+      select: { id: true, name: true, email: true, createdAt: true, updatedAt: true }
     });
-    res.json({ ok: true, total: usuarios.length, data: usuarios });
+    res.json(usuarios);
   } catch (err) {
-    console.error('Error listando usuarios:', err);
-    res.status(500).json({ ok: false, error: 'Error interno al listar usuarios' });
+    next(err);
   }
 });
 
-router.post('/', async (req, res) => {
+// Obtener usuario por ID
+router.get('/:id', async (req, res, next) => {
   try {
-    const { email, password, passwordHash } = req.body || {};
-    if (!email) return res.status(400).json({ ok: false, error: 'El campo email es obligatorio' });
-    let hash = passwordHash;
-    if (!hash) {
-      if (!password) return res.status(400).json({ ok: false, error: 'Falta password (o passwordHash)' });
-      hash = await bcrypt.hash(password, 10);
-    }
-
-    const nuevo = await prisma.usuario.create({
-      data: { email, passwordHash: hash },
-      select: { id: true, email: true, createdAt: true, updatedAt: true }
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: parseInt(req.params.id) },
+      select: { id: true, name: true, email: true, createdAt: true, updatedAt: true }
     });
-
-    res.status(201).json({ ok: true, data: nuevo });
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+    res.json(usuario);
   } catch (err) {
-    if (err.code === 'P2002') {
-      return res.status(409).json({ ok: false, error: 'El email ya existe' });
-    }
-    console.error('Error creando usuario:', err);
-    res.status(500).json({ ok: false, error: 'Error interno al crear usuario' });
+    next(err);
   }
 });
 
-router.put('/:id', async (req, res) => {
-  try {
-    const id = toIntId(req.params.id);
-    if (!id) return res.status(400).json({ ok: false, error: 'ID inválido' });
-
-    const { email, password, passwordHash } = req.body || {};
-    const data = {};
-    if (email) data.email = email;
-    if (passwordHash) data.passwordHash = passwordHash;
-    else if (password) data.passwordHash = await bcrypt.hash(password, 10);
-
-    if (Object.keys(data).length === 0) {
-      return res.status(400).json({ ok: false, error: 'No hay campos para actualizar' });
+// Crear usuario
+router.post('/',
+  body('email').isEmail().withMessage('Email inválido'),
+  body('password').isLength({ min: 6 }).withMessage('Mínimo 6 caracteres'),
+  async (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
     }
-
-    const actualizado = await prisma.usuario.update({
-      where: { id },
-      data,
-      select: { id: true, email: true, createdAt: true, updatedAt: true }
-    });
-
-    res.json({ ok: true, data: actualizado });
-  } catch (err) {
-    if (err.code === 'P2025') {
-      return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+    try {
+      const { name, email, password } = req.body;
+      const passwordHash = await bcrypt.hash(password, 10);
+      const nuevo = await prisma.usuario.create({
+        data: { name, email, passwordHash },
+        select: { id: true, name: true, email: true, createdAt: true, updatedAt: true }
+      });
+      res.status(201).json(nuevo);
+    } catch (err) {
+      next(err);
     }
-    if (err.code === 'P2002') {
-      return res.status(409).json({ ok: false, error: 'El email ya existe' });
-    }
-    console.error('Error actualizando usuario:', err);
-    res.status(500).json({ ok: false, error: 'Error interno al actualizar usuario' });
   }
-});
+);
 
-router.delete('/:id', async (req, res) => {
-  try {
-    const id = toIntId(req.params.id);
-    if (!id) return res.status(400).json({ ok: false, error: 'ID inválido' });
-
-    await prisma.usuario.delete({ where: { id } });
-    res.json({ ok: true, message: 'Usuario eliminado' });
-  } catch (err) {
-    if (err.code === 'P2025') {
-      return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+// Actualizar usuario
+router.put('/:id',
+  body('email').optional().isEmail().withMessage('Email inválido'),
+  async (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
     }
-    console.error('Error eliminando usuario:', err);
-    res.status(500).json({ ok: false, error: 'Error interno al eliminar usuario' });
+    try {
+      const { name, email, password } = req.body;
+      const data = {};
+      if (name) data.name = name;
+      if (email) data.email = email;
+      if (password) data.passwordHash = await bcrypt.hash(password, 10);
+
+      const actualizado = await prisma.usuario.update({
+        where: { id: parseInt(req.params.id) },
+        data,
+        select: { id: true, name: true, email: true, createdAt: true, updatedAt: true }
+      });
+      res.json(actualizado);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// Eliminar usuario
+router.delete('/:id', async (req, res, next) => {
+  try {
+    await prisma.usuario.delete({
+      where: { id: parseInt(req.params.id) }
+    });
+    res.json({ ok: true, mensaje: 'Usuario eliminado' });
+  } catch (err) {
+    next(err);
   }
 });
 
