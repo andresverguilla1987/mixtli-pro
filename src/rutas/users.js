@@ -1,7 +1,9 @@
-// src/rutas/users.js (HOTFIX combinado)
+// src/rutas/users.js — Rutas robustas para demo e inversión
 const express = require('express');
 const router = express.Router();
-const prisma = require('../lib/prisma');
+let prisma;
+try { prisma = require('../lib/prisma'); }
+catch(e){ prisma = require('../prisma'); } // fallback si cambió el path
 const Joi = require('joi');
 const bcrypt = require('bcryptjs');
 
@@ -40,7 +42,7 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Obtener por id
+// Obtener por id (solo numérico)
 router.get('/:id(\d+)', async (req, res, next) => {
   try {
     const id = parseId(req);
@@ -71,7 +73,7 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// Actualizar
+// Actualizar por id
 router.put('/:id(\d+)', async (req, res, next) => {
   try {
     const id = parseId(req);
@@ -89,7 +91,7 @@ router.put('/:id(\d+)', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Borrar
+// Borrar por id
 router.delete('/:id(\d+)', async (req, res, next) => {
   try {
     const id = parseId(req);

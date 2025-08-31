@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mixtli PRO — Transferencias pesadas, instantáneas.</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="bg-anim"></div>
+  <header class="container top">
+    <div class="brand">
+      <img src="/logo.svg" alt="Mixtli PRO" class="logo" />
+      <h1>Mixtli <span>PRO</span></h1>
+    </div>
+    <nav>
+      <a href="#features">Ventajas</a>
+      <a href="#metrics">Métricas</a>
+      <a href="#demo">Demo</a>
+      <a href="#casos">Casos</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero container">
+      <p class="pill">LIVE <span id="liveDot" class="dot"></span> <span id="liveText">verificando...</span></p>
+      <h2>Entrega archivos de <em>cualquier tamaño</em> a <span class="grad">velocidad máxima</span>.</h2>
+      <p class="sub">Infra moderna para <strong>terabytes</strong>, <strong>seguridad empresarial</strong> y <strong>escala global</strong>.</p>
+      <div class="cta">
+        <button id="btn-check" class="btn primary">Probar API ahora</button>
+        <button id="btn-create" class="btn">Crear usuario demo</button>
+        <button id="btn-list" class="btn ghost">Ver últimos usuarios</button>
+      </div>
+      <div class="hero-art">
+        <div class="tile">
+          <div class="row"><span>Partes subidas</span><strong id="mParts">0</strong></div>
+          <div class="row"><span>Velocidad pico</span><strong id="mSpeed">0 MB/s</strong></div>
+          <div class="row"><span>Éxito</span><strong class="ok" id="mOk">0%</strong></div>
+        </div>
+        <div class="tile code">
+          <pre><code>curl -X POST {{API}}/api/users \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "demo+<ts>@mixtli.com", "password": "123456" }'</code></pre>
+        </div>
+      </div>
+      <p class="hint">Base de API: <code id="baseUrl"></code></p>
+      <div id="result" class="card hidden"></div>
+    </section>
+
+    <section id="metrics" class="container metrics">
+      <div class="stat"><div class="num" data-target="99.99">0%</div><div class="label">Disponibilidad</div></div>
+      <div class="stat"><div class="num" data-target="6">0x</div><div class="label">Paralelismo</div></div>
+      <div class="stat"><div class="num" data-target="32">0 MB</div><div class="label">Tamaño por parte</div></div>
+      <div class="stat"><div class="num" data-target="10">0k</div><div class="label">Archivos/día</div></div>
+    </section>
+
+    <section id="features" class="container features">
+      <div class="card feat"><h3>⚡ Velocidad</h3><p>Multipart paralelo (4–6 hilos) y reintentos por parte.</p></div>
+      <div class="card feat"><h3>🔒 Seguridad</h3><p>URLs firmadas por parte, CORS estricto y Helmet.</p></div>
+      <div class="card feat"><h3>🌎 Escala</h3><p>Workers con colas. S3/R2/MinIO plug & play.</p></div>
+      <div class="card feat"><h3>📊 Observabilidad</h3><p>Métricas de éxito, latencias y throughput.</p></div>
+    </section>
+
+    <section id="demo" class="container demo">
+      <h3>Demo rápida</h3>
+      <div class="grid">
+        <div class="card mini"><h4>1) Salud</h4><p>Comprueba disponibilidad.</p><button class="btn small" onclick="Mixtli.salud()">GET /salud</button></div>
+        <div class="card mini"><h4>2) Crear usuario</h4><p>Crea un usuario demo único.</p><button class="btn small" onclick="Mixtli.crear()">POST /api/users</button></div>
+        <div class="card mini"><h4>3) Ver usuarios</h4><p>Lista últimos usuarios.</p><button class="btn small" onclick="Mixtli.listar()">GET /api/users</button></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="container foot">
+    <div class="left"><p>© <span id="yr"></span> Mixtli PRO — Demo</p></div>
+    <div class="right"><a class="btn ghost small" href="mailto:founders@mixtli.com">Contacto</a></div>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
