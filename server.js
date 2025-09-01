@@ -1,6 +1,6 @@
-import express from 'express';
-import cors from 'cors';
-import { PrismaClient } from '@prisma/client';
+const express = require('express');
+const cors = require('cors');
+const { PrismaClient } = require('@prisma/client');
 
 const app = express();
 const prisma = new PrismaClient();
@@ -8,82 +8,91 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
-// Endpoint de salud
-app.get('/salud', (req, res) => {
-  res.json({ status: 'ok', msg: 'API funcionando chingón 🚀' });
+// Healthcheck
+app.get('/salud', (_req, res) => {
+  res.json({ ok: true, msg: 'API funcionando chingón 🚀' });
 });
 
-// =========================
-// RUTAS DE USUARIOS CRUD
-// =========================
+// ===== Users CRUD =====
 
 // Crear usuario
 app.post('/api/users', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ error: 'email y password requeridos' });
     const user = await prisma.usuario.create({
       data: { email, passwordHash: password }
     });
-    res.status(201).json(user);
-  } catch (error) {
-    console.error('Error creando usuario:', error);
-    res.status(400).json({ error: error.message });
+    return res.status(201).json(user);
+  } catch (err) {
+    console.error('POST /api/users error:', err);
+    // Prisma unique violation => 409
+    const msg = String(err?.message || '');
+    if (/Unique constraint/i.test(msg)) return res.status(409).json({ error: 'Email duplicado' });
+    return res.status(400).json({ error: msg });
   }
 });
 
-// Listar todos los usuarios
-app.get('/api/users', async (req, res) => {
+// Listar usuarios
+app.get('/api/users', async (_req, res) => {
   try {
-    const users = await prisma.usuario.findMany({
-      orderBy: { id: 'asc' }
-    });
-    res.json(users);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    const users = await prisma.usuario.findMany({ orderBy: { id: 'asc' } });
+    return res.json(users);
+  } catch (err) {
+    console.error('GET /api/users error:', err);
+    return res.status(500).json({ error: String(err?.message || err) });
   }
 });
 
-// Obtener usuario por ID
+// Obtener por id
 app.get('/api/users/:id', async (req, res) => {
   try {
-    const user = await prisma.usuario.findUnique({
-      where: { id: Number(req.params.id) }
-    });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'id inválido' });
+    const user = await prisma.usuario.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.json(user);
+  } catch (err) {
+    console.error('GET /api/users/:id error:', err);
+    return res.status(500).json({ error: String(err?.message || err) });
   }
 });
 
-// Actualizar usuario
+// Actualizar
 app.put('/api/users/:id', async (req, res) => {
   try {
-    const updated = await prisma.usuario.update({
-      where: { id: Number(req.params.id) },
-      data: req.body
-    });
-    res.json(updated);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'id inválido' });
+    const data = {};
+    if (req.body?.email) data.email = req.body.email;
+    if (req.body?.password) data.passwordHash = req.body.password;
+    if (!Object.keys(data).length) return res.status(400).json({ error: 'Nada que actualizar' });
+    const updated = await prisma.usuario.update({ where: { id }, data });
+    return res.json(updated);
+  } catch (err) {
+    console.error('PUT /api/users/:id error:', err);
+    const msg = String(err?.message || '');
+    if (/Record to update not found/i.test(msg)) return res.status(404).json({ error: 'Usuario no encontrado' });
+    return res.status(400).json({ error: msg });
   }
 });
 
-// Eliminar usuario
+// Borrar
 app.delete('/api/users/:id', async (req, res) => {
   try {
-    await prisma.usuario.delete({
-      where: { id: Number(req.params.id) }
-    });
-    res.json({ msg: 'Usuario eliminado correctamente' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'id inválido' });
+    await prisma.usuario.delete({ where: { id } });
+    return res.status(204).send();
+  } catch (err) {
+    console.error('DELETE /api/users/:id error:', err);
+    const msg = String(err?.message || '');
+    if (/Record to delete does not exist|not found/i.test(msg)) return res.status(404).json({ error: 'Usuario no encontrado' });
+    return res.status(400).json({ error: msg });
   }
 });
 
-// =========================
-// INICIO DEL SERVIDOR
-// =========================
+// Start
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`🚀 API en puerto ${PORT}`);
