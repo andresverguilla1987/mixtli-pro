@@ -1,66 +1,67 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Mixtli — Archivos del bucket</title>
-  <style>
-    body { font-family: Arial, sans-serif; background: #111; color: #eee; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { padding: 0.5rem; border-bottom: 1px solid #333; }
-    a.button { padding: 0.3rem 0.6rem; background: #444; color: #fff; text-decoration: none; border-radius: 4px; }
-    a.button:hover { background: #666; }
-  </style>
+<meta charset="utf-8"/>
+<title>Mixtli — Archivos del bucket</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#0b0b0f;color:#e8e8ea;margin:0;padding:24px}
+.card{max-width:1100px;margin:0 auto;background:#121218;border:1px solid #23232e;border-radius:14px;padding:20px}
+input,button{background:#181822;border:1px solid #2b2b34;color:#cfcfe1;border-radius:10px;padding:10px 14px}
+table{width:100%;border-collapse:collapse;margin-top:16px}
+th,td{border-bottom:1px solid #242432;padding:10px;text-align:left}
+a{color:#7db2ff}
+</style>
 </head>
 <body>
+<div class="card">
   <h1>Mixtli — Archivos del bucket</h1>
-  <input id="prefix" value="uploads/" placeholder="Prefijo"/>
-  <button onclick="loadFiles()">Actualizar</button>
-  <p id="summary"></p>
+  <p><a href="/public/uploader.html">Uploader</a></p>
+  <div>
+    <input id="prefix" value="uploads/"/>
+    <button id="refresh">Actualizar</button>
+  </div>
+  <div style="margin-top:12px">
+    <span id="badge"></span>
+  </div>
   <table>
-    <thead>
-      <tr><th>Archivo (key)</th><th>Tamaño</th><th>Modificado</th><th>Acciones</th></tr>
-    </thead>
-    <tbody id="files"></tbody>
+    <thead><tr><th>Archivo (key)</th><th>Tamaño</th><th>Modificado</th></tr></thead>
+    <tbody id="rows"></tbody>
   </table>
+</div>
 
 <script>
-async function loadFiles() {
-  const prefix = document.getElementById("prefix").value;
-  const res = await fetch(`/api/files?prefix=${encodeURIComponent(prefix)}`);
-  const data = await res.json();
-  const tbody = document.getElementById("files");
-  tbody.innerHTML = "";
-  let total = 0;
-  data.forEach(file => {
-    total += file.size;
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${file.key}</td>
-      <td>${(file.size/1024).toFixed(2)} KB</td>
-      <td>${new Date(file.lastModified).toLocaleString()}</td>
-      <td>
-        <a href="#" class="button" onclick="downloadFile('${file.key}')">Descargar</a>
-        <a href="#" class="button" onclick="deleteFile('${file.key}')">Borrar</a>
-      </td>
-    `;
-    tbody.appendChild(tr);
+const rows = document.getElementById('rows');
+const badge = document.getElementById('badge');
+
+async function authToken(){
+  let t = localStorage.getItem('jwt');
+  if(!t){
+    t = prompt('Pega tu JWT (Bearer)');
+    if(t) localStorage.setItem('jwt', t);
+  }
+  return t;
+}
+
+async function load(){
+  const token = await authToken();
+  if(!token) return;
+  const pref = document.getElementById('prefix').value;
+  const r = await fetch('/api/files?prefix=' + encodeURIComponent(pref), {
+    headers:{'Authorization':'Bearer '+token}
   });
-  document.getElementById("summary").innerText = data.length + " archivos, " + (total/1024/1024).toFixed(2) + " MB";
+  const data = await r.json();
+  rows.innerHTML = '';
+  (data.items || []).forEach(it=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${it.key}</td><td>${(it.size/1024).toFixed(2)} KB</td><td>${new Date(it.lastModified).toLocaleString()}</td>`;
+    rows.appendChild(tr);
+  });
+  badge.textContent = `${(data.items||[]).length} archivos`;
 }
 
-async function downloadFile(key) {
-  const res = await fetch(`/api/files/download-url?key=${encodeURIComponent(key)}`);
-  const data = await res.json();
-  window.open(data.url, "_blank");
-}
-
-async function deleteFile(key) {
-  if (!confirm("¿Borrar " + key + "?")) return;
-  await fetch(`/api/files?key=${encodeURIComponent(key)}`, { method: "DELETE" });
-  loadFiles();
-}
-
-loadFiles();
+document.getElementById('refresh').onclick = load;
+load();
 </script>
 </body>
 </html>

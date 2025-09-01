@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+
 function authRequired(req, res, next) {
   const hdr = req.headers.authorization || '';
   const token = hdr.startsWith('Bearer ') ? hdr.slice(7) : null;
@@ -11,4 +12,5 @@ function authRequired(req, res, next) {
     return res.status(401).json({ error: 'Token inválido' });
   }
 }
+
 module.exports = { authRequired };

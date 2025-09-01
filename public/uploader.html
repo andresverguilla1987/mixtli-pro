@@ -1,2 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<title>Mixtli — Upload multipart</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#0b0b0f;color:#e8e8ea;margin:0;padding:24px}
+.card{max-width:960px;margin:0 auto;background:#121218;border:1px solid #23232e;border-radius:14px;padding:20px}
+button{background:#111;color:#fff;border:1px solid #2b2b34;border-radius:10px;padding:10px 18px;cursor:pointer}
+input[type=file]{padding:8px;background:#181822;border-radius:10px;border:1px solid #2b2b34;color:#cfcfe1}
+#log{background:#0f0f16;border:1px solid #2b2b34;border-radius:10px;padding:12px;white-space:pre-wrap;overflow:auto}
+a{color:#7db2ff}
+.progress{height:10px;background:#1b1b25;border-radius:8px;overflow:hidden;border:1px solid #2b2b34}
+.bar{height:100%;width:0%;background:#4aa3ff}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Mixtli — Upload multipart</h1>
+  <p>Sube archivos grandes con URLs firmadas (S3/R2/MinIO).</p>
+  <p><a href="/public/files.html">Archivos</a></p>
+  <div>
+    <input id="f" type="file"/>
+    <button id="btn">Subir</button>
+  </div>
+  <div class="progress" style="margin-top:12px"><div id="bar" class="bar"></div></div>
+  <div id="log" style="margin-top:14px;min-height:120px;"></div>
+</div>
 
-<!doctype html><html lang="es"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Mixtli — Upload multipart</title><link rel="stylesheet" href="/assets/uploader.css"/></head><body><header><h1>Mixtli — Upload multipart</h1><p>Sube archivos grandes directo a S3/R2/MinIO con URLs firmadas.</p><nav><a href="/uploader.html" class="active">Uploader</a><a href="/files.html">Archivos</a><a href="/api/users" target="_blank">API Users</a></nav></header><main><section class="card"><div id="drop" class="dropzone"><input id="file" type="file" hidden/><button id="choose">Elegir archivo</button><span id="fname">Ningún archivo seleccionado</span></div><div class="actions"><button id="start" class="primary" disabled>Subir</button></div><div class="progress"><div id="bar"></div></div><pre id="log" class="log"></pre></section></main><script src="/assets/uploader.js"></script></body></html>
+<script>
+const PART_SIZE = 5 * 1024 * 1024; // 5MB
+const log = (...a)=>{ const el=document.getElementById('log'); el.textContent += a.join(' ') + '\n'; el.scrollTop = el.scrollHeight; }
+const setProgress = (p)=>{ document.getElementById('bar').style.width = p + '%'; }
+
+async function authToken(){
+  let t = localStorage.getItem('jwt');
+  if(!t){
+    t = prompt('Pega tu JWT (Bearer)');
+    if(t) localStorage.setItem('jwt', t);
+  }
+  return t;
+}
+
+async function uploadMultipart(file){
+  const token = await authToken();
+  if(!token) throw new Error('Sin token');
+
+  const key = `uploads/${Date.now()}_${file.name}`;
+  log('INIT', file.name, (file.size/1024/1024).toFixed(2)+'MB');
+
+  // INIT
+  let r = await fetch('/api/uploads/multipart/init', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+    body: JSON.stringify({ key, contentType: file.type || 'application/octet-stream' })
+  });
+  if(!r.ok){ throw new Error('init failed'); }
+  const init = await r.json();
+  const uploadId = init.uploadId;
+  log('uploadId', uploadId);
+
+  // PARTS
+  const parts = [];
+  let uploaded = 0;
+  let partNumber = 1;
+  for (let start=0; start < file.size; start += PART_SIZE) {
+    const chunk = file.slice(start, start + PART_SIZE);
+    // sign
+    const qs = new URLSearchParams({ key, uploadId, partNumber: String(partNumber) });
+    r = await fetch('/api/uploads/multipart/sign-part?' + qs.toString(), {
+      headers:{'Authorization':'Bearer '+token}
+    });
+    if(!r.ok) throw new Error('sign failed');
+    const { url } = await r.json();
+    // put
+    const put = await fetch(url, { method:'PUT', headers:{'Content-Type': file.type || 'application/octet-stream'}, body: chunk });
+    if(!put.ok) throw new Error('upload part failed');
+    const etag = put.headers.get('etag') || put.headers.get('ETag');
+    if(!etag) throw new Error('no ETag');
+    parts.push({ ETag: etag.replaceAll('"',''), PartNumber: partNumber });
+    uploaded += chunk.size;
+    setProgress(Math.round(uploaded * 100 / file.size));
+    log('Parte', partNumber, 'ok', etag);
+    partNumber++;
+  }
+
+  // COMPLETE
+  r = await fetch('/api/uploads/multipart/complete', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+    body: JSON.stringify({ key, uploadId, parts })
+  });
+  if(!r.ok) throw new Error('complete failed');
+  const done = await r.json();
+  log('COMPLETE', JSON.stringify(done));
+  alert('Listo: ' + (done.location || ('s3://' + key)));
+}
+
+document.getElementById('btn').onclick = async () => {
+  try {
+    const file = document.getElementById('f').files[0];
+    if(!file) return alert('Elige archivo');
+    setProgress(0);
+    await uploadMultipart(file);
+  } catch (e) {
+    console.error(e);
+    log('ERROR', e.message || e.toString());
+    alert('Error: ' + (e.message||e));
+  }
+}
+</script>
+</body>
+</html>
