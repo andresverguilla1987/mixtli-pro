@@ -1,33 +1,32 @@
-PARCHE RÁPIDO - Rutas de usuarios (Prisma ↔️ API)
 
-Qué cambia:
-- Usa el campo real del schema Prisma `CorreoElectronico` en vez de `email`/`nombre`.
-- CRUD completo: GET/POST/PUT/DELETE con selects correctos.
-- Manejo de errores y códigos de estado.
+Pega/integra estos archivos sobre tu repo:
 
-Cómo aplicarlo:
-1) En tu repo, reemplaza el archivo `src/rutas/users.js` por el de este zip.
-2) Haz commit & push a GitHub.
-3) Render auto-deploy se disparará. También puedes redeploy manual.
-4) En Postman:
-   - POST /api/users  (raw JSON)
-     {
-       "email": "demo_{{timestamp}}@example.com",
-       "password": "123456"
-     }
-   - GET /api/users
-   - PUT /api/users/:id  (puedes enviar email y/o password)
-   - DELETE /api/users/:id
+- `src/lib/s3.js`           (añade list() y remove())
+- `src/rutas/files.js`      (nuevas rutas listar y eliminar)
+- `public/files.html`       (UI con previews, totales y eliminar)
 
-Notas:
-- El modelo Prisma esperado es:
+Luego en tu `server.js` agrega, si no existe ya:
 
-  model Usuario {
-    identificacion     Int      @id @default(autoincrement())
-    CorreoElectronico  String   @unique
-    passwordHash       String
-    createdAt          DateTime @default(now())
-    actualizadoEn      DateTime @updatedAt
-  }
+```js
+const filesRouter = require('./src/rutas/files');
+app.use('/api/files', filesRouter);
 
-- No se requiere `nombre`.
+// (Opcional) Si quieres servir proxy/descarga simple desde backend:
+app.get('/api/files/download/:key', async (req, res) => {
+  const key = decodeURIComponent(req.params.key);
+  const { BUCKET, REGION } = require('./src/lib/s3');
+  // Redirección a URL pública si tu bucket permite público por objeto; si no, cámbialo por un presign.
+  return res.redirect(`https://${BUCKET}.s3.${REGION}.amazonaws.com/${encodeURIComponent(key)}`);
+});
+app.get('/api/files/proxy/:key', async (req, res) => {
+  const key = decodeURIComponent(req.params.key);
+  const { BUCKET, REGION } = require('./src/lib/s3');
+  return res.redirect(`https://${BUCKET}.s3.${REGION}.amazonaws.com/${encodeURIComponent(key)}`);
+});
+```
+
+Variables de entorno (ya las tienes, confirmar):
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_REGION` (o `S3_REGION`)
+- `S3_BUCKET`

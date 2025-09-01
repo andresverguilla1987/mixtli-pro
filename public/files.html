@@ -1,94 +1,164 @@
-<!-- public/files.html -->
+
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mixtli — Archivos del bucket</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    :root { color-scheme: dark; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b0f14; color:#e8eef6; margin:0; }
-    header { padding:28px 24px 8px; }
-    h1 { margin:0 0 6px; font-size:36px; }
-    nav { padding:0 24px 16px; }
-    nav a { color:#9cc2ff; text-decoration:none; margin-right:16px; }
-    .card { background:#0f1620; margin:24px; border:1px solid #1b2a3a; border-radius:14px; overflow:hidden; }
-    .toolbar { display:flex; gap:12px; align-items:center; padding:16px; border-bottom:1px solid #1b2a3a; }
-    input[type=text]{ flex:1; background:#0b1220; color:#e8eef6; border:1px solid #243448; border-radius:10px; padding:12px }
-    button { background:#101820; color:#fff; border:1px solid #243448; border-radius:10px; padding:10px 18px; cursor:pointer; }
-    button:hover{ background:#122231; }
-    table { width:100%; border-collapse: collapse; }
-    th, td { padding:12px 16px; border-bottom:1px solid #162334; }
-    th { color:#9fb8d6; font-weight:600; text-align:left; }
-    .actions a{ color:#8fd1ff; margin-right:12px; text-decoration:none }
-    .empty { padding:24px; color:#89a; }
+    :root{--bg:#0b0f14;--card:#121824;--text:#e6edf3;--muted:#9fb0c3;--acc:#59d185;--danger:#ff6b6b}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:1100px;margin:32px auto;padding:0 16px}
+    h1{font-size:clamp(28px,4vw,42px);margin:0 0 8px}
+    .tabs{display:flex;gap:18px;margin:8px 0 24px}
+    .tabs a{color:var(--muted);text-decoration:none;font-weight:600}
+    .tabs a.active{color:var(--text)}
+    .panel{background:var(--card);border:1px solid #1f2937;border-radius:14px;overflow:hidden}
+    .toolbar{display:flex;gap:12px;padding:14px;border-bottom:1px solid #1f2937;align-items:center}
+    .toolbar input{flex:1;background:#0d121a;border:1px solid #243347;border-radius:10px;padding:12px 14px;color:var(--text);outline:none}
+    button{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+    .btn{background:#1f2937;color:var(--text)}
+    .btn:hover{filter:brightness(1.1)}
+    .btn-danger{background:var(--danger);color:#000}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:12px 16px;border-bottom:1px solid #1f2937;text-align:left;font-size:14px}
+    th{color:var(--muted);font-weight:600}
+    .row:hover{background:#0f1520}
+    .preview{display:flex;align-items:center;gap:12px}
+    img.thumb{width:48px;height:48px;object-fit:cover;border-radius:8px;border:1px solid #243347}
+    video.thumb{width:64px;height:40px;border-radius:6px;border:1px solid #243347;background:#000}
+    .summary{display:flex;gap:18px;align-items:center;margin:10px 0 20px;color:var(--muted)}
+    .pill{background:#0d121a;border:1px solid #243347;border-radius:999px;padding:8px 12px}
+    .link{color:var(--acc);text-decoration:none}
+    .empty{color:var(--muted);padding:20px}
   </style>
 </head>
 <body>
-  <header><h1>Mixtli — Archivos del bucket</h1></header>
-  <nav>
-    <a href="/uploader.html">Uploader</a>
-    <strong>Archivos</strong>
-  </nav>
-  <section class="card">
-    <div class="toolbar">
-      <label>Prefijo</label>
-      <input type="text" id="prefix" value="uploads/" />
-      <button id="btn">Actualizar</button>
+  <div class="wrap">
+    <h1>Mixtli — Archivos del bucket</h1>
+    <div class="tabs">
+      <a href="/uploader.html">Uploader</a>
+      <a class="active" href="/files.html">Archivos</a>
     </div>
-    <div style="overflow:auto">
-      <table id="tbl">
-        <thead>
-          <tr><th>Archivo (key)</th><th>Tamaño</th><th>Modificado</th><th>Acciones</th></tr>
-        </thead>
-        <tbody id="rows"><tr><td colspan="4" class="empty">Sin resultados…</td></tr></tbody>
-      </table>
+
+    <div class="summary" id="summary">
+      <span class="pill" id="count">0 archivos</span>
+      <span class="pill" id="total">0 MB</span>
     </div>
-  </section>
+
+    <div class="panel">
+      <div class="toolbar">
+        <input id="prefix" value="uploads/" placeholder="Prefijo, ej: uploads/">
+        <button class="btn" id="refresh">Actualizar</button>
+      </div>
+      <div class="table">
+        <table>
+          <thead>
+            <tr>
+              <th>Archivo (key)</th>
+              <th>Tamaño</th>
+              <th>Modificado</th>
+              <th style="width:160px">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr><td class="empty" colspan="4">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
   <script>
-    async function load() {
-      const prefix = document.getElementById('prefix').value.trim();
-      const res = await fetch(`/api/uploads/list?prefix=${encodeURIComponent(prefix)}`);
+    const $ = sel => document.querySelector(sel);
+
+    function human(n){
+      if(n == null) return "-";
+      const kb = n/1024, mb = kb/1024, gb = mb/1024;
+      if (gb >= 1) return gb.toFixed(2) + " GB";
+      if (mb >= 1) return mb.toFixed(2) + " MB";
+      return kb.toFixed(2) + " KB";
+    }
+    function fmtDate(s){
+      try{ return new Date(s).toLocaleString(); } catch{ return "-"; }
+    }
+    function isImg(key){
+      return /\.(png|jpg|jpeg|gif|webp|bmp)$/i.test(key);
+    }
+    function isVideo(key){
+      return /\.(mp4|webm|mov|m4v)$/i.test(key);
+    }
+
+    async function fetchList(){
+      const prefix = encodeURIComponent($("#prefix").value.trim() || "uploads/");
+      const res = await fetch(`/api/files?prefix=${prefix}`);
+      if(!res.ok){ alert("Error listando archivos"); return; }
       const data = await res.json();
-      const rows = document.getElementById('rows');
-      rows.innerHTML = '';
-      const files = (data.archivos || []).filter(x => !!x.key);
-      if (!files.length) {
-        rows.innerHTML = '<tr><td colspan="4" class="empty">Sin resultados…</td></tr>';
-        return;
+      renderRows(data.items || []);
+    }
+
+    function renderRows(items){
+      const tb = $("#tbody");
+      tb.innerHTML = "";
+      if(!items.length){
+        tb.innerHTML = `<tr><td class="empty" colspan="4">Sin archivos</td></tr>`;
       }
-      for (const f of files) {
-        const tr = document.createElement('tr');
-        const size = (f.size || 0);
-        const nice = size > 1e9 ? (size/1e9).toFixed(2)+' GB'
-                  : size > 1e6 ? (size/1e6).toFixed(2)+' MB'
-                  : size > 1e3 ? (size/1e3).toFixed(2)+' KB'
-                  : size + ' B';
-        const fecha = f.lastModified ? new Date(f.lastModified).toLocaleString() : '';
-        tr.innerHTML = `
-          <td>${f.key}</td>
-          <td>${nice}</td>
-          <td>${fecha}</td>
-          <td class="actions">
-            <a href="#" data-key="${f.key}" class="dl">Descargar</a>
-          </td>`;
-        rows.appendChild(tr);
+      let total = 0;
+      for(const it of items){
+        total += it.size || 0;
+        const key = it.key;
+        const safeKey = encodeURIComponent(key);
+        const row = document.createElement("tr");
+        row.className = "row";
+        const preview = (()=>{
+          if (isImg(key)) {
+            // Enlaces de descarga presuntos vía S3 pública del bucket si aplica; si no, mostramos solo key.
+            return `<div class="preview"><img class="thumb" src="https://${location.host}/api/files/proxy/${safeKey}" onerror="this.src='';this.outerHTML='<span>'+key+'</span>'"><div>${key}</div></div>`;
+          } else if (isVideo(key)) {
+            return `<div class="preview"><video class="thumb" controls src="https://${location.host}/api/files/proxy/${safeKey}"></video><div>${key}</div></div>`;
+          } else {
+            return `<div class="preview"><div>📄</div><div>${key}</div></div>`;
+          }
+        })();
+        row.innerHTML = `
+          <td>${preview}</td>
+          <td>${human(it.size)}</td>
+          <td>${fmtDate(it.lastModified)}</td>
+          <td>
+            <a class="link" href="https://${location.host}/api/files/proxy/${safeKey}" target="_blank">Ver</a>
+            &nbsp;·&nbsp;
+            <a class="link" href="https://${location.host}/api/files/download/${safeKey}">Descargar</a>
+            &nbsp;·&nbsp;
+            <button class="btn-danger" data-del="${safeKey}">Eliminar</button>
+          </td>
+        `;
+        tb.appendChild(row);
       }
-      // enlaces de descarga firmada
-      rows.querySelectorAll('a.dl').forEach(a => {
-        a.addEventListener('click', async (e) => {
-          e.preventDefault();
-          const key = a.getAttribute('data-key');
-          const r = await fetch(`/api/uploads/sign-get?key=${encodeURIComponent(key)}`);
-          const j = await r.json();
-          if (j.url) window.open(j.url, '_blank');
-          else alert('No se pudo firmar URL');
+      // Totales
+      $("#count").textContent = `${items.length} archivo${items.length===1?"":"s"}`;
+      $("#total").textContent = human(total);
+      // Wire delete
+      tb.querySelectorAll("button[data-del]").forEach(btn=>{
+        btn.addEventListener("click", async (e)=>{
+          const key = btn.getAttribute("data-del");
+          const nice = decodeURIComponent(key);
+          if(!confirm(`¿Eliminar "${nice}"? Esta acción no se puede deshacer.`)) return;
+          const res = await fetch(`/api/files/${key}`, { method:"DELETE" });
+          if(!res.ok){ alert("No se pudo eliminar."); return; }
+          await fetchList();
         });
       });
     }
-    document.getElementById('btn').addEventListener('click', load);
-    load();
+
+    $("#refresh").addEventListener("click", fetchList);
+    $("#prefix").addEventListener("keydown", (e)=>{
+      if(e.key === "Enter") fetchList();
+    });
+    fetchList();
   </script>
 </body>
 </html>
