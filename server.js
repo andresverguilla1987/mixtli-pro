@@ -1,46 +1,90 @@
-// server.js — Investor build (serve static + API)
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-require('dotenv').config();
+import express from 'express';
+import cors from 'cors';
+import { PrismaClient } from '@prisma/client';
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const prisma = new PrismaClient();
 
-// Seguridad y CORS
-app.use(helmet());
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
-}));
+app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// 👉 Servir la landing pro desde /public
-app.use(express.static('public'));
-
-// Endpoints simples
-app.get('/salud', (req, res) => res.json({ ok: true }));
-app.get('/', (req, res) => {
-  // Si no encuentra index.html por alguna razón, responde JSON
-  res.send({ name: 'Mixtli API', ok: true, docs: '/api/users' });
+// Endpoint de salud
+app.get('/salud', (req, res) => {
+  res.json({ status: 'ok', msg: 'API funcionando chingón 🚀' });
 });
 
-// Rutas API
-app.use('/api/users', require('./src/rutas/users'));
-try {
-  app.use('/api/uploads', require('./src/rutas/uploads'));
-} catch(e) {
-  // Si no existe la ruta de uploads en tu repo, ignora
-  console.warn('uploads route no disponible (ok para demo)');
-}
+// =========================
+// RUTAS DE USUARIOS CRUD
+// =========================
 
-// Error handler global
-app.use((err, req, res, next) => {
-  console.error('Error global:', err);
-  const status = err.status || 500;
-  res.status(status).json({ error: err.message || 'Error inesperado' });
+// Crear usuario
+app.post('/api/users', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await prisma.usuario.create({
+      data: { email, passwordHash: password }
+    });
+    res.status(201).json(user);
+  } catch (error) {
+    console.error('Error creando usuario:', error);
+    res.status(400).json({ error: error.message });
+  }
 });
 
+// Listar todos los usuarios
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await prisma.usuario.findMany({
+      orderBy: { id: 'asc' }
+    });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Obtener usuario por ID
+app.get('/api/users/:id', async (req, res) => {
+  try {
+    const user = await prisma.usuario.findUnique({
+      where: { id: Number(req.params.id) }
+    });
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Actualizar usuario
+app.put('/api/users/:id', async (req, res) => {
+  try {
+    const updated = await prisma.usuario.update({
+      where: { id: Number(req.params.id) },
+      data: req.body
+    });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Eliminar usuario
+app.delete('/api/users/:id', async (req, res) => {
+  try {
+    await prisma.usuario.delete({
+      where: { id: Number(req.params.id) }
+    });
+    res.json({ msg: 'Usuario eliminado correctamente' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =========================
+// INICIO DEL SERVIDOR
+// =========================
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`🚀 API en puerto ${PORT}`);
 });
