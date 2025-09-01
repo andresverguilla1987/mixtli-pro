@@ -1,45 +1,33 @@
-
-// src/lib/s3.js - CommonJS
 const { S3Client, ListObjectsV2Command, DeleteObjectCommand } = require("@aws-sdk/client-s3");
-
-const REGION = process.env.AWS_REGION || process.env.S3_REGION || "us-east-1";
-const BUCKET = process.env.S3_BUCKET;
-
-if (!BUCKET) {
-  console.error("⚠️  FALTA la variable de entorno S3_BUCKET");
-}
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
 const s3 = new S3Client({
-  region: REGION,
-  // Las credenciales vienen del entorno: AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY
+  region: process.env.AWS_REGION || process.env.S3_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
 });
 
-async function list(prefix = "uploads/") {
-  const cmd = new ListObjectsV2Command({
-    Bucket: BUCKET,
-    Prefix: prefix
-  });
-  const res = await s3.send(cmd);
-  const items = (res.Contents || []).map(obj => ({
-    key: obj.Key,
-    size: obj.Size,
-    lastModified: obj.LastModified
-  }));
-  return items;
+const bucket = process.env.S3_BUCKET;
+
+async function listFiles(prefix = "uploads/") {
+  const command = new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix });
+  const response = await s3.send(command);
+  return response.Contents || [];
 }
 
-async function remove(key) {
-  const cmd = new DeleteObjectCommand({
-    Bucket: BUCKET,
-    Key: key
+async function getDownloadUrl(key) {
+  const command = new (require("@aws-sdk/client-s3").GetObjectCommand)({
+    Bucket: bucket,
+    Key: key,
   });
-  await s3.send(cmd);
-  return { ok: true };
+  return await getSignedUrl(s3, command, { expiresIn: 3600 });
 }
 
-module.exports = {
-  list,
-  remove,
-  BUCKET,
-  REGION,
-};
+async function deleteFile(key) {
+  const command = new DeleteObjectCommand({ Bucket: bucket, Key: key });
+  return await s3.send(command);
+}
+
+module.exports = { listFiles, getDownloadUrl, deleteFile };

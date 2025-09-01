@@ -1,0 +1,3 @@
+// En server.js agrega estas líneas:
+const filesRouter = require('./src/rutas/files');
+app.use('/api/files', filesRouter);
