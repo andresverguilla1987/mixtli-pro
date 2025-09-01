@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mixtli — Upload multipart</title>
+<style>body{background:#0b0d12;color:#e7e9ee;font-family:system-ui,Segoe UI,Roboto,Ubuntu,Arial}.wrap{max-width:980px;margin:40px auto;padding:0 16px}.card{background:#0f131a;border:1px solid #1d2430;border-radius:14px;padding:18px;margin-top:24px}.log{font-family:ui-monospace,Consolas,Menlo,monospace;white-space:pre-wrap;background:#0c0f14;border:1px solid #1b2230;border-radius:12px;padding:12px;margin-top:12px}progress{width:100%}</style>
+</head><body>
+<div class="wrap"><h1>Mixtli — Upload multipart</h1><p>Sube archivos grandes directo a S3 con URLs firmadas.</p>
+<div class="card"><input id="file" type="file"><button id="btn">Subir</button><progress id="bar" max="100" value="0"></progress><div id="log" class="log"></div></div></div>
+<script>
+function log(t){document.getElementById('log').textContent+=t+"\n"}
+function reset(){document.getElementById('bar').value=0;document.getElementById('log').textContent=''}
+async function subir(){
+  reset();
+  const f=document.getElementById('file').files[0]; if(!f){log('Selecciona un archivo'); return;}
+  log('init... '+f.name);
+  let r=await fetch('/api/uploads/multipart/init',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:f.name,contentType:f.type})});
+  if(!r.ok){log('ERROR: init failed'); return;}
+  const {uploadId,key,partSize}=await r.json();
+  const parts=[],totalParts=Math.ceil(f.size/partSize);
+  for(let n=1;n<=totalParts;n++){
+    const start=(n-1)*partSize,end=Math.min(start+partSize,f.size),blob=f.slice(start,end);
+    const sig=await fetch(`/api/uploads/multipart/sign-part?key=${encodeURIComponent(key)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${n}`);
+    const {url}=await sig.json();
+    const put=await fetch(url,{method:'PUT',body:blob});
+    const etag=put.headers.get('etag')||put.headers.get('ETag'); parts.push({etag,partNumber:n});
+    document.getElementById('bar').value=Math.round(n*100/totalParts);
+  }
+  const fin=await fetch('/api/uploads/multipart/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,uploadId,parts})});
+  const j=await fin.json(); if(fin.ok){log('OK: '+j.location); alert('Subida completa: '+j.location);} else {log('ERROR al completar: '+JSON.stringify(j));}
+}
+document.getElementById('btn').addEventListener('click',subir);
+</script></body></html>

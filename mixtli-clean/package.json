@@ -1,0 +1,26 @@
+{
+  "name": "mixtli-clean",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mixtli API limpia: Express + Prisma + S3 multipart + paginas de prueba",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "prisma:generate": "npx prisma generate",
+    "prisma:push": "npx prisma db push"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "@aws-sdk/client-s3": "^3.620.0",
+    "@aws-sdk/s3-request-presigner": "^3.620.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "morgan": "^1.10.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

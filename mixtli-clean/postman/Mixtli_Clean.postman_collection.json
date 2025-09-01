@@ -1,0 +1,155 @@
+{
+  "info": {
+    "name": "Mixtli Clean API",
+    "_postman_id": "mixtli-clean-collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Coleccion CRUD Usuarios + salud"
+  },
+  "item": [
+    {
+      "name": "GET /salud",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/salud",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "salud"
+          ]
+        }
+      }
+    },
+    {
+      "name": "POST /api/users (crear)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\": \"prueba+{{timestamp}}@mixtli.com\", \"password\": \"123456\"}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/users",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "users"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201', ()=> pm.response.code === 201);",
+              "const j = pm.response.json();",
+              "pm.environment.set('userId', j.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "GET /api/users (lista)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/users",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "users"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET /api/users/:id",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/users/{{userId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "users",
+            "{{userId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "PUT /api/users/:id",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\": \"update+{{timestamp}}@mixtli.com\"}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/users/{{userId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "users",
+            "{{userId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "DELETE /api/users/:id",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "{{baseUrl}}/api/users/{{userId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "users",
+            "{{userId}}"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://mixtli-pro.onrender.com"
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "timestamp",
+      "value": "{{$timestamp}}"
+    }
+  ]
+}
