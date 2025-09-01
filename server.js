@@ -1,6 +1,11 @@
+// server.js (CommonJS, drop-in)
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { PrismaClient } = require('@prisma/client');
+
+// Rutas
+const uploadsRouter = require('./src/rutas/uploads');
 
 const app = express();
 const prisma = new PrismaClient();
@@ -26,7 +31,6 @@ app.post('/api/users', async (req, res) => {
     return res.status(201).json(user);
   } catch (err) {
     console.error('POST /api/users error:', err);
-    // Prisma unique violation => 409
     const msg = String(err?.message || '');
     if (/Unique constraint/i.test(msg)) return res.status(409).json({ error: 'Email duplicado' });
     return res.status(400).json({ error: msg });
@@ -92,7 +96,12 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 });
 
-// Start
+// ===== Uploads (S3 multipart) =====
+app.use('/api/uploads', uploadsRouter);
+
+// Static demo (uploader)
+app.use(express.static('public'));
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`🚀 API en puerto ${PORT}`);
