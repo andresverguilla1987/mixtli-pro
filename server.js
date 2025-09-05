@@ -1,33 +1,48 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import pkg from "@prisma/client";
 
-const health = require('./src/rutas/health');
-const auth = require('./src/rutas/auth');
-const users = require('./src/rutas/users');
-const uploads = require('./src/rutas/uploads');
+dotenv.config();
+const { PrismaClient } = pkg;
+export const prisma = new PrismaClient();
 
 const app = express();
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
-app.use(express.json({ limit: '50mb' }));
+app.use(cors({ origin: "*", methods: ["GET","POST","PUT","PATCH","DELETE"], allowedHeaders: ["Content-Type","Authorization"] }));
+app.use(express.json({ limit: "5mb" }));
 
-// Rutas
-app.use(health);
-app.use(auth);
-app.use(users);
-app.use(uploads);
-
-// Root
-app.get('/', (_, res) => res.status(200).send('<pre>Mixtli API up</pre>'));
-
-// Error handler
-app.use((err, req, res, next) => {
-  console.error('Error global:', err);
-  res.status(500).json({ error: 'error' });
+app.get("/api/health", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ ok: true, db: "ok", ts: new Date().toISOString() });
+  } catch (e) {
+    res.status(200).json({ ok: true, db: "error", error: (e && e.message) || String(e), ts: new Date().toISOString() });
+  }
 });
 
-const PORT = Number(process.env.PORT || 10000);
-app.listen(PORT, () => {
-  console.log('Usuarios: no encontrado (ok si no lo usas).');
-  console.log(`🚀 API en puerto ${PORT}`);
+import authRouter from "./routes/auth.js";
+app.use("/api/auth", authRouter);
+
+// Debug route to list express routes
+app.get("/__routes", (_req, res) => {
+  const list = [];
+  app._router.stack.forEach(m => {
+    if (m.route && m.route.path) {
+      const methods = Object.keys(m.route.methods).join(",").toUpperCase();
+      list.push({ method: methods, path: m.route.path });
+    } else if (m.name === "router" && m.handle?.stack) {
+      m.handle.stack.forEach(h => {
+        if (h.route) {
+          const methods = Object.keys(h.route.methods).join(",").toUpperCase();
+          list.push({ method: methods, path: h.route.path, base: m.regexp?.toString() });
+        }
+      });
+    }
+  });
+  res.json(list);
 });
+
+app.use((_req, res) => res.status(404).json({ error: "Not found" }));
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`🚀 API en puerto ${PORT}`));
