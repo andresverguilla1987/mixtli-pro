@@ -1,14 +1,11 @@
 /**
- * Root server for Render hotfix.
- * - Serves GET / with health JSON
- * - Mounts /security and /events from notifications module
- * - Mounts /debug if present
+ * Root server with CORS enabled (Render hotfix).
  */
 import 'dotenv/config';
 import express from 'express';
 import bodyParser from 'body-parser';
+import cors from 'cors';
 
-// Try to import notification module pieces
 let securityRoutes, eventRoutes, debugRoutes, prisma;
 try { ({ default: securityRoutes } = await import('./notifications/src/routes/security.js')); } catch {}
 try { ({ default: eventRoutes } = await import('./notifications/src/routes/events.js')); } catch {}
@@ -16,9 +13,13 @@ try { ({ default: debugRoutes } = await import('./notifications/src/routes/debug
 try { ({ prisma } = await import('./notifications/src/lib/prisma.js')); } catch {}
 
 const app = express();
+
+// 🔓 CORS para demo hosted (GitHub Pages)
+app.use(cors({ origin: true }));
+app.options('*', cors({ origin: true }));
+
 app.use(bodyParser.json({ limit: '1mb' }));
 
-// Attach demo user so routes funcionen si no hay auth real
 app.use(async (req, res, next) => {
   try {
     if (prisma) {
@@ -33,13 +34,11 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// Health root
 app.get('/', (req, res) => res.json({ status: 'ok', app: process.env.APP_NAME || 'Mixtli Pro', time: new Date().toISOString() }));
 
-// Mount feature routes if available
 if (securityRoutes) app.use('/security', securityRoutes);
 if (eventRoutes) app.use('/events', eventRoutes);
 if (debugRoutes) app.use('/debug', debugRoutes);
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`✅ Root server ready on port ${port}`));
+app.listen(port, () => console.log(`✅ Root+CORS server ready on ${port}`));
