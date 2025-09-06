@@ -1,10 +1,16 @@
 import fs from 'fs';
 import path from 'path';
 import handlebars from 'handlebars';
+import { recordMail } from './drylog.js';
 
+/**
+ * DRY RUN MODE
+ * Set DRY_RUN_EMAIL=1 to skip actual sends and just log payloads.
+ */
 const DRY = String(process.env.DRY_RUN_EMAIL || '') === '1';
 
 function logDry(payload) {
+  recordMail({ mode: 'DRY', ...payload });
   console.log('[MAIL:DRY_RUN]', JSON.stringify(payload, null, 2));
   return Promise.resolve({ dryRun: true });
 }
@@ -17,16 +23,21 @@ if (DRY) {
 } else if (useSendGrid) {
   const sgMail = (await import('@sendgrid/mail')).default;
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-  transport = async ({to, subject, html}) =>
-    sgMail.send({to, from: {email: process.env.MAIL_FROM_EMAIL, name: process.env.MAIL_FROM_NAME}, subject, html});
+  transport = async ({to, subject, html}) => {
+    recordMail({ mode: 'LIVE', provider: 'sendgrid', to, subject, htmlPreview: html?.slice(0, 400) });
+    return sgMail.send({to, from: {email: process.env.MAIL_FROM_EMAIL, name: process.env.MAIL_FROM_NAME}, subject, html});
+  };
 } else {
   const { SESClient, SendEmailCommand } = await import('@aws-sdk/client-ses');
   const ses = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
-  transport = async ({to, subject, html}) => ses.send(new SendEmailCommand({
-    Destination: { ToAddresses: [to] },
-    Source: `${process.env.MAIL_FROM_NAME} <${process.env.MAIL_FROM_EMAIL}>`,
-    Message: { Subject: { Data: subject }, Body: { Html: { Data: html } } }
-  }));
+  transport = async ({to, subject, html}) => {
+    recordMail({ mode: 'LIVE', provider: 'ses', to, subject, htmlPreview: html?.slice(0, 400) });
+    return ses.send(new SendEmailCommand({
+      Destination: { ToAddresses: [to] },
+      Source: `${process.env.MAIL_FROM_NAME} <${process.env.MAIL_FROM_EMAIL}>`,
+      Message: { Subject: { Data: subject }, Body: { Html: { Data: html } } }
+    }));
+  };
 }
 
 function getTemplatePath(name) {

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Mixtli – Demo Seguridad & Notificaciones</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0b1220; color:#e6edf3; margin:0; }
+    .wrap { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { background: #111827; border:1px solid #1f2937; border-radius: 14px; padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.28); }
+    h1 { font-size: 24px; margin: 0 0 16px; }
+    h2 { font-size: 18px; margin: 0 0 12px; }
+    button { background:#2563eb; border:none; color:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; }
+    button:disabled { background:#374151; cursor:not-allowed; }
+    input, textarea { width:100%; padding:10px; border-radius:10px; border:1px solid #374151; background:#0b1220; color:#e6edf3; }
+    .muted { color:#9ca3af; font-size:13px; }
+    .log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; background:#0b1220; color:#93c5fd; border:1px solid #1f2937; padding:8px; border-radius:10px; height:220px; overflow:auto; }
+    .row { display:flex; gap:8px; align-items:center; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #374151; }
+    .ok { color:#22c55e; }
+    a { color:#93c5fd; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Mixtli – Seguridad & Notificaciones (Demo)</h1>
+    <p class="muted">Todo corre live contra tu API. Activa <code>DRY_RUN_EMAIL=1</code> para ver los "envíos" en el panel sin mandar correos reales.</p>
+    <div class="grid">
+      <div class="card">
+        <h2>1) Ping</h2>
+        <div class="row">
+          <input id="baseUrl" placeholder="http://localhost:3000" value="http://localhost:3000"/>
+          <button onclick="ping()">Probar</button>
+        </div>
+        <div class="muted" id="pingStatus"></div>
+      </div>
+      <div class="card">
+        <h2>Usuario demo</h2>
+        <input id="userEmail" value="admin@mixtli.test"/>
+        <p class="muted">Se envía en el header <code>X-User-Email</code>.</p>
+      </div>
+
+      <div class="card">
+        <h2>2FA – Setup</h2>
+        <div class="row">
+          <button onclick="setup2fa()">Generar QR</button>
+          <span id="setupStatus" class="pill"></span>
+        </div>
+        <p class="muted">Escanéalo con Google Authenticator / 1Password.</p>
+        <img id="qr" style="max-width:100%; display:none; border:1px solid #374151; border-radius:10px;"/>
+      </div>
+
+      <div class="card">
+        <h2>2FA – Enable</h2>
+        <input id="totp" placeholder="Código de 6 dígitos"/>
+        <div class="row" style="margin-top:8px;">
+          <button onclick="enable2fa()">Confirmar</button>
+          <span id="enableStatus" class="pill"></span>
+        </div>
+        <div class="muted" id="codesInfo"></div>
+      </div>
+
+      <div class="card">
+        <h2>Notificaciones (DRY)</h2>
+        <div class="row">
+          <button onclick="sendLogin()">Enviar “Nuevo login”</button>
+          <span id="mailStatus" class="pill"></span>
+        </div>
+        <p class="muted">Con DRY activado, no salen correos reales; aparecerán abajo.</p>
+      </div>
+
+      <div class="card">
+        <h2>Mail Log</h2>
+        <div class="row" style="gap:12px;">
+          <button onclick="loadMailLog()">Refrescar</button>
+          <span class="muted">Endpoint: <code>/debug/mail-log</code></span>
+        </div>
+        <pre id="log" class="log"></pre>
+      </div>
+    </div>
+  </div>
+
+<script>
+function headers() {
+  return { 'Content-Type': 'application/json', 'X-User-Email': document.getElementById('userEmail').value || 'admin@mixtli.test' };
+}
+function url(path) {
+  const base = document.getElementById('baseUrl').value.replace(/\/$/,''); 
+  return base + path;
+}
+async function ping() {
+  const el = document.getElementById('pingStatus');
+  el.textContent = '→ consultando...';
+  try {
+    const r = await fetch(url('/'));
+    const j = await r.json();
+    el.textContent = r.ok ? '✓ OK: ' + (j.app || 'Mixtli Pro') : 'Error';
+    el.className = 'pill ' + (r.ok ? 'ok' : '');
+  } catch (e) { el.textContent = 'Error: ' + e.message; el.className='pill'; }
+}
+async function setup2fa() {
+  const el = document.getElementById('setupStatus');
+  el.textContent = '→ generando...';
+  try {
+    const r = await fetch(url('/security/2fa/setup'), { method:'POST', headers: headers() });
+    const j = await r.json();
+    if (j.qrDataUrl) {
+      const img = document.getElementById('qr');
+      img.src = j.qrDataUrl;
+      img.style.display='block';
+    }
+    el.textContent = r.ok ? '✓ QR listo' : 'Error';
+    el.className = 'pill ' + (r.ok ? 'ok' : '');
+  } catch (e) { el.textContent = 'Error: ' + e.message; el.className='pill'; }
+}
+async function enable2fa() {
+  const el = document.getElementById('enableStatus');
+  el.textContent = '→ verificando...';
+  const code = document.getElementById('totp').value;
+  try {
+    const r = await fetch(url('/security/2fa/enable'), {
+      method:'POST', headers: headers(), body: JSON.stringify({ code })
+    });
+    const j = await r.json();
+    if (r.ok && j.recoveryCodes) {
+      document.getElementById('codesInfo').textContent = 'Backup codes ('+j.recoveryCodes.length+'): ' + j.recoveryCodes.slice(0,3).join(', ') + ' ...';
+    }
+    el.textContent = r.ok ? '✓ 2FA habilitado' : ('Error: ' + (j.error || r.status));
+    el.className = 'pill ' + (r.ok ? 'ok' : '');
+  } catch (e) { el.textContent = 'Error: ' + e.message; el.className='pill'; }
+}
+async function sendLogin() {
+  const el = document.getElementById('mailStatus');
+  el.textContent = '→ enviando...';
+  try {
+    const r = await fetch(url('/events/login'), { method:'POST', headers: headers() });
+    const j = await r.json();
+    el.textContent = r.ok ? '✓ Evento enviado' : 'Error';
+    el.className = 'pill ' + (r.ok ? 'ok' : '');
+    await loadMailLog();
+  } catch (e) { el.textContent = 'Error: ' + e.message; el.className='pill'; }
+}
+async function loadMailLog() {
+  const pre = document.getElementById('log');
+  try {
+    const r = await fetch(url('/debug/mail-log'));
+    const j = await r.json();
+    pre.textContent = JSON.stringify(j.items || [], null, 2);
+  } catch (e) { pre.textContent = 'Error: ' + e.message; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+// En notifications/server.js, agrega estas líneas:
+import debugRoutes from './src/routes/debug.js';
+app.use('/debug', debugRoutes);
+// Ahora tendrás GET /debug/mail-log para mostrarle al inversionista los correos que "se enviaron".
