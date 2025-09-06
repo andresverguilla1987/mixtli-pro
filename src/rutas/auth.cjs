@@ -1,4 +1,4 @@
-// src/rutas/auth.cjs  (CJS)
+// src/rutas/auth.cjs - DIAG
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
@@ -22,6 +22,31 @@ function extractHash(user) {
   return user?.password ?? user?.passwordHash ?? user?.hash ?? null;
 }
 
+// ---- DIAGNÓSTICO ----
+router.get("/__ping", (_req, res) => res.json({ ok: true, route: "auth/__ping" }));
+
+router.get("/__dbcheck", async (_req, res) => {
+  try {
+    const count = await prisma.user.count();
+    res.json({ ok: true, userCount: count });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+router.post("/__create_test", async (_req, res) => {
+  try {
+    const rnd = Math.floor(Math.random() * 1e6);
+    const email = `diag_${rnd}@mixtli.mx`;
+    const hash = await bcrypt.hash("12345678", 10);
+    const user = await prisma.user.create({ data: { email, password: hash, name: "Diag" } });
+    res.json({ ok: true, created: { id: user.id, email: user.email } });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+// ---- REGISTER ----
 router.post("/register", async (req, res) => {
   try {
     const { email, password, name } = req.body || {};
@@ -41,6 +66,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
+// ---- LOGIN ----
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body || {};
@@ -65,13 +91,14 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// ---- REFRESH ----
 router.post("/refresh", async (req, res) => {
   try {
     const { refreshToken } = req.body || {};
     if (!refreshToken) return res.status(400).json({ error: "refreshToken requerido" });
-    if (!JWT_SECRET) throw new Error("JWT_SECRET_missing");
+    if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET_missing");
 
-    const decoded = jwt.verify(refreshToken, JWT_SECRET);
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
     const user = await prisma.user.findUnique({ where: { id: decoded.uid } });
     if (!user) return res.status(401).json({ error: "usuario no encontrado" });
 
@@ -85,14 +112,15 @@ router.post("/refresh", async (req, res) => {
   }
 });
 
+// ---- ME ----
 router.get("/me", async (req, res) => {
   try {
     const auth = req.headers.authorization || "";
     const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
     if (!token) return res.status(401).json({ error: "token_requerido" });
-    if (!JWT_SECRET) throw new Error("JWT_SECRET_missing");
+    if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET_missing");
 
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await prisma.user.findUnique({ where: { id: decoded.uid }, select: { id: true, email: true, name: true } });
     if (!user) return res.status(404).json({ error: "usuario_no_encontrado" });
 
