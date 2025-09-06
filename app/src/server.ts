@@ -4,10 +4,12 @@ import helmet from 'helmet';
 import pinoHttp from 'pino-http';
 import rateLimit from 'express-rate-limit';
 import cors from 'cors';
-import jwt from 'jsonwebtoken';
+/* jwt removed in favor of jose */
 import bcrypt from 'bcrypt';
+import cookieParser from 'cookie-parser';
 import { z } from 'zod';
 import { prisma } from './prisma.js';
+import { signTokens, getIssuer, getAudience, getJWKS } from './jwks.js';
 
 const app = express();
 // Confía en encabezados del proxy para X-Forwarded-For / req.ips
@@ -85,6 +87,17 @@ app.use('/api/auth', authMinuteLimiter, authWindowLimiter);
 app.use(morgan('combined'));
 
 app.use(express.json());
+app.use(cookieParser());
+
+// Filtro de User-Agent
+const UA_ALLOW_RE = new RegExp(process.env.UA_ALLOW_RE || '.*');
+const UA_DENY_RE = new RegExp(process.env.UA_DENY_RE || '^$');
+app.use((req, res, next) => {
+  const ua = String(req.headers['user-agent'] || '');
+  if (UA_DENY_RE.test(ua)) return res.status(403).json({ message: 'Forbidden UA', code: 'UA_BLOCKED' });
+  if (!UA_ALLOW_RE.test(ua)) return res.status(403).json({ message: 'Not allowed UA', code: 'UA_NOT_ALLOWED' });
+  next();
+});
 
 // CORS
 const origins = (process.env.CORS_ORIGINS || '').split(',').filter(Boolean);
@@ -100,7 +113,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const ACCESS_TTL = 60 * 60; // 1h
 const REFRESH_TTL = 60 * 60 * 24 * 7; // 7d
 
-function signTokens(payload: any) {
+// signTokens now imported from jwks.ts
+function signTokens_legacy(payload: any) {
   const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TTL });
   const refreshToken = jwt.sign({ sub: payload.sub, type: 'refresh' }, JWT_SECRET, { expiresIn: REFRESH_TTL });
   return { accessToken, refreshToken, tokenType: 'Bearer', expiresIn: ACCESS_TTL };
@@ -202,4 +216,37 @@ app.get('/ready', async (_req, res) => {
   } catch {
     res.status(500).send('NOT_READY');
   }
+});
+
+
+// CSRF (double-submit cookie) - habilitar con CSRF_ENABLED=true
+function randomToken(len: number) {
+  const buf = Buffer.alloc(len);
+  for (let i = 0; i < len; i++) buf[i] = Math.floor(Math.random() * 256);
+  return buf.toString('base64url');
+}
+app.get('/api/csrf', (req, res) => {
+  if ((process.env.CSRF_ENABLED || 'false') !== 'true') return res.status(404).end();
+  const token = randomToken(32);
+  res.cookie('csrf', token, { httpOnly: false, sameSite: 'lax', secure: false, maxAge: 3600_000 });
+  res.json({ csrfToken: token });
+});
+// Middleware CSRF para métodos que modifican estado
+app.use((req, res, next) => {
+  if ((process.env.CSRF_ENABLED || 'false') !== 'true') return next();
+  const method = req.method.toUpperCase();
+  const needs = ['POST','PUT','PATCH','DELETE'].includes(method);
+  if (!needs) return next();
+  const header = String(req.headers['x-csrf-token'] || '');
+  const cookie = String((req.cookies && req.cookies['csrf']) || '');
+  if (!header || !cookie || header !== cookie) {
+    return res.status(403).json({ message: 'CSRF token mismatch', code: 'CSRF_BLOCKED' });
+  }
+  next();
+});
+
+// JWKS público (para validación por terceros)
+app.get('/.well-known/jwks.json', async (_req, res) => {
+  const jwks = await getJWKS();
+  res.json(jwks);
 });

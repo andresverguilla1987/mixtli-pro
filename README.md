@@ -277,3 +277,21 @@ Descomenta y ajusta los CIDRs si quieres que la API solo responda a ciertas IPs/
   - `IP_ALLOWLIST_AUTH` y `IP_DENYLIST_AUTH` aplican **además** de los globales.
 
 > Soporta IPv4 exacto (`203.0.113.25`) y CIDR (`203.0.113.0/24`). Para IPv6, se puede integrar luego con `ipaddr.js` o `cidr-matcher`.
+
+
+## JWT con `iss`/`aud` y JWKS
+- Firma con **KID** activo (`JWT_ACTIVE_KID`) y expositor **JWKS** en `/.well-known/jwks.json`.
+- Reemplaza las llaves de `app/keys/*` por tus llaves reales:
+  - `dev-rs256-k1.private.pem` (PKCS8) y su `public.pem`
+  - Añade nuevos `KID`s y cambia `JWT_ACTIVE_KID` para **rotar**.
+- Si no configuras llaves, usa fallback **HS256** con `JWT_SECRET` (no recomendado en prod).
+
+## CSRF (doble cookie)
+- Actívalo con `CSRF_ENABLED=true`.
+- Obtén token en `GET /api/csrf` (setea cookie `csrf` y devuelve el valor).
+- Envía el mismo token en header **`X-CSRF-Token`** en `POST/PUT/PATCH/DELETE`.
+
+## Filtro de User-Agent
+- Ajusta regex en `UA_ALLOW_RE` y `UA_DENY_RE`. Por ejemplo:
+  - Bloquear curl: `UA_DENY_RE=^curl/.*`
+  - Permitir sólo navegadores: `UA_ALLOW_RE=Mozilla|Chrome|Safari|Edg`
