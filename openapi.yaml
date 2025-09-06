@@ -1,0 +1,185 @@
+openapi: 3.0.3
+info:
+  title: Mixtli Pro API
+  version: "1.0.0"
+  description: >
+    API de autenticación y utilidades de Mixtli Pro.
+    Incluye registro, login, refresh de tokens, healthcheck y echo.
+servers:
+  - url: https://mixtli-pro.onrender.com
+    description: Render (prod)
+  - url: https://{host}
+    description: Custom
+    variables:
+      host:
+        default: localhost:10000
+tags:
+  - name: Auth
+  - name: System
+paths:
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrar usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              default:
+                value: { name: "Admin", email: "admin@example.com", password: "S3gura#123" }
+      responses:
+        "201":
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "400":
+          description: Datos inválidos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        "409":
+          description: Email ya registrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Iniciar sesión
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+            examples:
+              default:
+                value: { email: "admin@example.com", password: "S3gura#123" }
+      responses:
+        "200":
+          description: Login exitoso
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        "401":
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Renovar tokens con refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        "200":
+          description: Tokens renovados
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        "401":
+          description: Refresh token inválido o expirado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/health:
+    get:
+      tags: [System]
+      summary: Healthcheck del servicio
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+
+  /api/echo:
+    post:
+      tags: [System]
+      summary: Devuelve el cuerpo enviado (para pruebas)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EchoRequest' }
+            examples:
+              default:
+                value: { hola: "mixtli" }
+      responses:
+        "200":
+          description: Eco
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EchoResponse' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1 }
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+    AuthResponse:
+      type: object
+      required: [accessToken, refreshToken, tokenType, expiresIn]
+      properties:
+        accessToken: { type: string, description: "JWT de acceso" }
+        refreshToken: { type: string, description: "Token para renovar sesión" }
+        tokenType: { type: string, enum: [Bearer], default: Bearer }
+        expiresIn: { type: integer, description: "Segundos de vigencia del access token", example: 3600 }
+        user:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            email: { type: string, format: email }
+            role: { type: string, example: ADMIN }
+    HealthResponse:
+      type: object
+      properties:
+        status: { type: string, example: "ok" }
+        uptime: { type: number, description: "Segundos" }
+        timestamp: { type: string, format: date-time }
+    EchoRequest:
+      type: object
+      additionalProperties: true
+    EchoResponse:
+      type: object
+      additionalProperties: true
+    Error:
+      type: object
+      properties:
+        message: { type: string }
+        code: { type: string }
+security:
+  - bearerAuth: []
