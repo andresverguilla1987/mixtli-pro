@@ -1,4 +1,4 @@
-// src/rutas/auth.cjs — FIX: sin campo `name` (modelo `usuario` solo tiene email/passwordHash)
+// src/rutas/auth.cjs — PROD CLEAN (modelo `usuario`, campo `passwordHash`, sin `name`)
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
