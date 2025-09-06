@@ -27,7 +27,9 @@
     "pino-http": "^10.3.0",
     "helmet": "^7.1.0",
     "jose": "^5.9.3",
-    "cookie-parser": "^1.4.6"
+    "cookie-parser": "^1.4.6",
+    "qrcode": "^1.5.3",
+    "nodemailer": "^6.9.13"
   },
   "devDependencies": {
     "tsx": "^4.19.0",

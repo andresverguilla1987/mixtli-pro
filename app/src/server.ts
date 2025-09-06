@@ -929,6 +929,12 @@ app.post('/login', express.urlencoded({ extended: true }), async (req, res) => {
     if (user.lockoutUntil && user.lockoutUntil > new Date()) return res.status(429).send('Cuenta bloqueada temporalmente');
     const ok = await verifyPassword(String(password), user.passwordHash);
     if (!ok) { await registerFailedLogin(user.id); return res.status(401).send('Usuario o contraseña inválidos'); }
+    // 2FA obligatorio para roles sensibles
+    const enforce = (user.role === 'ADMIN' || user.role === 'SECOPS');
+    const qs = new URLSearchParams(req.query as any).toString();
+    if (enforce && !user.totpEnabled) {
+      return res.redirect(`/2fa/enroll?${qs}`);
+    }
     // If TOTP enabled, go to 2FA step
     const qs = new URLSearchParams(req.query as any).toString();
     if (user.totpEnabled) {
@@ -995,8 +1001,14 @@ app.post('/forgot-password', express.urlencoded({ extended: true }), async (req,
   const tok = require('crypto').randomBytes(24).toString('base64url');
   const exp = new Date(Date.now() + 1000*60*15);
   await prisma.passwordReset.create({ data: { userId: user.id, token: tok, expiresAt: exp } });
-  // DEMO: mostramos el link
-  return res.send(`Enlace de reset (demo): <a href="/reset-password?token=${tok}">Reset</a> (válido 15 min)`);
+  if (process.env.SMTP_HOST) {
+    const link = `${req.protocol}://${req.get('host')}/reset-password?token=${tok}`;
+    await sendMail(String(email), 'Recupera tu contraseña', `<p>Para resetear tu contraseña haz clic en: <a href="${link}">${link}</a></p>`);
+    return res.send('Si existe, te enviaremos un correo con instrucciones.');
+  } else {
+    // DEMO: mostramos el link
+    return res.send(`Enlace de reset (demo): <a href="/reset-password?token=${tok}">Reset</a> (válido 15 min)`);
+  }
 });
 app.get('/reset-password', async (req, res) => {
   const { token } = req.query as any;
@@ -1020,3 +1032,56 @@ app.post('/reset-password', express.urlencoded({ extended: true }), async (req, 
   await prisma.passwordReset.update({ where: { id: rec.id }, data: { usedAt: new Date() } });
   return res.send('Contraseña actualizada. Ahora inicia sesión.');
 });
+
+
+async function sendMail(to: string, subject: string, html: string) {
+  const host = process.env.SMTP_HOST;
+  if (!host) { console.log('[MAIL:demo]', subject, '->', to); return { demo: true }; }
+  const transporter = nodemailer.createTransport({
+    host: host,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: false,
+    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS || '' } : undefined
+  } as any);
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || 'no-reply@localhost',
+    to, subject, html
+  });
+}
+
+
+app.get('/api/auth/totp/enroll/qr', requireAuth(async (req: any, res: any) => {
+  const user = (req as any).user;
+  const fresh = await prisma.user.findUnique({ where: { id: user.id } });
+  if (!fresh?.totpSecret) return res.status(400).send('No hay secret; llama /api/auth/totp/enroll primero');
+  const issuer = encodeURIComponent('Mixtli');
+  const label = encodeURIComponent(fresh.email || fresh.id);
+  const otpauth = `otpauth://totp/${issuer}:${label}?secret=${fresh.totpSecret}&issuer=${issuer}&digits=6`;
+  const png = await QRCode.toDataURL(otpauth, { width: 220, margin: 1 });
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.end(`<!doctype html><html><body style="font-family:system-ui"><h2>Escanea este QR</h2><img src="${png}"/><p>${otpauth}</p></body></html>`);
+}));
+
+
+app.get('/2fa/enroll', requireAuth(async (req: any, res: any) => {
+  const user = (req as any).user;
+  const fresh = await prisma.user.findUnique({ where: { id: user.id } });
+  if (!fresh?.totpSecret) {
+    // auto-enroll to get secret
+    await fetch(`${req.protocol}://${req.get('host')}/api/auth/totp/enroll`, { headers: { cookie: req.headers.cookie || '' } as any });
+  }
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  const qs = new URLSearchParams(req.query as any).toString();
+  res.end(`<!doctype html><html><head><meta charset="utf-8"><title>Habilitar 2FA</title></head><body style="font-family:system-ui;max-width:520px;margin:40px auto">
+  <h1>Habilitar 2FA</h1>
+  <p>1) Escanea el QR con Google Authenticator / Authy.</p>
+  <iframe src="/api/auth/totp/enroll/qr" style="border:0;width:240px;height:280px"></iframe>
+  <p>2) Ingresa el código de 6 dígitos:</p>
+  <form method="post" action="/api/auth/totp/verify?${qs}">
+    <input name="token" pattern="\\d{6}" required />
+    <button type="submit">Verificar y activar</button>
+  </form>
+  <p>3) Genera códigos de respaldo (guárdalos):</p>
+  <form method="post" action="/api/auth/backup/regenerate?${qs}"><button type="submit">Generar códigos</button></form>
+  </body></html>`);
+}));

@@ -528,3 +528,15 @@ En el panel **Audit**, tienes controles para estas opciones y se aplican tambié
 - Al exceder intentos fallidos → **lockout** temporal; se limpia al login correcto.
 
 > Producción: envía el enlace de reset por email (SMTP/SendGrid) en lugar de mostrarlo.
+
+
+## 2FA con QR y SMTP
+- **QR TOTP**: 
+  - `GET /api/auth/totp/enroll` → crea `secret` y `otpauth`.
+  - `GET /api/auth/totp/enroll/qr` → página con QR (PNG) + `otpauth://...`.
+  - `GET /2fa/enroll` → UI guiada para activar 2FA y generar códigos de respaldo.
+- **2FA obligatorio**:
+  - Para roles `ADMIN` y `SECOPS`, si no tienen 2FA habilitado, el login redirige a `/2fa/enroll` antes de continuar.
+- **SMTP real (password reset)**:
+  - Configura `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`.
+  - Con SMTP activo, el flujo de reset envía correo; sin SMTP, muestra el link (modo demo).
