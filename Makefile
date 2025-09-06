@@ -28,3 +28,11 @@ web:
 
 all:
 	cd infra && docker compose --env-file ./.env.docker up --build -d db adminer swagger app web
+
+
+caddy:
+	cd infra && docker compose --env-file ./.env.docker up -d caddy
+
+
+caddy:
+	cd infra && docker compose --env-file ./.env.docker up -d caddy

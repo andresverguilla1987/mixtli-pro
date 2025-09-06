@@ -139,3 +139,65 @@ npx cap open ios       # abre Xcode
 
 > Nota: Para producción, construye la PWA con tu framework favorito (Vite/React/etc.), apunta `server.url` a tu dominio HTTPS y configura CORS/JWT en la API (ya preparado).
 
+
+
+## Reverse Proxy + HTTPS (Caddy)
+
+Ya viene un servicio **Caddy** listo para producción con HTTPS automático de Let's Encrypt.
+
+1) Edita `infra/Caddyfile` y pon tus dominios reales:
+```
+api.tudominio.com   -> proxy a servicio app (API)
+app.tudominio.com   -> proxy a web PWA
+swagger.tudominio.com -> Swagger UI
+db.tudominio.com    -> Adminer (opcional)
+```
+
+2) Configura los DNS de esos dominios apuntando a tu servidor (A/AAAA records).
+
+3) Levanta todo con Caddy incluido:
+```bash
+make all
+cd infra && docker compose up -d caddy
+```
+
+4) Caddy pedirá certificados SSL/TLS de Let's Encrypt automáticamente y servirá tus servicios en HTTPS.
+
+> **Nota**: Asegúrate de abrir puertos 80 y 443 en tu servidor/VPS.
+
+
+## Reverse Proxy HTTPS (Caddy)
+
+1) Apunta tus DNS:
+   - `A` / `AAAA` de **api.tu-dominio.com** -> tu servidor
+   - `A` / `AAAA` de **app.tu-dominio.com** -> tu servidor
+   - `A` / `AAAA` de **swagger.tu-dominio.com** -> tu servidor
+   - `A` / `AAAA` de **db.tu-dominio.com** -> tu servidor
+
+2) Edita `infra/.env.docker`:
+```
+ACME_EMAIL=you@example.com
+DOMAIN_API=api.tu-dominio.com
+DOMAIN_WEB=app.tu-dominio.com
+DOMAIN_SWAGGER=swagger.tu-dominio.com
+DOMAIN_ADMINER=db.tu-dominio.com
+
+# (Opcional) Protege Adminer con Basic Auth
+# ADMINER_USER=admin
+# ADMINER_PASS_BCRYPT=$2a$14$hash-generado-con-caddy
+```
+Genera hash bcrypt:
+```bash
+docker run --rm caddy caddy hash-password --plaintext 'tuPass'
+```
+
+3) Levanta proxy:
+```bash
+make caddy
+```
+
+- Accesos:
+  - API → https://${DOMAIN_API}/api/health
+  - Web → https://${DOMAIN_WEB}
+  - Swagger → https://${DOMAIN_SWAGGER}
+  - Adminer → https://${DOMAIN_ADMINER}

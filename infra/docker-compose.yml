@@ -84,3 +84,57 @@ volumes:
     depends_on:
       - app
     networks: [mixtli]
+
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: mixtli_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+      - web
+      - swagger
+      - adminer
+    networks: [mixtli]
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: mixtli_caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - ACME_AGREE=true
+      - EMAIL=${ACME_EMAIL}
+      - DOMAIN_API=${DOMAIN_API}
+      - DOMAIN_WEB=${DOMAIN_WEB}
+      - DOMAIN_SWAGGER=${DOMAIN_SWAGGER}
+      - DOMAIN_ADMINER=${DOMAIN_ADMINER}
+      - ADMINER_USER=${ADMINER_USER:-}
+      - ADMINER_PASS_BCRYPT=${ADMINER_PASS_BCRYPT:-}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+      - web
+      - swagger
+      - adminer
+    networks: [mixtli]
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,25 @@
+{
+  # Global options
+  email you@example.com
+  acme_ca https://acme-v02.api.letsencrypt.org/directory
+}
+
+# API reverse proxy
+api.tudominio.com {
+  reverse_proxy app:10000
+}
+
+# Web PWA reverse proxy
+app.tudominio.com {
+  reverse_proxy web:80
+}
+
+# Swagger UI
+swagger.tudominio.com {
+  reverse_proxy swagger:8080
+}
+
+# Adminer (opcional proteger con auth)
+db.tudominio.com {
+  reverse_proxy adminer:8080
+}

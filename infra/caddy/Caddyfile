@@ -1,0 +1,37 @@
+
+{
+	# Logs básicos
+	admin off
+}
+
+# API
+{$DOMAIN_API} {
+	encode gzip
+	@api path /api* *
+	rewrite @api {path}
+	reverse_proxy app:10000
+}
+
+# Web PWA
+{$DOMAIN_WEB} {
+	encode gzip
+	root * /usr/share/nginx/html
+	# Servimos vía contenedor 'web' por reverse proxy
+	reverse_proxy web:80
+}
+
+# Swagger UI
+{$DOMAIN_SWAGGER} {
+	encode gzip
+	reverse_proxy swagger:8080
+}
+
+# Adminer (puedes proteger con Basic Auth opcional)
+{$DOMAIN_ADMINER} {
+	encode gzip
+	# Descomenta para Basic Auth:
+	# basicauth /* {
+	#   {$ADMINER_USER} {$ADMINER_PASS_BCRYPT}
+	# }
+	reverse_proxy adminer:8080
+}
