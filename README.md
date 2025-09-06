@@ -401,3 +401,24 @@ El seed crea/actualiza un **client** con:
 - `OAUTH_REDIRECT_URIS` (CSV)
 - `OAUTH_PUBLIC_CLIENT` (true/false)
 Ajusta estas variables en `infra/.env.docker` o `.env` antes de correr `make seed`.
+
+
+## Gestión de sesiones y revocación
+### Endpoints de usuario
+- `GET /api/sessions` → lista sesiones (sid, IP, UA, created/expires, revoked)
+- `POST /api/sessions/revoke` `{ sid }` → revoca una sesión propia
+- `POST /api/sessions/revoke_all` → revoca todas menos la actual
+
+### Endpoints admin
+- `POST /api/admin/refresh/revoke` `{ userId, clientId? }` → revoca *todos* los refresh tokens de un usuario (opcionalmente sólo de `clientId`)
+
+> Requiere `role=ADMIN` (el seed ya crea un admin).
+
+### Migración
+```bash
+npx prisma migrate dev -n "sessions_ip_ua"
+# o: make seed
+```
+
+### Consent UI
+- UI con **tema claro/oscuro**, badges de scopes y botones estilizados.

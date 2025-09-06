@@ -198,7 +198,7 @@ app.post('/api/auth/login', async (req, res) => {
   if (!ok) return res.status(401).json({ message: 'Credenciales inválidas', code: 'BAD_CREDENTIALS' });
 
   const tokens = await signTokens({ sub: user.id, email: user.email, role: user.role });
-  if ((process.env.SESSION_ENABLED || 'false') === 'true') { await setSessionCookie(res, user.id); }
+  if ((process.env.SESSION_ENABLED || 'false') === 'true') { await setSessionCookie(res, user.id, req); }
   return res.json({ ...tokens, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 });
 
@@ -398,19 +398,30 @@ app.get('/oauth/authorize', async (req, res) => {
     const denyUrl = `/oauth/consent?approve=0&${qs}`;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.end(`<!doctype html>
-<html><head><meta charset="utf-8"><title>Consentimiento</title></head>
-<body style="font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width:720px; margin:40px auto;">
-  <div style=\"display:flex;align-items:center;gap:12px\">
-    <div style=\"width:40px;height:40px;border-radius:10px;background:#0ea5e9\"></div>
+<html><head><meta charset="utf-8"><title>Consentimiento</title>
+<style>
+:root{color-scheme:light dark}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:720px;margin:40px auto;padding:0 16px;}
+.card{border:1px solid #e5e7eb;border-radius:12px;padding:16px;background:Canvas;color:CanvasText}
+.btn{padding:10px 14px;border-radius:8px;border:none;cursor:pointer}
+.btn-yes{background:#16a34a;color:#fff}
+.btn-no{background:#ef4444;color:#fff}
+.badge{display:inline-block;background:#e2e8f0;color:#111827;border-radius:6px;padding:4px 8px;margin:4px 4px 0 0}
+@media (prefers-color-scheme: dark){.card{border-color:#334155}.badge{background:#334155;color:#e2e8f0}}
+</style>
+</head>
+<body>
+  <div class="card" style="display:flex;align-items:center;gap:12px">
+    <svg width=\"40\" height=\"40\" viewBox=\"0 0 40 40\" xmlns=\"http://www.w3.org/2000/svg\"><defs><linearGradient id=\"g\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop stop-color=\"#0ea5e9\"/><stop offset=\"1\" stop-color=\"#38bdf8\"/></linearGradient></defs><rect rx=\"10\" width=\"40\" height=\"40\" fill=\"url(#g)\"/></svg>
     <h1 style=\"margin:0\">Mixtli – Consentimiento</h1>
   </div>
   <p>La app <b>${client_id}</b> solicita acceso con el/los <b>alcances</b>:</p>
-  <ul style=\"background:#f1f5f9;padding:12px;border-radius:8px\">
-    ${String(scope).split(' ').map(s=>`<li><code>${s}</code></li>`).join('')}
-  </ul>
-  <div style=\"display:flex;gap:12px\">
-    <a href=\"${approveUrl}\"><button style=\"padding:10px 14px;border-radius:8px;background:#16a34a;color:white;border:none\">Aprobar</button></a>
-    <a href=\"${denyUrl}\"><button style=\"padding:10px 14px;border-radius:8px;background:#ef4444;color:white;border:none\">Denegar</button></a>
+  <div>
+    ${String(scope).split(' ').map(s=>`<span class=\"badge\"><code>${s}</code></code></span>`).join('')}
+  </div>
+  <div style=\"display:flex;gap:12px;align-items:center\">
+    <a href=\"${approveUrl}\"><button class=\"btn btn-yes\">Aprobar</button></a>
+    <a href=\"${denyUrl}\"><button class=\"btn btn-no\">Denegar</button></a>
   </div>
   <p style=\"color:#64748b;margin-top:12px\">Demo: se usa el access_token del usuario en query o Authorization header.</p>
 </body></html>`);
@@ -453,3 +464,69 @@ app.get('/oauth/consent', (req, res) => {
 async function getOAuthClient(client_id: string) {
   return prisma.oAuthClient.findFirst({ where: { clientId: client_id } });
 }
+
+
+async function currentUser(req: any) {
+  // Prefer session
+  const s = await sessionUser(req);
+  if (s) return await prisma.user.findUnique({ where: { id: String(s.sub) } });
+  // Fallback: decode bearer payload (not verifying here)
+  const b = bearerUser(req);
+  if (b) return await prisma.user.findUnique({ where: { id: String(b.sub) } });
+  return null;
+}
+
+function requireAuth(handler: any) {
+  return async (req: any, res: any) => {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ message: 'Unauthorized' });
+    (req as any).user = user;
+    return handler(req, res);
+  };
+}
+
+function requireAdmin(handler: any) {
+  return requireAuth(async (req: any, res: any) => {
+    const user = (req as any).user;
+    if (user.role !== 'ADMIN') return res.status(403).json({ message: 'Forbidden' });
+    return handler(req, res);
+  });
+}
+
+
+app.get('/api/sessions', requireAuth(async (req: any, res: any) => {
+  const user = (req as any).user;
+  const sessions = await prisma.session.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: 'desc' },
+    select: { sid: true, createdAt: true, expiresAt: true, revokedAt: true, ip: true, userAgent: true, id: true }
+  });
+  res.json({ sessions });
+}));
+
+
+app.post('/api/sessions/revoke', requireAuth(async (req: any, res: any) => {
+  const user = (req as any).user;
+  const { sid } = req.body || {};
+  if (!sid) return res.status(400).json({ message: 'sid requerido' });
+  await prisma.session.updateMany({ where: { userId: user.id, sid, revokedAt: null }, data: { revokedAt: new Date() } });
+  res.status(204).end();
+}));
+
+
+app.post('/api/sessions/revoke_all', requireAuth(async (req: any, res: any) => {
+  const user = (req as any).user;
+  const currentSid = req.cookies?.sid || '';
+  await prisma.session.updateMany({ where: { userId: user.id, sid: { not: currentSid }, revokedAt: null }, data: { revokedAt: new Date() } });
+  res.status(204).end();
+}));
+
+
+app.post('/api/admin/refresh/revoke', requireAdmin(async (req: any, res: any) => {
+  const { userId, clientId } = req.body || {};
+  if (!userId) return res.status(400).json({ message: 'userId requerido' });
+  const where: any = { userId: String(userId), revokedAt: null };
+  if (clientId) where.clientId = String(clientId);
+  const count = await prisma.refreshToken.updateMany({ where, data: { revokedAt: new Date(), reason: 'admin_revoked' } });
+  res.json({ revoked: count.count });
+}));
