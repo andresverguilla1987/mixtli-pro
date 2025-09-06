@@ -1,5 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
+import helmet from 'helmet';
+import pinoHttp from 'pino-http';
+import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
@@ -7,6 +10,16 @@ import { z } from 'zod';
 import { prisma } from './prisma.js';
 
 const app = express();
+import rateLimit from 'express-rate-limit';
+import morgan from 'morgan';
+
+// Rate limiting (100 req/15min por IP)
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+app.use(limiter);
+
+// Logs en JSON
+app.use(morgan('combined'));
+
 app.use(express.json());
 
 // CORS
@@ -99,4 +112,15 @@ app.post('/api/echo', (req, res) => {
 const PORT = Number(process.env.PORT || 10000);
 app.listen(PORT, () => {
   console.log('🚀 API en puerto', PORT);
+});
+
+
+app.get('/live', (_req, res) => res.status(200).send('OK'));
+app.get('/ready', async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).send('READY');
+  } catch {
+    res.status(500).send('NOT_READY');
+  }
 });

@@ -201,3 +201,47 @@ make caddy
   - Web → https://${DOMAIN_WEB}
   - Swagger → https://${DOMAIN_SWAGGER}
   - Adminer → https://${DOMAIN_ADMINER}
+
+
+## CI/CD (GitHub Actions)
+
+- Workflow en `.github/workflows/ci-cd.yml`.
+- Jobs:
+  - **build**: instala deps, genera Prisma, compila y corre tests con Postgres de servicio.
+  - **docker**: si pasa build, hace push de imágenes `mixtli-app` y `mixtli-web` a DockerHub.
+- Configura secretos en tu repo:
+  - `DOCKER_USER`
+  - `DOCKER_PASS`
+- Deployment server:
+```bash
+git pull
+docker compose pull
+docker compose up -d
+```
+
+
+## Observabilidad y seguridad
+- **Logs JSON** con `pino` (API): listos para centralizar (Loki/ELK).
+- **Rate limiting** (100 req / 15min por IP, ajustable con `RATE_LIMIT_MAX`).
+- **Helmet** activo para headers de seguridad.
+- **Healthchecks** (`/live`, `/ready`) conectados a Docker healthchecks.
+
+## CI (GitHub Actions)
+- Workflow `ci` build & push imágenes a **GHCR**:
+  - `ghcr.io/<owner>/mixtli-app:latest`
+  - `ghcr.io/<owner>/mixtli-web:latest`
+  - `ghcr.io/<owner>/mixtli-caddy:latest`
+- Necesitas GHCR habilitado (usa el `GITHUB_TOKEN` por defecto).
+
+## Deploy (workflow manual)
+1) Guarda en *Secrets* de tu repo:
+   - `SSH_USER`, `SSH_KEY` (PEM), `SSH_PORT` (p. ej., 22)
+2) Ejecuta workflow **Deploy** (`workflow_dispatch`) con:
+   - `host`: `tu-usuario@tu-servidor`
+   - `path`: `/opt/mixtli` (por ejemplo)
+3) El job hace:
+   - `scp` de `infra/.env.docker`, `infra/docker-compose.yml` y `infra/caddy/Caddyfile`
+   - `docker compose pull && up -d` en el server
+
+> Puedes versionar `infra/` y mantener `.env.docker` en secrets o en tu servidor.
+

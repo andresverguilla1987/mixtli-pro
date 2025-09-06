@@ -7,7 +7,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "prisma:gen": "prisma generate"
+    "prisma:gen": "prisma generate",
+    "start:pretty": "NODE_ENV=production node dist/server.js | pino-pretty"
   },
   "dependencies": {
     "express": "^4.19.2",
@@ -16,7 +17,13 @@
     "zod": "^3.23.8",
     "jsonwebtoken": "^9.0.2",
     "bcrypt": "^5.1.1",
-    "@prisma/client": "^5.18.0"
+    "@prisma/client": "^5.18.0",
+    "express-rate-limit": "^7.4.0",
+    "morgan": "^1.10.0",
+    "pino": "^9.3.2",
+    "pino-pretty": "^11.2.2",
+    "pino-http": "^10.3.0",
+    "helmet": "^7.1.0"
   },
   "devDependencies": {
     "tsx": "^4.19.0",
