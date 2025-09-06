@@ -1,16 +1,22 @@
-# Mixtli Pro - Fix Pack v2 (con diagnósticos)
-- Mejora `login` para detectar campos `password` / `passwordHash` / `hash`
-- Añade `/api/auth/me` (validación de Access Token)
-- Añade `/api/auth/__debug_user?email=...` para verificar qué campo de hash está presente
+# Mixtli Corrector (Producción)
+- Entrypoint CJS con shim (`server.js` -> `src/server.cjs`).
+- Rutas `/api/auth/*` fijas al delegate Prisma `prisma.usuario` (según tu schema).
+- JWT con `JWT_SECRET` desde Environment.
 
-## Rutas
+## Estructura
+server.js
+src/
+  server.cjs
+  rutas/
+    auth.cjs
+
+## Render
+- **Start Command**: `node server.js` (o `node src/server.cjs` si no usas el shim).
+- **Env**: `DATABASE_URL`, `JWT_SECRET`.
+
+## Endpoints
 - GET `/api/health`
-- POST `/api/auth/register`
-- POST `/api/auth/login`
-- POST `/api/auth/refresh`
-- GET `/api/auth/me` (con `Authorization: Bearer <accessToken>`)
-- GET `/api/auth/__debug_user?email=correo` (solo para pruebas; quítala en producción)
-
-## Sugerencia
-- Asegura `JWT_SECRET` en el entorno de Render.
-- Si `__debug_user` te dice `passwordFieldDetected=null`, revisa tu `schema.prisma` y renombra a `password` o ajusta el código.
+- POST `/api/auth/register` { email, password, name? }
+- POST `/api/auth/login` { email, password }
+- POST `/api/auth/refresh` { refreshToken }
+- GET  `/api/auth/me`   (Authorization: Bearer <accessToken>)
