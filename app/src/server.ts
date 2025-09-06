@@ -624,17 +624,104 @@ async function audit(type: string, req: any, extra: any = {}) {
   const clientId = extra.clientId || null;
   const details = extra.details || {};
   try {
-    await prisma.auditEvent.create({ data: { type, userId: userId || undefined, clientId: clientId || undefined, ip, userAgent: ua, details } });
+    const ev = await prisma.auditEvent.create({ data: { type, userId: userId || undefined, clientId: clientId || undefined, ip, userAgent: ua, details } });
   } catch {}
   try {
     const url = process.env.AUDIT_WEBHOOK_URL;
     if (url) {
-      const payload = { ts: new Date().toISOString(), type, userId, clientId, ip, ua, details };
+      const payload = { ts: new Date().toISOString(), type, userId, clientId, ip, ua, details, eventId: ev.id };
       const body = JSON.stringify(payload);
       const secret = process.env.AUDIT_WEBHOOK_SECRET || '';
       const crypto = await import('crypto');
       const sig = crypto.createHmac('sha256', secret).update(body).digest('hex');
-      await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Signature': sig }, body }).catch(()=>{});
+      try {
+        const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Signature': sig }, body });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        await prisma.webhookDelivery.create({ data: { eventId: ev.id, url, payload: payload as any, status: 'delivered', attempts: 1 } });
+      } catch (err: any) {
+        const backoff = Number(process.env.WEBHOOK_BACKOFF_SECONDS || 60);
+        await prisma.webhookDelivery.create({ data: { eventId: ev.id, url, payload: payload as any, status: 'pending', attempts: 1, lastError: String(err?.message || err), nextAttemptAt: new Date(Date.now() + backoff * 1000) } });
+      }
     }
   } catch {}
 }
+
+
+app.get('/api/admin/audit/events', requireAdmin(async (req: any, res: any) => {
+  const { type, userId, clientId, start, end, limit = 200 } = req.query as any;
+  const where: any = {};
+  if (type) where.type = String(type);
+  if (userId) where.userId = String(userId);
+  if (clientId) where.clientId = String(clientId);
+  if (start || end) {
+    where.ts = {};
+    if (start) where.ts.gte = new Date(String(start));
+    if (end) where.ts.lte = new Date(String(end));
+  }
+  const items = await prisma.auditEvent.findMany({
+    where,
+    orderBy: { ts: 'desc' },
+    take: Math.min(Number(limit) || 200, 1000),
+  });
+  res.json({ items });
+}));
+
+app.get('/api/admin/audit/webhooks', requireAdmin(async (req: any, res: any) => {
+  const { status, limit = 200 } = req.query as any;
+  const where: any = {};
+  if (status) where.status = String(status);
+  const items = await prisma.webhookDelivery.findMany({
+    where,
+    orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+    take: Math.min(Number(limit) || 200, 500),
+  });
+  res.json({ items });
+}));
+
+app.post('/api/admin/audit/webhooks/retry', requireAdmin(async (req: any, res: any) => {
+  const { id } = req.body || {};
+  const url = process.env.AUDIT_WEBHOOK_URL;
+  if (!url) return res.status(400).json({ message: 'AUDIT_WEBHOOK_URL no está configurado' });
+  const secret = process.env.AUDIT_WEBHOOK_SECRET || '';
+  const maxAttempts = Number(process.env.WEBHOOK_MAX_ATTEMPTS || 6);
+
+  if (id) {
+    const delivery = await prisma.webhookDelivery.findUnique({ where: { id: String(id) } });
+    if (!delivery) return res.status(404).json({ message: 'No encontrado' });
+    if (delivery.attempts >= maxAttempts) return res.status(400).json({ message: 'Max attempts reached' });
+    const body = JSON.stringify(delivery.payload);
+    const crypto = await import('crypto');
+    const sig = crypto.createHmac('sha256', secret).update(body).digest('hex');
+    try {
+      const r = await fetch(delivery.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Signature': sig }, body });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      await prisma.webhookDelivery.update({ where: { id: delivery.id }, data: { status: 'delivered', attempts: delivery.attempts + 1, lastError: null, nextAttemptAt: null } });
+      return res.json({ status: 'delivered' });
+    } catch (e: any) {
+      const next = new Date(Date.now() + Number(process.env.WEBHOOK_BACKOFF_SECONDS || 60) * 1000);
+      await prisma.webhookDelivery.update({ where: { id: delivery.id }, data: { status: 'pending', attempts: delivery.attempts + 1, lastError: String(e?.message || e), nextAttemptAt: next } });
+      return res.json({ status: 'pending', error: String(e?.message || e) });
+    }
+  } else {
+    // Retry all pending whose nextAttemptAt <= now
+    const pendings = await prisma.webhookDelivery.findMany({ where: { status: 'pending', OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: new Date() } }] } });
+    let delivered = 0, pending = 0;
+    for (const d of pendings) {
+      if (d.attempts >= maxAttempts) continue;
+      const body = JSON.stringify(d.payload);
+      const crypto = await import('crypto');
+      const sig = crypto.createHmac('sha256', secret).update(body).digest('hex');
+      try {
+        const r = await fetch(d.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Signature': sig }, body });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        await prisma.webhookDelivery.update({ where: { id: d.id }, data: { status: 'delivered', attempts: d.attempts + 1, lastError: null, nextAttemptAt: null } });
+        delivered++;
+      } catch (e: any) {
+        const next = new Date(Date.now() + Number(process.env.WEBHOOK_BACKOFF_SECONDS || 60) * 1000);
+        await prisma.webhookDelivery.update({ where: { id: d.id }, data: { status: 'pending', attempts: d.attempts + 1, lastError: String(e?.message || e), nextAttemptAt: next } });
+        pending++;
+      }
+    }
+    res.json({ delivered, pending });
+  }
+}));

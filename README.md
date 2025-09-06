@@ -452,3 +452,16 @@ npx prisma migrate dev -n "sessions_ip_ua"
 npx prisma migrate dev -n "audit_events"
 # o: make seed
 ```
+
+
+## Audit UI + Webhook retries
+- **API**
+  - `GET /api/admin/audit/events` → filtros: `type`, `userId`, `clientId`, `start`, `end`, `limit`
+  - `GET /api/admin/audit/webhooks` → lista deliveries (`status`, `attempts`, `lastError`, `nextAttemptAt`)
+  - `POST /api/admin/audit/webhooks/retry` → reintentar uno `{ id }` o todos pendientes `{}`
+- **Webclient**
+  - Nueva pestaña **Audit**: filtros de eventos + lista de webhooks con botón **Reintentar** (individual o todos).
+- **Prisma**
+  - `WebhookDelivery` con `status=pending|delivered|failed`, `attempts`, `nextAttemptAt` para backoff.
+- **ENV**
+  - `WEBHOOK_MAX_ATTEMPTS=6`, `WEBHOOK_BACKOFF_SECONDS=60`

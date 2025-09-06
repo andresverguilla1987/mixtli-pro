@@ -1,3 +1,4 @@
+import AuditView from './AuditView'
 import AdminPanel from './AdminPanel'
 import React, { useEffect, useMemo, useState } from 'react'
 import { randomString, sha256base64url } from './pkce'
@@ -7,7 +8,7 @@ const CLIENT_ID = import.meta.env.VITE_CLIENT_ID || 'mixtli-web'
 const REDIRECT_URI = import.meta.env.VITE_REDIRECT_URI || 'http://localhost:5174/callback'
 
 export default function App() {
-  const [tab, setTab] = useState<'demo'|'admin'>('demo')
+  const [tab, setTab] = useState<'demo'|'admin'|'audit'>('demo')
   const [email, setEmail] = useState('admin@example.com')
   const [password, setPassword] = useState('S3gura#123')
   const [access, setAccess] = useState<string>('')
@@ -87,12 +88,12 @@ export default function App() {
       <h1>Mixtli OAuth2 + PKCE (Demo)</h1>
       <div style={{marginBottom:16}}>
         <button onClick={()=>setTab('demo')}>Demo</button>{' '}
-        <button onClick={()=>setTab('admin')}>Admin</button>
+        <button onClick={()=>setTab('admin')}>Admin</button>{' '}<button onClick={()=>setTab('audit')}>Audit</button>
       </div>
       {tab === 'demo' ? (
       <div style={{marginBottom:16}}>
         <button onClick={()=>setTab('demo')}>Demo</button>{' '}
-        <button onClick={()=>setTab('admin')}>Admin</button>
+        <button onClick={()=>setTab('admin')}>Admin</button>{' '}<button onClick={()=>setTab('audit')}>Audit</button>
       </div>
       <p>API: {API}</p>
 
@@ -145,8 +146,10 @@ export default function App() {
         <h2>Log</h2>
         <pre style={{whiteSpace:'pre-wrap'}}>{log}</pre>
       </section>
-      ) : (
+      ) : tab === 'admin' ? (
         <AdminPanel />
+      ) : (
+        <AuditView />
       )}
     </div>
   )
