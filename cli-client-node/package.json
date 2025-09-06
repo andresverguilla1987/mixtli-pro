@@ -1,0 +1,9 @@
+{
+  "name": "mixtli-cli-oauth-client",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {}
+}

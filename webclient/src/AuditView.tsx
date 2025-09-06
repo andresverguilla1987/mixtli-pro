@@ -10,6 +10,9 @@ export default function AuditView() {
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
   const [events, setEvents] = useState<any[]>([])
+  const [relative, setRelative] = useState('')
+  const [detailsQ, setDetailsQ] = useState('')
+  const [detailsRe, setDetailsRe] = useState('')
   const [deliveries, setDeliveries] = useState<any[]>([])
   const [log, setLog] = useState('')
 
@@ -19,8 +22,11 @@ export default function AuditView() {
     if (type) url.searchParams.set('type', type)
     if (userId) url.searchParams.set('userId', userId)
     if (clientId) url.searchParams.set('clientId', clientId)
+    if (relative) url.searchParams.set('relative', relative)
     if (start) url.searchParams.set('start', start)
     if (end) url.searchParams.set('end', end)
+    if (detailsQ) url.searchParams.set('details_q', detailsQ)
+    if (detailsRe) url.searchParams.set('details_re', detailsRe)
     const r = await fetch(url.toString(), { headers: { 'Authorization': `Bearer ${access}` } })
     const d = await r.json()
     setEvents(d.items || [])
@@ -63,14 +69,34 @@ export default function AuditView() {
           <input placeholder="type (opc)" value={type} onChange={e=>setType(e.target.value)} />
           <input placeholder="userId (opc)" value={userId} onChange={e=>setUserId(e.target.value)} />
           <input placeholder="clientId (opc)" value={clientId} onChange={e=>setClientId(e.target.value)} />
-          <div style={{display:'flex', gap:8}}>
+          <div style={{display:'flex', gap:8, alignItems:'center'}}>
+            <label>Rango:</label>
+            <select value={relative} onChange={e=>setRelative(e.target.value)}>
+              <option value=''>-- personalizado --</option>
+              <option value='24h'>Últimas 24h</option>
+              <option value='7d'>Últimos 7 días</option>
+              <option value='30d'>Últimos 30 días</option>
+            </select>
             <input type="datetime-local" value={start} onChange={e=>setStart(e.target.value)} />
             <input type="datetime-local" value={end} onChange={e=>setEnd(e.target.value)} />
+          </div>
+          <div style={{display:'flex', gap:8}}>
+            <input placeholder="details contiene (texto)" value={detailsQ} onChange={e=>setDetailsQ(e.target.value)} />
+            <input placeholder="details regex (/.*/i)" value={detailsRe} onChange={e=>setDetailsRe(e.target.value)} />
           </div>
           <button onClick={loadEvents}>Cargar eventos</button>
         </div>
         <div>
           <h3>Webhooks</h3>
+      <div style={{margin:'8px 0'}}>
+        <a href="#" onClick={(e)=>{e.preventDefault(); if(!access) return alert('Pega token ADMIN'); const u=new URL(`${API}/api/admin/audit/events.csv`); if(type) u.searchParams.set('type', type); if(userId) u.searchParams.set('userId', userId); if(clientId) u.searchParams.set('clientId', clientId); if(relative) u.searchParams.set('relative', relative); if(start) u.searchParams.set('start', start); if(end) u.searchParams.set('end', end); if(detailsQ) u.searchParams.set('details_q', detailsQ); if(detailsRe) u.searchParams.set('details_re', detailsRe); window.open(u.toString(), '_blank');}}>Exportar eventos CSV</a>
+        {' | '}
+        <a href="#" onClick={(e)=>{e.preventDefault(); if(!access) return alert('Pega token ADMIN'); const u=new URL(`${API}/api/admin/audit/events.ndjson`); if(type) u.searchParams.set('type', type); if(userId) u.searchParams.set('userId', userId); if(clientId) u.searchParams.set('clientId', clientId); if(relative) u.searchParams.set('relative', relative); if(start) u.searchParams.set('start', start); if(end) u.searchParams.set('end', end); if(detailsQ) u.searchParams.set('details_q', detailsQ); if(detailsRe) u.searchParams.set('details_re', detailsRe); window.open(u.toString(), '_blank');}}>Exportar eventos NDJSON</a>
+        {' | '}
+        <a href="#" onClick={(e)=>{e.preventDefault(); if(!access) return alert('Pega token ADMIN'); window.open(`${API}/api/admin/audit/webhooks.csv`, '_blank');}}>Exportar webhooks CSV</a>
+        {' | '}
+        <a href="#" onClick={(e)=>{e.preventDefault(); if(!access) return alert('Pega token ADMIN'); window.open(`${API}/api/admin/audit/webhooks.ndjson`, '_blank');}}>Exportar webhooks NDJSON</a>
+      </div>
           <button onClick={loadWebhooks}>Cargar deliveries</button>{' '}
           <button onClick={retryAll}>Reintentar pendientes</button>
         </div>

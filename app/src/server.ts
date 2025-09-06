@@ -533,7 +533,7 @@ app.post('/api/sessions/revoke_all', requireAuth(async (req: any, res: any) => {
 }));
 
 
-app.post('/api/admin/refresh/revoke', requireAdmin(async (req: any, res: any) => {
+app.post('/api/admin/refresh/revoke', requireScopes('refresh:revoke'(async (req: any, res: any) => {
   const { userId, clientId } = req.body || {};
   if (!userId) return res.status(400).json({ message: 'userId requerido' });
   const where: any = { userId: String(userId), revokedAt: null };
@@ -544,7 +544,7 @@ app.post('/api/admin/refresh/revoke', requireAdmin(async (req: any, res: any) =>
 }));
 
 
-app.get('/api/admin/refresh/list', requireAdmin(async (req: any, res: any) => {
+app.get('/api/admin/refresh/list', requireScopes('refresh:revoke'(async (req: any, res: any) => {
   const { userId, clientId, limit = 200 } = req.query as any;
   if (!userId) return res.status(400).json({ message: 'userId requerido' });
   const where: any = { userId: String(userId) };
@@ -555,11 +555,19 @@ app.get('/api/admin/refresh/list', requireAdmin(async (req: any, res: any) => {
     take: Math.min(Number(limit) || 200, 500),
     select: { id: true, jti: true, userId: true, clientId: true, issuedAt: true, expiresAt: true, revokedAt: true, reason: true }
   });
+  // Optional post-filter on details string
+  if (details_q || details_re) {
+    const toStr = (d:any)=> JSON.stringify(d||{});
+    if (details_q) items = items.filter(it => toStr(it.details).toLowerCase().includes(String(details_q).toLowerCase()));
+    if (details_re) {
+      try { const rx = new RegExp(String(details_re), 'i'); items = items.filter(it => rx.test(toStr(it.details))); } catch {}
+    }
+  }
   res.json({ items });
 }));
 
 
-app.get('/api/admin/sessions', requireAdmin(async (req: any, res: any) => {
+app.get('/api/admin/sessions', requireScopes('sessions:read'(async (req: any, res: any) => {
   const { userId, limit = 200 } = req.query as any;
   if (!userId) return res.status(400).json({ message: 'userId requerido' });
   const items = await prisma.session.findMany({
@@ -568,11 +576,19 @@ app.get('/api/admin/sessions', requireAdmin(async (req: any, res: any) => {
     take: Math.min(Number(limit) || 200, 500),
     select: { id: true, sid: true, userId: true, ip: true, userAgent: true, createdAt: true, expiresAt: true, revokedAt: true }
   });
+  // Optional post-filter on details string
+  if (details_q || details_re) {
+    const toStr = (d:any)=> JSON.stringify(d||{});
+    if (details_q) items = items.filter(it => toStr(it.details).toLowerCase().includes(String(details_q).toLowerCase()));
+    if (details_re) {
+      try { const rx = new RegExp(String(details_re), 'i'); items = items.filter(it => rx.test(toStr(it.details))); } catch {}
+    }
+  }
   res.json({ items });
 }));
 
 
-app.post('/api/admin/sessions/revoke', requireAdmin(async (req: any, res: any) => {
+app.post('/api/admin/sessions/revoke', requireScopes('sessions:revoke'(async (req: any, res: any) => {
   const { sid } = req.body || {};
   if (!sid) return res.status(400).json({ message: 'sid requerido' });
   await prisma.session.updateMany({ where: { sid: String(sid), revokedAt: null }, data: { revokedAt: new Date() } });
@@ -580,7 +596,7 @@ app.post('/api/admin/sessions/revoke', requireAdmin(async (req: any, res: any) =
 }));
 
 
-app.post('/api/admin/sessions/revoke_all', requireAdmin(async (req: any, res: any) => {
+app.post('/api/admin/sessions/revoke_all', requireScopes('sessions:revoke'(async (req: any, res: any) => {
   const { userId, keepSid } = req.body || {};
   if (!userId) return res.status(400).json({ message: 'userId requerido' });
   const where: any = { userId: String(userId), revokedAt: null };
@@ -591,7 +607,7 @@ app.post('/api/admin/sessions/revoke_all', requireAdmin(async (req: any, res: an
 }));
 
 
-app.get('/api/admin/users/search', requireAdmin(async (req: any, res: any) => {
+app.get('/api/admin/users/search', requireScopes('admin:read'(async (req: any, res: any) => {
   const { q = '', limit = 20 } = req.query as any;
   const take = Math.min(Number(limit) || 20, 100);
   // Simple search by email contains or id exact
@@ -605,14 +621,30 @@ app.get('/api/admin/users/search', requireAdmin(async (req: any, res: any) => {
     take,
     select: { id: true, email: true, name: true, role: true, createdAt: true }
   });
+  // Optional post-filter on details string
+  if (details_q || details_re) {
+    const toStr = (d:any)=> JSON.stringify(d||{});
+    if (details_q) items = items.filter(it => toStr(it.details).toLowerCase().includes(String(details_q).toLowerCase()));
+    if (details_re) {
+      try { const rx = new RegExp(String(details_re), 'i'); items = items.filter(it => rx.test(toStr(it.details))); } catch {}
+    }
+  }
   res.json({ items });
 }));
 
-app.get('/api/admin/oauth/clients', requireAdmin(async (_req: any, res: any) => {
+app.get('/api/admin/oauth/clients', requireScopes('admin:read'(async (_req: any, res: any) => {
   const items = await prisma.oAuthClient.findMany({
     orderBy: { createdAt: 'desc' },
     select: { clientId: true, name: true, publicClient: true, redirectUris: true, createdAt: true }
   });
+  // Optional post-filter on details string
+  if (details_q || details_re) {
+    const toStr = (d:any)=> JSON.stringify(d||{});
+    if (details_q) items = items.filter(it => toStr(it.details).toLowerCase().includes(String(details_q).toLowerCase()));
+    if (details_re) {
+      try { const rx = new RegExp(String(details_re), 'i'); items = items.filter(it => rx.test(toStr(it.details))); } catch {}
+    }
+  }
   res.json({ items });
 }));
 
@@ -647,8 +679,8 @@ async function audit(type: string, req: any, extra: any = {}) {
 }
 
 
-app.get('/api/admin/audit/events', requireAdmin(async (req: any, res: any) => {
-  const { type, userId, clientId, start, end, limit = 200 } = req.query as any;
+app.get('/api/admin/audit/events', requireScopes('audit:read'(async (req: any, res: any) => {
+  const { type, userId, clientId, start, end, limit = 200, relative, details_q, details_re } = req.query as any;
   const where: any = {};
   if (type) where.type = String(type);
   if (userId) where.userId = String(userId);
@@ -658,15 +690,23 @@ app.get('/api/admin/audit/events', requireAdmin(async (req: any, res: any) => {
     if (start) where.ts.gte = new Date(String(start));
     if (end) where.ts.lte = new Date(String(end));
   }
-  const items = await prisma.auditEvent.findMany({
+  let items = await prisma.auditEvent.findMany({
     where,
     orderBy: { ts: 'desc' },
     take: Math.min(Number(limit) || 200, 1000),
   });
+  // Optional post-filter on details string
+  if (details_q || details_re) {
+    const toStr = (d:any)=> JSON.stringify(d||{});
+    if (details_q) items = items.filter(it => toStr(it.details).toLowerCase().includes(String(details_q).toLowerCase()));
+    if (details_re) {
+      try { const rx = new RegExp(String(details_re), 'i'); items = items.filter(it => rx.test(toStr(it.details))); } catch {}
+    }
+  }
   res.json({ items });
 }));
 
-app.get('/api/admin/audit/webhooks', requireAdmin(async (req: any, res: any) => {
+app.get('/api/admin/audit/webhooks', requireScopes('audit:read'(async (req: any, res: any) => {
   const { status, limit = 200 } = req.query as any;
   const where: any = {};
   if (status) where.status = String(status);
@@ -675,10 +715,18 @@ app.get('/api/admin/audit/webhooks', requireAdmin(async (req: any, res: any) => 
     orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
     take: Math.min(Number(limit) || 200, 500),
   });
+  // Optional post-filter on details string
+  if (details_q || details_re) {
+    const toStr = (d:any)=> JSON.stringify(d||{});
+    if (details_q) items = items.filter(it => toStr(it.details).toLowerCase().includes(String(details_q).toLowerCase()));
+    if (details_re) {
+      try { const rx = new RegExp(String(details_re), 'i'); items = items.filter(it => rx.test(toStr(it.details))); } catch {}
+    }
+  }
   res.json({ items });
 }));
 
-app.post('/api/admin/audit/webhooks/retry', requireAdmin(async (req: any, res: any) => {
+app.post('/api/admin/audit/webhooks/retry', requireScopes('admin:write'(async (req: any, res: any) => {
   const { id } = req.body || {};
   const url = process.env.AUDIT_WEBHOOK_URL;
   if (!url) return res.status(400).json({ message: 'AUDIT_WEBHOOK_URL no está configurado' });
@@ -725,3 +773,112 @@ app.post('/api/admin/audit/webhooks/retry', requireAdmin(async (req: any, res: a
     res.json({ delivered, pending });
   }
 }));
+
+
+// Helpers: build where from query
+function auditWhereFromQuery(q: any) {
+  const where: any = {};
+  if (q.type) where.type = String(q.type);
+  if (q.userId) where.userId = String(q.userId);
+  if (q.clientId) where.clientId = String(q.clientId);
+  // Relative ranges: q.relative in { '24h','7d','30d' } sets start automatically
+  if (q.relative) {
+    const now = Date.now();
+    const map: any = { '24h': 24*3600*1000, '7d': 7*24*3600*1000, '30d': 30*24*3600*1000 };
+    const dur = map[String(q.relative)] || 0;
+    if (dur) q.start = new Date(now - dur).toISOString();
+  }
+  if (q.start || q.end) {
+    where.ts = {};
+    if (q.start) where.ts.gte = new Date(String(q.start));
+    if (q.end) where.ts.lte = new Date(String(q.end));
+  }
+  return where;
+}
+
+function csvEscape(v: any) {
+  const s = (v===undefined || v===null) ? '' : String(v);
+  if (/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+
+app.get('/api/admin/audit/events.csv', requireScopes('audit:export'(async (req: any, res: any) => {
+  const where = auditWhereFromQuery(req.query);
+  let items = await prisma.auditEvent.findMany({ where, orderBy: { ts: 'desc' }, take: 5000 });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="audit-events.csv"');
+  const header = ['ts','type','userId','clientId','ip','userAgent','details'];
+  res.write(header.join(',') + '\n');
+  for (const it of items) {
+    res.write([csvEscape(it.ts.toISOString()), csvEscape(it.type), csvEscape(it.userId||''), csvEscape(it.clientId||''), csvEscape(it.ip||''), csvEscape(it.userAgent||''), csvEscape(JSON.stringify(it.details||{}))].join(',') + '\n');
+  }
+  res.end();
+}));
+
+app.get('/api/admin/audit/events.ndjson', requireScopes('audit:export'(async (req: any, res: any) => {
+  const where = auditWhereFromQuery(req.query);
+  let items = await prisma.auditEvent.findMany({ where, orderBy: { ts: 'desc' }, take: 5000 });
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  for (const it of items) {
+    res.write(JSON.stringify(it) + '\n');
+  }
+  res.end();
+}));
+
+app.get('/api/admin/audit/webhooks.csv', requireScopes('audit:export'(async (_req: any, res: any) => {
+  const items = await prisma.webhookDelivery.findMany({ orderBy: [{ status:'asc' }, { createdAt:'desc' }], take: 5000 });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="webhook-deliveries.csv"');
+  const header = ['createdAt','status','attempts','lastError','nextAttemptAt','eventId','url'];
+  res.write(header.join(',') + '\n');
+  for (const it of items) {
+    res.write([csvEscape(it.createdAt.toISOString()), csvEscape(it.status), csvEscape(it.attempts), csvEscape(it.lastError||''), csvEscape(it.nextAttemptAt?it.nextAttemptAt.toISOString():''), csvEscape(it.eventId), csvEscape(it.url)].join(',') + '\n');
+  }
+  res.end();
+}));
+
+app.get('/api/admin/audit/webhooks.ndjson', requireScopes('audit:export'(async (_req: any, res: any) => {
+  const items = await prisma.webhookDelivery.findMany({ orderBy: [{ status:'asc' }, { createdAt:'desc' }], take: 5000 });
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  for (const it of items) {
+    res.write(JSON.stringify(it) + '\n');
+  }
+  res.end();
+}));
+
+
+function parseScopes(str?: string) {
+  return String(str || '').trim().split(/\s+/).filter(Boolean);
+}
+function hasScope(claim: string | undefined, needed: string | string[]) {
+  const got = new Set(parseScopes(claim));
+  const need = Array.isArray(needed) ? needed : [needed];
+  return need.every(s => got.has(s));
+}
+// requires token with scopes (from access token's 'scope' claim)
+function requireScopes(scopes: string | string[], handler: any) {
+  return async (req: any, res: any) => {
+    const auth = String(req.headers['authorization'] || '');
+    const m = auth.match(/^Bearer\s+(.+)$/i);
+    if (!m) return res.status(401).json({ message: 'Unauthorized' });
+    try {
+      const { verifyJWT } = await import('./jwks.js');
+      const dec: any = await verifyJWT(m[1]);
+      if (!hasScope(dec.scope, scopes)) return res.status(403).json({ message: 'Insufficient scope', required: scopes });
+      (req as any).token = dec;
+      return handler(req, res);
+    } catch {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+  };
+}
+
+
+function roleDefaultScopes(role: string) {
+  switch (role) {
+    case 'ADMIN': return 'openid profile email sessions:read sessions:revoke refresh:revoke audit:read audit:export admin:read admin:write';
+    case 'AUDITOR': return 'openid profile email audit:read audit:export';
+    case 'SECOPS': return 'openid profile email sessions:read sessions:revoke refresh:revoke audit:read';
+    default: return 'openid profile email';
+  }
+}

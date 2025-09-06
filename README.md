@@ -465,3 +465,37 @@ npx prisma migrate dev -n "audit_events"
   - `WebhookDelivery` con `status=pending|delivered|failed`, `attempts`, `nextAttemptAt` para backoff.
 - **ENV**
   - `WEBHOOK_MAX_ATTEMPTS=6`, `WEBHOOK_BACKOFF_SECONDS=60`
+
+
+## Export de auditoría
+- **Eventos**: `GET /api/admin/audit/events.csv` y `.../events.ndjson` (aceptan mismos filtros que `/events`)
+- **Webhooks**: `GET /api/admin/audit/webhooks.csv` y `.../webhooks.ndjson`
+- En el `webclient` (pestaña **Audit**) hay enlaces de **Exportar** para descargar directamente.
+
+
+## Filtros avanzados en auditoría
+- **Rangos relativos**: `relative=24h|7d|30d` (ajusta `start` automáticamente).
+- **Búsqueda en `details`**:
+  - `details_q` (substring case-insensitive)
+  - `details_re` (regex, se evalúa en servidor tras consulta)
+En el panel **Audit**, tienes controles para estas opciones y se aplican también a las exportaciones.
+
+
+## Roles & Scopes
+### Roles (User.role)
+- `ADMIN`: acceso total. Scopes por defecto: `sessions:read sessions:revoke refresh:revoke audit:read audit:export admin:read admin:write` (+ básicos `openid profile email`)
+- `AUDITOR`: lectura/exports de auditoría.
+- `SECOPS`: sesiones y revocaciones + lectura de auditoría.
+- `USER`: básico.
+
+> El **access token** incluye `scope` acorde al rol (a menos que definas un `payload.scope` explícito al firmar).
+
+### Scopes protegidos
+- Auditoría: `audit:read`, `audit:export`
+- Sesiones: `sessions:read`, `sessions:revoke`
+- Refresh: `refresh:revoke`
+- Admin: `admin:read`, `admin:write`
+
+### Integraciones externas (OAuth)
+- Registra un **OAuthClient** y solicita scopes en `/oauth/authorize` como `scope="audit:read audit:export"`.
+- El consentimiento por scope se almacena en `OAuthConsent`. Los endpoints verifican **scopes del token** (no sólo rol).

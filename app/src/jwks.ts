@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs';
 import fs from 'fs';
 import path from 'path';
 import { createLocalJWKSet, exportJWK, importJWK, importPKCS8, SignJWT, jwtVerify, JWK } from 'jose';
