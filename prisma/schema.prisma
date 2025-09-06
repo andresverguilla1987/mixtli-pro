@@ -1,3 +1,7 @@
+// prisma/schema.example.prisma
+// Copia/ajusta a tu schema.prisma si lo necesitas.
+// No sobrescribe tu schema actual.
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,10 +11,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Usuario {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
-  passwordHash String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  USER
 }

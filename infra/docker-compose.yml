@@ -1,0 +1,86 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mixtli_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mixtli}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mixtli}
+      POSTGRES_DB: ${POSTGRES_DB:-mixtli}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks: [mixtli]
+
+  adminer:
+    image: adminer:4
+    container_name: mixtli_adminer
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    depends_on: [db]
+    networks: [mixtli]
+
+  swagger:
+    image: swaggerapi/swagger-ui:latest
+    container_name: mixtli_swagger
+    environment:
+      SWAGGER_JSON: /openapi/openapi.yaml
+    volumes:
+      - ../openapi.yaml:/openapi/openapi.yaml:ro
+    ports:
+      - "${SWAGGER_PORT:-9000}:8080"
+    networks: [mixtli]
+
+  seed:
+    image: node:18-alpine
+    container_name: mixtli_seed
+    working_dir: /app
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://mixtli:mixtli@db:5432/mixtli?schema=public}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-S3gura#123}
+      ADMIN_NAME: ${ADMIN_NAME:-Admin}
+      # optional: PRISMA_LOG_LEVEL: query
+    volumes:
+      - ..:/app
+    command: sh -c "npm ci && npx prisma generate && npx prisma migrate deploy && npm run seed"
+    depends_on:
+      - db
+    networks: [mixtli]
+
+networks:
+  mixtli:
+
+volumes:
+  db_data:
+
+
+  app:
+    build:
+      context: ../app
+    container_name: mixtli_app
+    environment:
+      PORT: ${APP_PORT:-10000}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://mixtli:mixtli@db:5432/mixtli?schema=public}
+      JWT_SECRET: ${JWT_SECRET:-super-secret-change-me}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:9000,http://localhost:8080,http://localhost:3000}
+    ports:
+      - "${APP_PORT:-10000}:10000"
+    depends_on:
+      - db
+    networks: [mixtli]
+
+  web:
+    build:
+      context: ../web
+    container_name: mixtli_web
+    ports:
+      - "${WEB_PORT:-5173}:80"
+    depends_on:
+      - app
+    networks: [mixtli]
