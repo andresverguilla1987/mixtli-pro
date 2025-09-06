@@ -8,7 +8,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "prisma:gen": "prisma generate",
-    "start:pretty": "NODE_ENV=production node dist/server.js | pino-pretty"
+    "start:pretty": "NODE_ENV=production node dist/server.js | pino-pretty",
+    "keygen": "tsx scripts/keygen.ts",
+    "rotate:keys": "KID_PREFIX=rs256 KID=$(date +%s) npm run keygen"
   },
   "dependencies": {
     "express": "^4.19.2",

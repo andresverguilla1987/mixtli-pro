@@ -295,3 +295,26 @@ Descomenta y ajusta los CIDRs si quieres que la API solo responda a ciertas IPs/
 - Ajusta regex en `UA_ALLOW_RE` y `UA_DENY_RE`. Por ejemplo:
   - Bloquear curl: `UA_DENY_RE=^curl/.*`
   - Permitir sólo navegadores: `UA_ALLOW_RE=Mozilla|Chrome|Safari|Edg`
+
+
+## Rotación de llaves (CLI + CI)
+### CLI local
+Genera un nuevo par RSA y actualiza `JWT_ACTIVE_KID` en `.env.example`:
+```bash
+cd app
+npm i
+npm run keygen                  # usa KID por timestamp y prefijo 'rs256'
+# o personalizado:
+KID_PREFIX=mykid KID=mykid-001 npm run keygen
+```
+
+Llaves en `app/keys/<KID>.private.pem` y `app/keys/<KID>.public.pem`.
+El **manifest.json** mantiene un inventario de claves públicas expuestas en JWKS.
+
+### GitHub Actions
+Workflow `rotate-keys.yml`:
+- **Schedule** mensual (`cron`) o **manual** via `workflow_dispatch`.
+- Crea una rama `chore/rotate-keys-<run_id>` con llaves nuevas y abre **PR**.
+- Tras merge a `main`, tu `/.well-known/jwks.json` expondrá el nuevo `KID` (no olvides desplegar).
+
+> Nota: Los privados viven en el repo para demo. En producción, guarda **private.pem** en un **secret manager** (AWS KMS, GCP KMS, Vault) y solo versiona la parte pública/manifest.
