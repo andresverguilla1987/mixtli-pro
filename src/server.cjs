@@ -1,4 +1,4 @@
-// src/server.cjs — PROD + lite diag
+// src/server.cjs — PANIC KIT (verbose)
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -11,12 +11,17 @@ const app = express();
 app.use(cors({ origin: "*", methods: ["GET","POST","PUT","PATCH","DELETE"], allowedHeaders: ["Content-Type","Authorization"] }));
 app.use(express.json({ limit: "5mb" }));
 
+console.log(">>> MIXTLI PANIC KIT — boot at", new Date().toISOString());
+console.log("PORT:", process.env.PORT || 10000);
+console.log("JWT_SECRET set:", !!process.env.JWT_SECRET);
+console.log("DATABASE_URL set:", !!process.env.DATABASE_URL);
+
 app.get("/api/health", async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ ok: true, db: "ok", ts: new Date().toISOString(), build: "MIXTLI-PROD-CORRECTOR" });
+    res.json({ ok: true, db: "ok", ts: new Date().toISOString(), build: "MIXTLI-PANIC" });
   } catch (e) {
-    res.status(200).json({ ok: true, db: "error", error: String(e), ts: new Date().toISOString(), build: "MIXTLI-PROD-CORRECTOR" });
+    res.status(200).json({ ok: true, db: "error", error: String(e), ts: new Date().toISOString(), build: "MIXTLI-PANIC" });
   }
 });
 
@@ -24,8 +29,11 @@ app.get("/api/health", async (_req, res) => {
 const authRouter = require("./rutas/auth.cjs");
 app.use("/api/auth", authRouter);
 
-// --- LITE DIAG ---
-app.post("/api/echo", (req, res) => res.json({ ok: true, received: req.body ?? null }));
+// lite diag
+app.post("/api/echo", (req, res) => {
+  console.log("[ECHO] body:", req.body);
+  res.json({ ok: true, received: req.body ?? null });
+});
 app.get("/__routes", (_req, res) => {
   const list = [];
   const stack = app._router?.stack || [];
@@ -47,6 +55,6 @@ app.get("/__routes", (_req, res) => {
 app.use((_req, res) => res.status(404).json({ error: "Not found" }));
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 API en puerto ${PORT} (PROD + lite diag)`));
+app.listen(PORT, () => console.log(`🚀 API en puerto ${PORT} (PANIC KIT)`));
 
 module.exports = { app, prisma };
