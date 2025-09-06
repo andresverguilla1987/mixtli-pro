@@ -4,9 +4,20 @@ services:
     env: node
     plan: free
     buildCommand: |
-      npm ci
-      npx prisma generate
+      corepack enable || true
+      npm i -g pnpm@9 || true
+      pnpm i
+      # install notifications submodule deps & prisma
+      if [ -d notifications ]; then
+        pnpm --filter ./notifications i || true
+        cd notifications || exit 0
+        pnpm prisma:gen || true
+        pnpm prisma:migrate --name init || true
+        cd ..
+      fi
     startCommand: node server.js
+    autoDeploy: true
+    healthCheckPath: /
     envVars:
-      - key: DATABASE_URL
-        sync: false
+      - key: NODE_VERSION
+        value: 20
