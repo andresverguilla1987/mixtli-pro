@@ -340,3 +340,18 @@ Ejemplo (si `JWT_ISS=https://idp.mixtli.com`):
 ```
 
 Esto permite que clientes estándar (OAuth2/OIDC) se configuren automáticamente usando la URL del issuer.
+
+
+## OAuth2 Authorization Code + PKCE (mínimo viable)
+- Endpoints:
+  - `POST /oauth/authorize` → devuelve `{ code }` (requiere Bearer token del usuario ya logueado)
+  - `POST /oauth/token` con `grant_type=authorization_code`, `code_verifier`, `client_id`, `redirect_uri`
+- Variables:
+  - `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET` (si `OAUTH_PUBLIC_CLIENT=false`), `OAUTH_REDIRECT_URIS` (CSV)
+- Flujo:
+  1. App hace `POST /api/auth/login` ⇒ obtiene **access token** de usuario
+  2. App genera PKCE (`code_verifier`, `code_challenge` = SHA256 base64url)
+  3. `POST /oauth/authorize` con `response_type=code`, `client_id`, `redirect_uri`, `code_challenge`, `code_challenge_method=S256` (Bearer en headers)
+  4. `POST /oauth/token` con `grant_type=authorization_code`, `code`, `code_verifier`, `client_id`, `redirect_uri`  ⇒ tokens
+
+> **Demo** guarda codes en memoria (5 min). Para producción, persistir en DB y agregar consentimiento/UI.

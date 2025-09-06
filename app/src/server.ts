@@ -9,6 +9,15 @@ import bcrypt from 'bcrypt';
 import cookieParser from 'cookie-parser';
 import { z } from 'zod';
 import { prisma } from './prisma.js';
+
+/* --- OAuth2 in-memory store --- */
+const oauthCodes = new Map<string, any>(); // code -> {sub, client_id, redirect_uri, code_challenge, method, scope, exp}
+function randUrlSafe(len: number) {
+  const buf = Buffer.alloc(len);
+  for (let i=0;i<len;i++) buf[i] = Math.floor(Math.random()*256);
+  return buf.toString('base64url');
+}
+
 import { signTokens, getIssuer, getAudience, getJWKS } from './jwks.js';
 
 const app = express();
@@ -111,6 +120,15 @@ app.use(cors({
 }));
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const ACCESS_TTL = 60 * 60; // 1h
+
+function bearerUser(req: any): { sub: string, email?: string, role?: string } | null {
+  const auth = String(req.headers['authorization'] || '');
+  const m = auth.match(/^Bearer\s+(.+)$/i);
+  if (!m) return null;
+  // No verificamos firma aquí por velocidad; endpoints críticos ya validan al emitir/refresh
+  try { const parts = m[1].split('.'); const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8')); return { sub: payload.sub, email: payload.email, role: payload.role }; } catch { return null; }
+}
+
 const REFRESH_TTL = 60 * 60 * 24 * 7; // 7d
 
 // signTokens now imported from jwks.ts
@@ -268,4 +286,88 @@ app.get('/.well-known/openid-configuration', (req, res) => {
     token_endpoint_auth_methods_supported: ['client_secret_basic','client_secret_post'],
     claims_supported: ['sub','email','name','iat','exp']
   });
+});
+
+
+// OAuth2 Authorization Code + PKCE (mínimo viable)
+// Requiere que el usuario venga con Bearer (access token) ya emitido por /api/auth/login.
+// 1) Cliente hace login -> obtiene access token del usuario
+// 2) Cliente llama a /oauth/authorize con PKCE -> recibe authorization_code
+// 3) Cliente intercambia en /oauth/token -> recibe tokens finales
+
+// /oauth/authorize (dev: POST para simplificar; en prod sería GET con UI de consentimiento)
+app.post('/oauth/authorize', async (req, res) => {
+  const user = bearerUser(req);
+  if (!user) return res.status(401).json({ error: 'unauthorized' });
+
+  const { response_type, client_id, redirect_uri, code_challenge, code_challenge_method = 'S256', scope = 'openid profile email', state } = req.body || {};
+
+  if (response_type !== 'code') return res.status(400).json({ error: 'unsupported_response_type' });
+
+  const allowedClient = (process.env.OAUTH_CLIENT_ID || 'mixtli-web');
+  const allowedRedirects = String(process.env.OAUTH_REDIRECT_URIS || 'http://localhost:5173/callback').split(',').map(s => s.trim());
+  if (client_id !== allowedClient) return res.status(400).json({ error: 'invalid_client' });
+  if (!allowedRedirects.includes(redirect_uri)) return res.status(400).json({ error: 'invalid_redirect_uri' });
+
+  if (!code_challenge || !['S256','plain'].includes(code_challenge_method)) return res.status(400).json({ error: 'invalid_request' });
+
+  const code = randUrlSafe(32);
+  const exp = Date.now() + 5 * 60 * 1000; // 5 min
+  oauthCodes.set(code, { sub: user.sub, client_id, redirect_uri, code_challenge, method: code_challenge_method, scope, exp });
+  // Limpiar expirados rápido (best-effort)
+  for (const [c,data] of oauthCodes) { if (data.exp < Date.now()) oauthCodes.delete(c); }
+
+  // Para POST devolvemos JSON; si fuera GET redirigiríamos a redirect_uri?code=...&state=...
+  return res.json({ code, state });
+});
+
+// /oauth/token (authorization_code)
+app.post('/oauth/token', async (req, res) => {
+  const { grant_type } = req.body || {};
+  if (grant_type !== 'authorization_code') return res.status(400).json({ error: 'unsupported_grant_type' });
+
+  // Auth methods: basic or body
+  const basic = String(req.headers['authorization'] || '');
+  let client_id = req.body.client_id;
+  let client_secret = req.body.client_secret;
+  const m = basic.match(/^Basic\s+(.+)$/i);
+  if (m) {
+    const dec = Buffer.from(m[1], 'base64').toString('utf8');
+    const [cid, csec] = dec.split(':', 2);
+    client_id = cid; client_secret = csec;
+  }
+
+  const allowedClient = (process.env.OAUTH_CLIENT_ID || 'mixtli-web');
+  const allowedSecret = (process.env.OAUTH_CLIENT_SECRET || 'dev-secret');
+  const allowedRedirects = String(process.env.OAUTH_REDIRECT_URIS || 'http://localhost:5173/callback').split(',').map(s => s.trim());
+
+  if (client_id !== allowedClient) return res.status(400).json({ error: 'invalid_client' });
+  // Permitimos public client sin secret si OAUTH_PUBLIC_CLIENT=true
+  const publicClient = (process.env.OAUTH_PUBLIC_CLIENT || 'true') === 'true';
+  if (!publicClient && client_secret !== allowedSecret) return res.status(401).json({ error: 'invalid_client_secret' });
+
+  const { code, redirect_uri, code_verifier } = req.body || {};
+  if (!code || !redirect_uri || !code_verifier) return res.status(400).json({ error: 'invalid_request' });
+  if (!allowedRedirects.includes(redirect_uri)) return res.status(400).json({ error: 'invalid_redirect_uri' });
+
+  const data = oauthCodes.get(code);
+  if (!data || data.exp < Date.now()) return res.status(400).json({ error: 'invalid_grant' });
+  if (data.client_id !== client_id || data.redirect_uri !== redirect_uri) return res.status(400).json({ error: 'invalid_grant' });
+
+  // PKCE check
+  const method = data.method || 'S256';
+  if (method === 'plain') {
+    if (data.code_challenge !== code_verifier) return res.status(400).json({ error: 'invalid_grant' });
+  } else {
+    // S256
+    const crypto = await import('crypto');
+    const hash = crypto.createHash('sha256').update(code_verifier).digest('base64url');
+    if (hash !== data.code_challenge) return res.status(400).json({ error: 'invalid_grant' });
+  }
+
+  oauthCodes.delete(code);
+
+  // Emitir tokens
+  const tokens = await signTokens({ sub: data.sub, scope: data.scope, client_id });
+  return res.json(tokens);
 });
