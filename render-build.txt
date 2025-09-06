@@ -1,0 +1,5 @@
+# Render build commands sugeridos
+pnpm i
+pnpm --filter ./notifications i
+pnpm prisma:gen --filter ./notifications
+pnpm prisma:migrate --filter ./notifications --name init
