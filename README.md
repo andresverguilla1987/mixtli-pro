@@ -430,3 +430,8 @@ npx prisma migrate dev -n "sessions_ip_ua"
   - Lista **Sesiones** por `userId` y **Refresh Tokens** por `userId`/`clientId`.
   - Botones para **revocar** sesiones y refresh tokens.
 - Rate limit de admin: `RATE_LIMIT_ADMIN_PER_MIN` (default 30 req/min).
+
+
+## Admin Panel: búsqueda y selección
+- **Buscar usuario** por email o ID: usa `GET /api/admin/users/search?q=...` (requiere ADMIN).
+- **Selector de clientes OAuth**: `GET /api/admin/oauth/clients` y el panel llena el dropdown; puedes filtrar refresh tokens por `clientId` con un clic.

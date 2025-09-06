@@ -7,6 +7,9 @@ export default function AdminPanel() {
   const [userId, setUserId] = useState('')
   const [clientId, setClientId] = useState('')
   const [sessions, setSessions] = useState<any[]>([])
+  const [users, setUsers] = useState<any[]>([])
+  const [q, setQ] = useState('')
+  const [clients, setClients] = useState<any[]>([])
   const [refreshes, setRefreshes] = useState<any[]>([])
   const [log, setLog] = useState('')
 
@@ -69,10 +72,37 @@ export default function AdminPanel() {
       <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12}}>
         <div>
           <h3>Credenciales</h3>
+          <button onClick={async()=>{
+            if(!access) return alert('Pega un access token ADMIN');
+            const r = await fetch(`${API}/api/admin/oauth/clients`, { headers: { 'Authorization': `Bearer ${access}` } });
+            const d = await r.json(); setClients(d.items||[]);
+          }}>Cargar clientes OAuth</button>
+          <div style={{marginTop:8}}>
+            <label>Cliente: </label>
+            <select value={clientId} onChange={e=>setClientId(e.target.value)}>
+              <option value=''>-- cualquiera --</option>
+              {clients.map((c:any)=> <option key={c.clientId} value={c.clientId}>{c.clientId} ({c.name})</option>)}
+            </select>
+          </div>
           <input placeholder="Access Token (ADMIN)" value={access} onChange={e=>setAccess(e.target.value)} style={{width:'100%'}} />
           <p style={{fontSize:12,color:'#666'}}>Inicia sesión con el admin seed en la sección de Demo y pega aquí el access token.</p>
           <h3>Filtros</h3>
-          <input placeholder="userId" value={userId} onChange={e=>setUserId(e.target.value)} style={{width:'100%'}} />
+          <div style={{display:'flex', gap:8}}>
+            <input placeholder="Buscar usuario por email o ID" value={q} onChange={e=>setQ(e.target.value)} style={{flex:1}} />
+            <button onClick={async()=>{
+              if(!access) return alert('Pega un access token ADMIN');
+              const url = new URL(`${API}/api/admin/users/search`); url.searchParams.set('q', q);
+              const r = await fetch(url.toString(), { headers: { 'Authorization': `Bearer ${access}` } });
+              const d = await r.json(); setUsers(d.items||[]);
+            }}>Buscar usuario</button>
+          </div>
+          <div style={{marginTop:8}}>
+            <label>Selecciona usuario: </label>
+            <select value={userId} onChange={e=>setUserId(e.target.value)}>
+              <option value=''>-- elige --</option>
+              {users.map((u:any)=> <option key={u.id} value={u.id}>{u.email} ({u.id.slice(0,6)}…)</option>)}
+            </select>
+          </div>
           <input placeholder="clientId (opcional)" value={clientId} onChange={e=>setClientId(e.target.value)} style={{width:'100%'}} />
         </div>
         <div>

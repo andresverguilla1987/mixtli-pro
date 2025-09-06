@@ -580,3 +580,29 @@ app.post('/api/admin/sessions/revoke_all', requireAdmin(async (req: any, res: an
   const count = await prisma.session.updateMany({ where, data: { revokedAt: new Date() } });
   res.json({ revoked: count.count });
 }));
+
+
+app.get('/api/admin/users/search', requireAdmin(async (req: any, res: any) => {
+  const { q = '', limit = 20 } = req.query as any;
+  const take = Math.min(Number(limit) || 20, 100);
+  // Simple search by email contains or id exact
+  const items = await prisma.user.findMany({
+    where: {
+      OR: [
+        { email: { contains: String(q), mode: 'insensitive' } },
+        { id: String(q) }
+      ]
+    },
+    take,
+    select: { id: true, email: true, name: true, role: true, createdAt: true }
+  });
+  res.json({ items });
+}));
+
+app.get('/api/admin/oauth/clients', requireAdmin(async (_req: any, res: any) => {
+  const items = await prisma.oAuthClient.findMany({
+    orderBy: { createdAt: 'desc' },
+    select: { clientId: true, name: true, publicClient: true, redirectUris: true, createdAt: true }
+  });
+  res.json({ items });
+}));
