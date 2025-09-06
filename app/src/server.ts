@@ -197,7 +197,8 @@ app.post('/api/auth/login', async (req, res) => {
   const ok = await bcrypt.compare(password, user.password);
   if (!ok) return res.status(401).json({ message: 'Credenciales inválidas', code: 'BAD_CREDENTIALS' });
 
-  const tokens = signTokens({ sub: user.id, email: user.email, role: user.role });
+  const tokens = await signTokens({ sub: user.id, email: user.email, role: user.role });
+  if ((process.env.SESSION_ENABLED || 'false') === 'true') { await setSessionCookie(res, user.id); }
   return res.json({ ...tokens, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 });
 

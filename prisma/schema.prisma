@@ -68,3 +68,29 @@ model OAuthCode {
 
   @@index([clientId, expiresAt], map: "code_client_expires_idx")
 }
+
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  jti        String   @unique
+  userId     String
+  clientId   String?    // nullable: first-party login may omit
+  issuedAt   DateTime   @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  reason     String?
+
+  @@index([userId, clientId], map: "refresh_user_client_idx")
+  @@index([expiresAt], map: "refresh_exp_idx")
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  sid        String   @unique
+  userId     String
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+
+  @@index([userId, expiresAt], map: "session_user_exp_idx")
+}
