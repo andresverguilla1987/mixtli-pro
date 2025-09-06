@@ -882,3 +882,141 @@ function roleDefaultScopes(role: string) {
     default: return 'openid profile email';
   }
 }
+
+
+// --- Login UI (server-side) ---
+app.get('/login', async (req, res) => {
+  const qs = new URLSearchParams(req.query as any).toString();
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.end(`<!doctype html>
+<html><head><meta charset="utf-8"><title>Mixtli – Login</title>
+<style>
+:root{color-scheme:light dark}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:420px;margin:40px auto;padding:0 16px}
+.card{border:1px solid #e5e7eb;border-radius:12px;padding:16px;background:Canvas;color:CanvasText}
+label{display:block;margin:8px 0 4px}
+input{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:Canvas;color:CanvasText}
+button{padding:10px 14px;border-radius:8px;border:none;background:#0ea5e9;color:#fff;cursor:pointer;width:100%;margin-top:12px}
+a.small{font-size:12px;color:#64748b}
+@media (prefers-color-scheme: dark){.card{border-color:#334155} input{border-color:#475569}}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <svg width="36" height="36" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0ea5e9"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs><rect rx="10" width="40" height="40" fill="url(#g)"/></svg>
+      <h1 style="margin:0;font-size:20px">Mixtli – Login</h1>
+    </div>
+    <form method="post" action="/login?${qs}">
+      <label>Email</label>
+      <input name="email" type="email" required autofocus />
+      <label>Password</label>
+      <input name="password" type="password" required />
+      <button type="submit">Entrar</button>
+    </form>
+    <div style="margin-top:8px"><a class="small" href="/oauth/authorize?${qs}">Volver</a></div>
+  </div>
+</body></html>`);
+});
+
+
+app.post('/login', express.urlencoded({ extended: true }), async (req, res) => {
+  const { email, password } = req.body || {};
+  try {
+    const user = await prisma.user.findUnique({ where: { email: String(email) } });
+    if (!user) return res.status(401).send('Usuario o contraseña inválidos');
+    // Lockout check
+    if (user.lockoutUntil && user.lockoutUntil > new Date()) return res.status(429).send('Cuenta bloqueada temporalmente');
+    const ok = await verifyPassword(String(password), user.passwordHash);
+    if (!ok) { await registerFailedLogin(user.id); return res.status(401).send('Usuario o contraseña inválidos'); }
+    // If TOTP enabled, go to 2FA step
+    const qs = new URLSearchParams(req.query as any).toString();
+    if (user.totpEnabled) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.end(`<!doctype html><html><head><meta charset="utf-8"><title>2FA</title>
+<style>:root{color-scheme:light dark}body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:420px;margin:40px auto;padding:0 16px}.card{border:1px solid #e5e7eb;border-radius:12px;padding:16px}@media(prefers-color-scheme:dark){.card{border-color:#334155}}</style>
+</head><body><div class="card">
+  <h2>Segundo factor</h2>
+  <form method="post" action="/login/2fa?${qs}">
+    <input type="hidden" name="email" value="${String(email)}"/>
+    <label>Código TOTP</label>
+    <input name="token" required pattern="\d{6}" />
+    <button type="submit">Verificar</button>
+  </form>
+  <form method="post" action="/login/backup-code?${qs}" style="margin-top:8px">
+    <input type="hidden" name="email" value="${String(email)}"/>
+    <label>o Código de respaldo</label>
+    <input name="code" required />
+    <button type="submit">Usar código de respaldo</button>
+  </form>
+</div></body></html>`);
+    }
+    // No 2FA -> sesión directa
+    if ((process.env.SESSION_ENABLED || 'false') !== 'true') {
+      return res.status(500).send('Sesiones deshabilitadas. Activa SESSION_ENABLED.');
+    }
+    await setSessionCookie(res, user.id, req);
+    await clearFailedLogin(user.id);
+    return res.redirect(`/oauth/authorize?${qs}`);
+  } catch (e) {
+    return res.status(500).send('Error en login');
+  }
+});
+
+app.post('/login/2fa', express.urlencoded({ extended: true }), async (req, res) => {
+  const { email, token } = req.body || {};
+  const qs = new URLSearchParams(req.query as any).toString();
+  try {
+    const user = await prisma.user.findUnique({ where: { email: String(email) } });
+    if (!user || !user.totpEnabled || !user.totpSecret) return res.status(401).send('Código inválido');
+    if (user.lockoutUntil && user.lockoutUntil > new Date()) return res.status(429).send('Cuenta bloqueada temporalmente');
+    const windowSteps = Number(process.env.TOTP_WINDOW_STEPS || 1);
+    if (!totpVerify(user.totpSecret, String(token||''), windowSteps)) { await registerFailedLogin(user.id); return res.status(401).send('Código inválido'); }
+    if ((process.env.SESSION_ENABLED || 'false') !== 'true') return res.status(500).send('Sesiones deshabilitadas');
+    await setSessionCookie(res, user.id, req);
+    await clearFailedLogin(user.id);
+    return res.redirect(`/oauth/authorize?${qs}`);
+  } catch (e) { return res.status(500).send('Error'); }
+});
+
+// --- Password reset (email out-of-scope; mostramos token en pantalla para demo) ---
+app.get('/forgot-password', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.end(`<!doctype html><html><head><meta charset="utf-8"><title>Recuperar contraseña</title></head><body>
+  <form method="post" action="/forgot-password">
+    <label>Email</label><input name="email" type="email" required/>
+    <button type="submit">Enviar enlace</button>
+  </form></body></html>`);
+});
+app.post('/forgot-password', express.urlencoded({ extended: true }), async (req, res) => {
+  const { email } = req.body || {};
+  const user = await prisma.user.findUnique({ where: { email: String(email) } });
+  if (!user) return res.status(200).send('Si existe, te enviaremos un correo');
+  const tok = require('crypto').randomBytes(24).toString('base64url');
+  const exp = new Date(Date.now() + 1000*60*15);
+  await prisma.passwordReset.create({ data: { userId: user.id, token: tok, expiresAt: exp } });
+  // DEMO: mostramos el link
+  return res.send(`Enlace de reset (demo): <a href="/reset-password?token=${tok}">Reset</a> (válido 15 min)`);
+});
+app.get('/reset-password', async (req, res) => {
+  const { token } = req.query as any;
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.end(`<!doctype html><html><head><meta charset="utf-8"><title>Reset</title></head><body>
+  <form method="post" action="/reset-password">
+    <input type="hidden" name="token" value="${String(token||'')}"/>
+    <label>Nueva contraseña</label><input name="password" type="password" required/>
+    <button type="submit">Cambiar</button>
+  </form></body></html>`);
+});
+app.post('/reset-password', express.urlencoded({ extended: true }), async (req, res) => {
+  const { token, password } = req.body || {};
+  const rec = await prisma.passwordReset.findUnique({ where: { token: String(token) } });
+  if (!rec || rec.usedAt || rec.expiresAt < new Date()) return res.status(400).send('Token inválido/expirado');
+  const user = await prisma.user.findUnique({ where: { id: rec.userId } });
+  if (!user) return res.status(400).send('Usuario no encontrado');
+  const { hashPassword } = await import('./password.js');
+  const newHash = await hashPassword(String(password));
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: newHash } });
+  await prisma.passwordReset.update({ where: { id: rec.id }, data: { usedAt: new Date() } });
+  return res.send('Contraseña actualizada. Ahora inicia sesión.');
+});

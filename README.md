@@ -499,3 +499,32 @@ En el panel **Audit**, tienes controles para estas opciones y se aplican tambié
 ### Integraciones externas (OAuth)
 - Registra un **OAuthClient** y solicita scopes en `/oauth/authorize` como `scope="audit:read audit:export"`.
 - El consentimiento por scope se almacena en `OAuthConsent`. Los endpoints verifican **scopes del token** (no sólo rol).
+
+
+## Login real en flujo GET /oauth/authorize
+- **/login (GET/POST)** con UI simple (email + password). Tema claro/oscuro, branding Mixtli.
+- **/oauth/authorize** si no hay sesión -> redirige a `/login` y, tras autenticarse, vuelve al consentimiento.
+- Requiere: `SESSION_ENABLED=true` para usar cookie `sid`.
+- Para demos, existe `DEMO_ENABLE_QUERY_ACCESS` pero está **desactivado** por defecto.
+
+
+## Seguridad de Login: 2FA, Reset y Lockout
+### TOTP (2FA)
+- Endpoints:
+  - `GET /api/auth/totp/enroll` (autenticado) → genera **secret** y `otpauth://` (escanear en Google Authenticator / Authy).
+  - `POST /api/auth/totp/verify` `{ token }` → verifica y **habilita** 2FA.
+  - `POST /api/auth/totp/disable` → deshabilita 2FA.
+  - `POST /api/auth/backup/regenerate` → entrega **10 códigos de respaldo** (se almacenan **hasheados**).
+- Login UI: si `totpEnabled`, después de email/contraseña se pide **código TOTP** o **código de respaldo**.
+
+### Recuperación de contraseña
+- `GET/POST /forgot-password` → emite token de 15 min (en demo muestra el link).
+- `GET/POST /reset-password` → cambia contraseña (invalida el token).
+
+### Lockout por intentos
+- Env:
+  - `LOGIN_MAX_ATTEMPTS` (default 5)
+  - `LOGIN_LOCKOUT_SECONDS` (default 900 = 15 min)
+- Al exceder intentos fallidos → **lockout** temporal; se limpia al login correcto.
+
+> Producción: envía el enlace de reset por email (SMTP/SendGrid) en lugar de mostrarlo.

@@ -127,3 +127,25 @@ model WebhookDelivery {
 
   @@index([status, nextAttemptAt], map: "webhook_status_next_idx")
 }
+
+
+model PasswordReset {
+  id         String   @id @default(cuid())
+  userId     String
+  token      String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, expiresAt], map: "pwreset_user_exp_idx")
+}
+
+model BackupCode {
+  id        String   @id @default(cuid())
+  userId    String
+  codeHash  String   // store hashed backup code
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId], map: "backup_user_idx")
+}
