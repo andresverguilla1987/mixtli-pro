@@ -328,6 +328,7 @@ app.post('/oauth/authorize', async (req, res) => {
   for (const [c,data] of oauthCodes) { if (data.exp < Date.now()) oauthCodes.delete(c); }
 
   // Para POST devolvemos JSON; si fuera GET redirigiríamos a redirect_uri?code=...&state=...
+  await audit('oauth.code.issued', req, { userId: String(user.sub), clientId: String(client_id), details: { redirect_uri, scope } });
   return res.json({ code, state });
 });
 
@@ -373,6 +374,7 @@ app.post('/oauth/token', async (req, res) => {
   await prisma.oAuthCode.delete({ where: { id: record.id } });
 
   const tokens = await signTokens({ sub: record.userId, scope: record.scope, client_id });
+  await audit('oauth.token.exchange', req, { userId: record.userId, clientId: String(client_id) });
   return res.json(tokens);
 });
 
@@ -438,6 +440,7 @@ body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:72
   const u = new URL(String(redirect_uri));
   u.searchParams.set('code', code);
   if (state) u.searchParams.set('state', String(state));
+  await audit('oauth.code.issued', req, { userId: String(user.sub), clientId: String(client_id), details: { redirect_uri, scope } });
   return res.redirect(u.toString());
 });
 
@@ -449,12 +452,14 @@ app.get('/oauth/consent', (req, res) => {
   const { client_id, scope = 'openid profile email' } = req.query as any;
   if (!client_id) return res.status(400).send('invalid_client');
   if (approve === '1') {
+    await audit('consent.approve', req, { userId: user.id, clientId: String(client_id), details: { scope } });
     await prisma.oAuthConsent.upsert({
       where: { userId_clientId: { userId: String(user.sub), clientId: String(client_id) } },
       update: { scope: String(scope) },
       create: { userId: String(user.sub), clientId: String(client_id), scope: String(scope) }
     });
   } else {
+    await audit('consent.deny', req, { userId: user.id, clientId: String(client_id), details: { scope } });
     // deny: opcionalmente borrar consent
     await prisma.oAuthConsent.deleteMany({ where: { userId: String(user.sub), clientId: String(client_id) } });
   }
@@ -514,6 +519,7 @@ app.post('/api/sessions/revoke', requireAuth(async (req: any, res: any) => {
   const { sid } = req.body || {};
   if (!sid) return res.status(400).json({ message: 'sid requerido' });
   await prisma.session.updateMany({ where: { userId: user.id, sid, revokedAt: null }, data: { revokedAt: new Date() } });
+  await audit('session.revoke', req, { userId: user.id, details: { sid } });
   res.status(204).end();
 }));
 
@@ -522,6 +528,7 @@ app.post('/api/sessions/revoke_all', requireAuth(async (req: any, res: any) => {
   const user = (req as any).user;
   const currentSid = req.cookies?.sid || '';
   await prisma.session.updateMany({ where: { userId: user.id, sid: { not: currentSid }, revokedAt: null }, data: { revokedAt: new Date() } });
+  await audit('session.revoke_all', req, { userId: user.id });
   res.status(204).end();
 }));
 
@@ -532,6 +539,7 @@ app.post('/api/admin/refresh/revoke', requireAdmin(async (req: any, res: any) =>
   const where: any = { userId: String(userId), revokedAt: null };
   if (clientId) where.clientId = String(clientId);
   const count = await prisma.refreshToken.updateMany({ where, data: { revokedAt: new Date(), reason: 'admin_revoked' } });
+  await audit('admin.refresh.revoked', req, { details: { where } });
   res.json({ revoked: count.count });
 }));
 
@@ -578,6 +586,7 @@ app.post('/api/admin/sessions/revoke_all', requireAdmin(async (req: any, res: an
   const where: any = { userId: String(userId), revokedAt: null };
   if (keepSid) where.sid = { not: String(keepSid) };
   const count = await prisma.session.updateMany({ where, data: { revokedAt: new Date() } });
+  await audit('admin.session.revoke_all', req, { details: { where } });
   res.json({ revoked: count.count });
 }));
 
@@ -606,3 +615,26 @@ app.get('/api/admin/oauth/clients', requireAdmin(async (_req: any, res: any) => 
   });
   res.json({ items });
 }));
+
+
+async function audit(type: string, req: any, extra: any = {}) {
+  const ip = String(req?.ip || '');
+  const ua = String(req?.headers?.['user-agent'] || '');
+  const userId = (req as any)?.user?.id || extra.userId || null;
+  const clientId = extra.clientId || null;
+  const details = extra.details || {};
+  try {
+    await prisma.auditEvent.create({ data: { type, userId: userId || undefined, clientId: clientId || undefined, ip, userAgent: ua, details } });
+  } catch {}
+  try {
+    const url = process.env.AUDIT_WEBHOOK_URL;
+    if (url) {
+      const payload = { ts: new Date().toISOString(), type, userId, clientId, ip, ua, details };
+      const body = JSON.stringify(payload);
+      const secret = process.env.AUDIT_WEBHOOK_SECRET || '';
+      const crypto = await import('crypto');
+      const sig = crypto.createHmac('sha256', secret).update(body).digest('hex');
+      await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Signature': sig }, body }).catch(()=>{});
+    }
+  } catch {}
+}

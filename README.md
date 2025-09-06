@@ -435,3 +435,20 @@ npx prisma migrate dev -n "sessions_ip_ua"
 ## Admin Panel: búsqueda y selección
 - **Buscar usuario** por email o ID: usa `GET /api/admin/users/search?q=...` (requiere ADMIN).
 - **Selector de clientes OAuth**: `GET /api/admin/oauth/clients` y el panel llena el dropdown; puedes filtrar refresh tokens por `clientId` con un clic.
+
+
+## Auditoría + Webhooks
+- **Tabla `AuditEvent`**: guarda `type`, `userId`, `clientId`, `ip`, `userAgent`, `details` (JSON) y timestamp.
+- Eventos registrados: `login.success`, `logout`, `consent.approve/deny`, `oauth.code.issued`, `oauth.token.exchange`, `auth.refresh.rotated`, `session.revoke(_all)`, `admin.*`.
+- **Webhooks** (JSON POST) opcionales:
+  - Define `AUDIT_WEBHOOK_URL` y (opcional) `AUDIT_WEBHOOK_SECRET` para firma HMAC SHA-256 en header `X-Signature`.
+  - Payload ejemplo:
+    ```json
+    { "ts":"2025-09-06T12:34:56Z", "type":"login.success", "userId":"...", "clientId":null, "ip":"1.2.3.4", "ua":"...", "details":{} }
+    ```
+
+### Migración
+```bash
+npx prisma migrate dev -n "audit_events"
+# o: make seed
+```

@@ -96,3 +96,18 @@ model Session {
 
   @@index([userId, expiresAt], map: "session_user_exp_idx")
 }
+
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  ts         DateTime @default(now())
+  type       String
+  userId     String?
+  clientId   String?
+  ip         String?
+  userAgent  String?
+  details    Json?
+
+  @@index([ts, type], map: "audit_ts_type_idx")
+  @@index([userId], map: "audit_user_idx")
+}
