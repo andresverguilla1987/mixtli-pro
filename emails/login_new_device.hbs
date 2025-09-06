@@ -1,1 +1,10 @@
-{{#> base}}<p>Nuevo login detectado para {{name}}</p>{{/base}}
+{{#> base}}
+  <h1 style="margin:0 0 16px;">Nuevo inicio de sesión</h1>
+  <p>Hola {{name}}, detectamos un inicio de sesión en tu cuenta de {{app_name}}.</p>
+  <ul>
+    <li>Fecha: {{date_human}}</li>
+    <li>IP: {{ip}}</li>
+    <li>Dispositivo: {{ua}}</li>
+  </ul>
+  <p>¿No fuiste tú? <a href="{{secure_link}}">Protege tu cuenta</a>.</p>
+{{/base}}

@@ -1,151 +1,31 @@
-// prisma/schema.example.prisma
-// Copia/ajusta a tu schema.prisma si lo necesitas.
-// No sobrescribe tu schema actual.
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      Role     @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  email                  String   @unique
+  name                   String?
+  emailVerifiedAt        DateTime?
+  twoFactorEnabled       Boolean  @default(false)
+  twoFactorSecretEnc     String?
+  lastLoginAt            DateTime?
+  notificationPrefs      Json?
+  twoFactorRecoveryCodes RecoveryCode[]
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 }
 
-enum Role {
-  ADMIN
-  USER
-}
-
-
-/// --- OAuth models ---
-model OAuthClient {
-  id            String   @id @default(cuid())
-  clientId      String   @unique
-  clientSecret  String?
-  name          String
-  redirectUris  String   // CSV
-  publicClient  Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  consents OAuthConsent[]
-  codes    OAuthCode[]
-}
-
-model OAuthConsent {
-  id         String   @id @default(cuid())
-  userId     String
-  clientId   String   // references OAuthClient.clientId
-  scope      String   // CSV
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([userId, clientId], map: "consent_user_client_idx")
-  @@unique([userId, clientId], map: "consent_user_client_unique")
-}
-
-model OAuthCode {
-  id                String   @id @default(cuid())
-  code              String   @unique
-  userId            String
-  clientId          String   // references OAuthClient.clientId
-  redirectUri       String
-  codeChallenge     String
-  codeChallengeMethod String
-  scope             String
-  expiresAt         DateTime
-  createdAt         DateTime @default(now())
-
-  @@index([clientId, expiresAt], map: "code_client_expires_idx")
-}
-
-
-model RefreshToken {
-  id         String   @id @default(cuid())
-  jti        String   @unique
-  userId     String
-  clientId   String?    // nullable: first-party login may omit
-  issuedAt   DateTime   @default(now())
-  expiresAt  DateTime
-  revokedAt  DateTime?
-  reason     String?
-
-  @@index([userId, clientId], map: "refresh_user_client_idx")
-  @@index([expiresAt], map: "refresh_exp_idx")
-}
-
-model Session {
-  id         String   @id @default(cuid())
-  sid        String   @unique
-  userId     String
-  ip         String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
-  expiresAt  DateTime
-  revokedAt  DateTime?
-
-  @@index([userId, expiresAt], map: "session_user_exp_idx")
-}
-
-
-model AuditEvent {
-  id         String   @id @default(cuid())
-  ts         DateTime @default(now())
-  type       String
-  userId     String?
-  clientId   String?
-  ip         String?
-  userAgent  String?
-  details    Json?
-
-  @@index([ts, type], map: "audit_ts_type_idx")
-  @@index([userId], map: "audit_user_idx")
-}
-
-
-model WebhookDelivery {
-  id            String   @id @default(cuid())
-  eventId       String
-  url           String
-  payload       Json
-  status        String   @default("pending") // pending, delivered, failed
-  attempts      Int      @default(0)
-  lastError     String?
-  nextAttemptAt DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([status, nextAttemptAt], map: "webhook_status_next_idx")
-}
-
-
-model PasswordReset {
-  id         String   @id @default(cuid())
-  userId     String
-  token      String   @unique
-  expiresAt  DateTime
-  usedAt     DateTime?
-  createdAt  DateTime @default(now())
-
-  @@index([userId, expiresAt], map: "pwreset_user_exp_idx")
-}
-
-model BackupCode {
+model RecoveryCode {
   id        String   @id @default(cuid())
   userId    String
-  codeHash  String   // store hashed backup code
+  hash      String
   usedAt    DateTime?
   createdAt DateTime @default(now())
-
-  @@index([userId], map: "backup_user_idx")
+  user      User     @relation(fields: [userId], references: [id])
 }
