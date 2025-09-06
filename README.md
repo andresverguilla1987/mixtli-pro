@@ -245,3 +245,24 @@ docker compose up -d
 
 > Puedes versionar `infra/` y mantener `.env.docker` en secrets o en tu servidor.
 
+
+
+## IP Allowlist (Caddy)
+
+### Adminer (por defecto solo LAN/localhost)
+En `infra/caddy/Caddyfile` ya está activo un **allowlist**:
+```caddyfile
+@adminer_not_allowed not remote_ip 127.0.0.1/32 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+respond @adminer_not_allowed 403
+```
+- Si quieres entrar desde **tu IP pública** agrega tu /32, por ejemplo:
+  `203.0.113.25/32`
+- También puedes proteger con **Basic Auth** activando las variables en `.env.docker` y descomentando el bloque `basicauth` del host de Adminer.
+
+### API (opcional)
+En el host de la **API** dejé un bloque comentado para restringir por IP:
+```caddyfile
+# @api_not_allowed not remote_ip 203.0.113.25/32  # agrega tus CIDRs
+# respond @api_not_allowed 403
+```
+Descomenta y ajusta los CIDRs si quieres que la API solo responda a ciertas IPs/redes.
