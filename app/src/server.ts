@@ -94,6 +94,10 @@ const authMinuteLimiter = rateLimit({ windowMs: 60 * 1000, max: Number(process.e
 const authWindowLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: Number(process.env.RATE_LIMIT_AUTH_MAX || 50), standardHeaders: true, legacyHeaders: false });
 app.use('/api/auth', authMinuteLimiter, authWindowLimiter);
 
+// Admin rate limit
+const adminLimiter = rateLimit({ windowMs: 60 * 1000, max: Number(process.env.RATE_LIMIT_ADMIN_PER_MIN || 30), standardHeaders: true, legacyHeaders: false });
+app.use('/api/admin', adminLimiter);
+
 // Logs en JSON
 app.use(morgan('combined'));
 
@@ -528,5 +532,51 @@ app.post('/api/admin/refresh/revoke', requireAdmin(async (req: any, res: any) =>
   const where: any = { userId: String(userId), revokedAt: null };
   if (clientId) where.clientId = String(clientId);
   const count = await prisma.refreshToken.updateMany({ where, data: { revokedAt: new Date(), reason: 'admin_revoked' } });
+  res.json({ revoked: count.count });
+}));
+
+
+app.get('/api/admin/refresh/list', requireAdmin(async (req: any, res: any) => {
+  const { userId, clientId, limit = 200 } = req.query as any;
+  if (!userId) return res.status(400).json({ message: 'userId requerido' });
+  const where: any = { userId: String(userId) };
+  if (clientId) where.clientId = String(clientId);
+  const items = await prisma.refreshToken.findMany({
+    where,
+    orderBy: { issuedAt: 'desc' },
+    take: Math.min(Number(limit) || 200, 500),
+    select: { id: true, jti: true, userId: true, clientId: true, issuedAt: true, expiresAt: true, revokedAt: true, reason: true }
+  });
+  res.json({ items });
+}));
+
+
+app.get('/api/admin/sessions', requireAdmin(async (req: any, res: any) => {
+  const { userId, limit = 200 } = req.query as any;
+  if (!userId) return res.status(400).json({ message: 'userId requerido' });
+  const items = await prisma.session.findMany({
+    where: { userId: String(userId) },
+    orderBy: { createdAt: 'desc' },
+    take: Math.min(Number(limit) || 200, 500),
+    select: { id: true, sid: true, userId: true, ip: true, userAgent: true, createdAt: true, expiresAt: true, revokedAt: true }
+  });
+  res.json({ items });
+}));
+
+
+app.post('/api/admin/sessions/revoke', requireAdmin(async (req: any, res: any) => {
+  const { sid } = req.body || {};
+  if (!sid) return res.status(400).json({ message: 'sid requerido' });
+  await prisma.session.updateMany({ where: { sid: String(sid), revokedAt: null }, data: { revokedAt: new Date() } });
+  res.status(204).end();
+}));
+
+
+app.post('/api/admin/sessions/revoke_all', requireAdmin(async (req: any, res: any) => {
+  const { userId, keepSid } = req.body || {};
+  if (!userId) return res.status(400).json({ message: 'userId requerido' });
+  const where: any = { userId: String(userId), revokedAt: null };
+  if (keepSid) where.sid = { not: String(keepSid) };
+  const count = await prisma.session.updateMany({ where, data: { revokedAt: new Date() } });
   res.json({ revoked: count.count });
 }));

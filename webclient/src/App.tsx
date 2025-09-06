@@ -1,3 +1,4 @@
+import AdminPanel from './AdminPanel'
 import React, { useEffect, useMemo, useState } from 'react'
 import { randomString, sha256base64url } from './pkce'
 
@@ -6,6 +7,7 @@ const CLIENT_ID = import.meta.env.VITE_CLIENT_ID || 'mixtli-web'
 const REDIRECT_URI = import.meta.env.VITE_REDIRECT_URI || 'http://localhost:5174/callback'
 
 export default function App() {
+  const [tab, setTab] = useState<'demo'|'admin'>('demo')
   const [email, setEmail] = useState('admin@example.com')
   const [password, setPassword] = useState('S3gura#123')
   const [access, setAccess] = useState<string>('')
@@ -83,6 +85,15 @@ export default function App() {
   return (
     <div style={{maxWidth: 720, margin: '40px auto', fontFamily: 'system-ui, sans-serif'}}>
       <h1>Mixtli OAuth2 + PKCE (Demo)</h1>
+      <div style={{marginBottom:16}}>
+        <button onClick={()=>setTab('demo')}>Demo</button>{' '}
+        <button onClick={()=>setTab('admin')}>Admin</button>
+      </div>
+      {tab === 'demo' ? (
+      <div style={{marginBottom:16}}>
+        <button onClick={()=>setTab('demo')}>Demo</button>{' '}
+        <button onClick={()=>setTab('admin')}>Admin</button>
+      </div>
       <p>API: {API}</p>
 
       <section style={{padding: 12, border: '1px solid #ddd', borderRadius: 8, marginBottom: 16}}>
@@ -134,6 +145,9 @@ export default function App() {
         <h2>Log</h2>
         <pre style={{whiteSpace:'pre-wrap'}}>{log}</pre>
       </section>
+      ) : (
+        <AdminPanel />
+      )}
     </div>
   )
 }

@@ -422,3 +422,11 @@ npx prisma migrate dev -n "sessions_ip_ua"
 
 ### Consent UI
 - UI con **tema claro/oscuro**, badges de scopes y botones estilizados.
+
+
+## Admin Panel (webclient)
+- En el `webclient`, pestaña **Admin**:
+  - Pega un **access token de un usuario ADMIN** (usa el admin del seed).
+  - Lista **Sesiones** por `userId` y **Refresh Tokens** por `userId`/`clientId`.
+  - Botones para **revocar** sesiones y refresh tokens.
+- Rate limit de admin: `RATE_LIMIT_ADMIN_PER_MIN` (default 30 req/min).
