@@ -1,4 +1,4 @@
-// src/server.cjs — production CJS entrypoint
+// src/server.cjs — PROD + lite diag
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
@@ -8,11 +8,9 @@ dotenv.config();
 const prisma = new PrismaClient();
 const app = express();
 
-// Middleware
 app.use(cors({ origin: "*", methods: ["GET","POST","PUT","PATCH","DELETE"], allowedHeaders: ["Content-Type","Authorization"] }));
 app.use(express.json({ limit: "5mb" }));
 
-// Health
 app.get("/api/health", async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -22,14 +20,33 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
-// Auth routes
+// auth
 const authRouter = require("./rutas/auth.cjs");
 app.use("/api/auth", authRouter);
 
-// 404
+// --- LITE DIAG ---
+app.post("/api/echo", (req, res) => res.json({ ok: true, received: req.body ?? null }));
+app.get("/__routes", (_req, res) => {
+  const list = [];
+  const stack = app._router?.stack || [];
+  stack.forEach(layer => {
+    if (layer.route?.path) {
+      list.push({ method: Object.keys(layer.route.methods).join(",").toUpperCase(), path: layer.route.path });
+    } else if (layer.name === "router" && layer.handle?.stack) {
+      layer.handle.stack.forEach(h => {
+        if (h.route?.path) {
+          const methods = Object.keys(h.route.methods).join(",").toUpperCase();
+          list.push({ method: methods, path: "/api/auth" + (h.route.path === "/" ? "" : h.route.path) });
+        }
+      });
+    }
+  });
+  res.json(list);
+});
+
 app.use((_req, res) => res.status(404).json({ error: "Not found" }));
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 API en puerto ${PORT} (PROD Corrector)`));
+app.listen(PORT, () => console.log(`🚀 API en puerto ${PORT} (PROD + lite diag)`));
 
 module.exports = { app, prisma };

@@ -1,4 +1,4 @@
-// src/rutas/auth.cjs — PROD (delegate fijo: prisma.usuario)
+// src/rutas/auth.cjs — PROD (passwordHash)
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
@@ -6,11 +6,8 @@ const { PrismaClient } = require("@prisma/client");
 
 const prisma = new PrismaClient();
 const router = express.Router();
-
-// Delegate fijo segun tu schema
 const User = prisma.usuario;
 
-// JWT
 const JWT_SECRET = process.env.JWT_SECRET || "";
 if (!JWT_SECRET) console.warn("[WARN] JWT_SECRET vacío. Configúralo en Render > Environment.");
 
@@ -22,12 +19,10 @@ function signTokens(user) {
   return { accessToken, refreshToken };
 }
 
-function getPasswordHash(user) {
-  // Ajusta aquí si tu campo no es "password"
-  return user?.password ?? user?.passwordHash ?? user?.hash ?? null;
+function getHash(u) {
+  return u?.passwordHash ?? u?.password ?? u?.hash ?? null;
 }
 
-// POST /api/auth/register
 router.post("/register", async (req, res) => {
   try {
     const { email, password, name } = req.body || {};
@@ -37,7 +32,7 @@ router.post("/register", async (req, res) => {
     if (exists) return res.status(409).json({ error: "email ya registrado" });
 
     const hash = await bcrypt.hash(password, 10);
-    const user = await User.create({ data: { email, password: hash, name: name || null } });
+    const user = await User.create({ data: { email, passwordHash: hash, name: name || null } });
     const tokens = signTokens(user);
     res.status(201).json({ user: { id: user.id, email: user.email, name: user.name }, ...tokens });
   } catch (e) {
@@ -47,7 +42,6 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// POST /api/auth/login
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body || {};
@@ -56,7 +50,7 @@ router.post("/login", async (req, res) => {
     const user = await User.findUnique({ where: { email } });
     if (!user) return res.status(401).json({ error: "credenciales invalidas" });
 
-    const hash = getPasswordHash(user);
+    const hash = getHash(user);
     if (!hash) return res.status(500).json({ error: "password_no_disponible" });
 
     const ok = await bcrypt.compare(password, hash);
@@ -72,7 +66,6 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// POST /api/auth/refresh
 router.post("/refresh", async (req, res) => {
   try {
     const { refreshToken } = req.body || {};
@@ -93,7 +86,6 @@ router.post("/refresh", async (req, res) => {
   }
 });
 
-// GET /api/auth/me
 router.get("/me", async (req, res) => {
   try {
     const auth = req.headers.authorization || "";
