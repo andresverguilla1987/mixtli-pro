@@ -25,3 +25,46 @@ enum Role {
   ADMIN
   USER
 }
+
+
+/// --- OAuth models ---
+model OAuthClient {
+  id            String   @id @default(cuid())
+  clientId      String   @unique
+  clientSecret  String?
+  name          String
+  redirectUris  String   // CSV
+  publicClient  Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  consents OAuthConsent[]
+  codes    OAuthCode[]
+}
+
+model OAuthConsent {
+  id         String   @id @default(cuid())
+  userId     String
+  clientId   String   // references OAuthClient.clientId
+  scope      String   // CSV
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, clientId], map: "consent_user_client_idx")
+  @@unique([userId, clientId], map: "consent_user_client_unique")
+}
+
+model OAuthCode {
+  id                String   @id @default(cuid())
+  code              String   @unique
+  userId            String
+  clientId          String   // references OAuthClient.clientId
+  redirectUri       String
+  codeChallenge     String
+  codeChallengeMethod String
+  scope             String
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+
+  @@index([clientId, expiresAt], map: "code_client_expires_idx")
+}

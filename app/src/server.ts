@@ -124,6 +124,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const ACCESS_TTL = 60 * 60; // 1h
 
 function bearerUser(req: any): { sub: string, email?: string, role?: string } | null {
+
   // DEMO: también aceptamos ?access_token=... en query para flujos redirect
   const qtok = (req.query && (req.query.access_token as string)) || '';
   const auth = String(req.headers['authorization'] || '');
@@ -341,38 +342,32 @@ app.post('/oauth/token', async (req, res) => {
     client_id = cid; client_secret = csec;
   }
 
-  const allowedClient = (process.env.OAUTH_CLIENT_ID || 'mixtli-web');
-  const allowedSecret = (process.env.OAUTH_CLIENT_SECRET || 'dev-secret');
-  const allowedRedirects = String(process.env.OAUTH_REDIRECT_URIS || 'http://localhost:5173/callback').split(',').map(s => s.trim());
-
-  if (client_id !== allowedClient) return res.status(400).json({ error: 'invalid_client' });
-  // Permitimos public client sin secret si OAUTH_PUBLIC_CLIENT=true
-  const publicClient = (process.env.OAUTH_PUBLIC_CLIENT || 'true') === 'true';
-  if (!publicClient && client_secret !== allowedSecret) return res.status(401).json({ error: 'invalid_client_secret' });
+  const client = await getOAuthClient(String(client_id));
+  if (!client) return res.status(400).json({ error: 'invalid_client' });
+  if (!client.publicClient && client.clientSecret !== client_secret) return res.status(401).json({ error: 'invalid_client_secret' });
+  const allowedRedirects = client.redirectUris.split(',').map(s => s.trim());
 
   const { code, redirect_uri, code_verifier } = req.body || {};
   if (!code || !redirect_uri || !code_verifier) return res.status(400).json({ error: 'invalid_request' });
   if (!allowedRedirects.includes(redirect_uri)) return res.status(400).json({ error: 'invalid_redirect_uri' });
 
-  const data = oauthCodes.get(code);
-  if (!data || data.exp < Date.now()) return res.status(400).json({ error: 'invalid_grant' });
-  if (data.client_id !== client_id || data.redirect_uri !== redirect_uri) return res.status(400).json({ error: 'invalid_grant' });
+  const record = await prisma.oAuthCode.findFirst({ where: { code: String(code) } });
+  if (!record || record.expiresAt < new Date()) return res.status(400).json({ error: 'invalid_grant' });
+  if (record.clientId !== client_id || record.redirectUri !== redirect_uri) return res.status(400).json({ error: 'invalid_grant' });
 
-  // PKCE check
-  const method = data.method || 'S256';
+  // PKCE
+  const method = record.codeChallengeMethod || 'S256';
   if (method === 'plain') {
-    if (data.code_challenge !== code_verifier) return res.status(400).json({ error: 'invalid_grant' });
+    if (record.codeChallenge !== code_verifier) return res.status(400).json({ error: 'invalid_grant' });
   } else {
-    // S256
     const crypto = await import('crypto');
-    const hash = crypto.createHash('sha256').update(code_verifier).digest('base64url');
-    if (hash !== data.code_challenge) return res.status(400).json({ error: 'invalid_grant' });
+    const hash = crypto.createHash('sha256').update(String(code_verifier)).digest('base64url');
+    if (hash !== record.codeChallenge) return res.status(400).json({ error: 'invalid_grant' });
   }
 
-  oauthCodes.delete(code);
+  await prisma.oAuthCode.delete({ where: { id: record.id } });
 
-  // Emitir tokens
-  const tokens = await signTokens({ sub: data.sub, scope: data.scope, client_id });
+  const tokens = await signTokens({ sub: record.userId, scope: record.scope, client_id });
   return res.json(tokens);
 });
 
@@ -404,10 +399,19 @@ app.get('/oauth/authorize', async (req, res) => {
     return res.end(`<!doctype html>
 <html><head><meta charset="utf-8"><title>Consentimiento</title></head>
 <body style="font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width:720px; margin:40px auto;">
-  <h1>Mixtli - Consentimiento</h1>
-  <p>El cliente <b>${client_id}</b> solicita acceso con scope: <code>${scope}</code>.</p>
-  <p><a href="${approveUrl}"><button>Aprobar</button></a> <a href="${denyUrl}"><button>Denegar</button></a></p>
-  <p style="color:#666">Demo: se usa el access_token del usuario en query o Authorization header.</p>
+  <div style=\"display:flex;align-items:center;gap:12px\">
+    <div style=\"width:40px;height:40px;border-radius:10px;background:#0ea5e9\"></div>
+    <h1 style=\"margin:0\">Mixtli – Consentimiento</h1>
+  </div>
+  <p>La app <b>${client_id}</b> solicita acceso con el/los <b>alcances</b>:</p>
+  <ul style=\"background:#f1f5f9;padding:12px;border-radius:8px\">
+    ${String(scope).split(' ').map(s=>`<li><code>${s}</code></li>`).join('')}
+  </ul>
+  <div style=\"display:flex;gap:12px\">
+    <a href=\"${approveUrl}\"><button style=\"padding:10px 14px;border-radius:8px;background:#16a34a;color:white;border:none\">Aprobar</button></a>
+    <a href=\"${denyUrl}\"><button style=\"padding:10px 14px;border-radius:8px;background:#ef4444;color:white;border:none\">Denegar</button></a>
+  </div>
+  <p style=\"color:#64748b;margin-top:12px\">Demo: se usa el access_token del usuario en query o Authorization header.</p>
 </body></html>`);
   }
 
@@ -426,12 +430,25 @@ app.get('/oauth/consent', (req, res) => {
   const user = bearerUser(req);
   if (!user) return res.status(401).send('Unauthorized');
   const { approve } = req.query as any;
-  const { client_id } = req.query as any;
+  const { client_id, scope = 'openid profile email' } = req.query as any;
   if (!client_id) return res.status(400).send('invalid_client');
-  const key = `${user.sub}::${client_id}`;
-  oauthConsent.set(key, approve === '1');
+  if (approve === '1') {
+    await prisma.oAuthConsent.upsert({
+      where: { userId_clientId: { userId: String(user.sub), clientId: String(client_id) } },
+      update: { scope: String(scope) },
+      create: { userId: String(user.sub), clientId: String(client_id), scope: String(scope) }
+    });
+  } else {
+    // deny: opcionalmente borrar consent
+    await prisma.oAuthConsent.deleteMany({ where: { userId: String(user.sub), clientId: String(client_id) } });
+  }
   // Redirect back to /oauth/authorize with same params to proceed
   const params = new URLSearchParams(req.query as any);
   params.delete('approve');
   return res.redirect(`/oauth/authorize?${params.toString()}`);
 });
+
+
+async function getOAuthClient(client_id: string) {
+  return prisma.oAuthClient.findFirst({ where: { clientId: client_id } });
+}

@@ -378,3 +378,26 @@ Esto permite que clientes estándar (OAuth2/OIDC) se configuren automáticamente
 - Se añadió `GET /oauth/authorize` con **página de consentimiento** simple.
 - Para demo, el backend acepta `?access_token=` en la URL para identificar al usuario (ya logueado). **No usar así en producción**; en prod usar **sesión** (cookie HttpOnly) y UI de login/consent real.
 - Tras aprobar, redirige a `redirect_uri?code=...&state=...`.
+
+
+## OAuth con persistencia (Prisma + Postgres)
+Ahora `/oauth/authorize` y `/oauth/token` usan tablas **Prisma**:
+- `OAuthClient` (clientes, redirect URIs, público/privado)
+- `OAuthConsent` (consentimientos por usuario/cliente)
+- `OAuthCode` (authorization codes con PKCE y expiración)
+
+### Migraciones
+```bash
+# local
+npx prisma migrate dev -n "oauth_persistence"
+
+# en Docker (servicio seed ya hace migrate deploy)
+make seed
+```
+
+### Seed de cliente
+El seed crea/actualiza un **client** con:
+- `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET` (si `publicClient=false`)
+- `OAUTH_REDIRECT_URIS` (CSV)
+- `OAUTH_PUBLIC_CLIENT` (true/false)
+Ajusta estas variables en `infra/.env.docker` o `.env` antes de correr `make seed`.
