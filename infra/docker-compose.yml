@@ -191,3 +191,18 @@ volumes:
 volumes:
   caddy_data:
   caddy_config:
+
+
+  webclient:
+    build:
+      context: ../webclient
+    container_name: mixtli_webclient
+    environment:
+      - VITE_API_URL=${API_PUBLIC_URL:-http://localhost:10000}
+      - VITE_CLIENT_ID=${OAUTH_CLIENT_ID:-mixtli-web}
+      - VITE_REDIRECT_URI=${WEBCLIENT_REDIRECT_URI:-http://localhost:5174/callback}
+    ports:
+      - "${WEBCLIENT_PORT:-5174}:80"
+    depends_on:
+      - app
+    networks: [mixtli]

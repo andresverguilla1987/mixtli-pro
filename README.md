@@ -355,3 +355,20 @@ Esto permite que clientes estándar (OAuth2/OIDC) se configuren automáticamente
   4. `POST /oauth/token` con `grant_type=authorization_code`, `code`, `code_verifier`, `client_id`, `redirect_uri`  ⇒ tokens
 
 > **Demo** guarda codes en memoria (5 min). Para producción, persistir en DB y agregar consentimiento/UI.
+
+
+## Webclient (React + Vite) con PKCE
+- Carpeta: `webclient/`
+- Variables (`.env`):
+  ```
+  VITE_API_URL=http://localhost:10000
+  VITE_CLIENT_ID=mixtli-web
+  VITE_REDIRECT_URI=http://localhost:5174/callback
+  ```
+- Docker:
+  ```bash
+  make up && make app
+  cd infra && docker compose --env-file ./.env.docker up --build -d webclient
+  # Abrir: http://localhost:5174
+  ```
+- Asegúrate de incluir `http://localhost:5174/callback` en `OAUTH_REDIRECT_URIS` del API.
