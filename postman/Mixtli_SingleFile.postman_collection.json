@@ -1,0 +1,142 @@
+{
+  "info": {
+    "name": "Mixtli – Single File (Colección + Variables)",
+    "_postman_id": "auto-008642e7",
+    "description": "Colección mínima sin environments.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Ping raíz",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "2FA Setup (QR)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-User-Email",
+            "value": "{{user_email}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/security/2fa/setup"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "2FA Enable (confirma)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-User-Email",
+            "value": "{{user_email}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"123456\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/security/2fa/enable"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Backup PDF (descarga)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-User-Email",
+            "value": "{{user_email}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"plainCodes\": [\"xxxx-xxxx-xxxx\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/security/2fa/backup/pdf"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Usar backup code",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-User-Email",
+            "value": "{{user_email}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"xxxx-xxxx-xxxx\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/security/2fa/backup/use"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Evento: Nuevo login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-User-Email",
+            "value": "{{user_email}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/events/login"
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "user_email",
+      "value": "admin@mixtli.test"
+    }
+  ]
+}

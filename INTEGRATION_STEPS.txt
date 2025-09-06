@@ -1,0 +1,11 @@
+1) Copia la carpeta /notifications a la raíz de tu repo.
+2) Copia .env.example -> .env y llena CRYPTO_KEY (openssl rand -hex 32). En Render usa .env.render.example.
+3) Instala y migra:
+   cd notifications
+   pnpm i
+   pnpm prisma:gen
+   pnpm prisma:migrate --name init
+   pnpm run seed
+   pnpm run dev
+4) Importa postman/Mixtli_SingleFile.postman_collection.json y ajusta {{baseUrl}}.
+5) Si usas Render, monta Disk en /data y usa DATABASE_URL=file:/data/dev.db

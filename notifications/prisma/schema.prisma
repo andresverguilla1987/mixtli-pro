@@ -1,0 +1,23 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "sqlite"; url = env("DATABASE_URL") }
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  name String?
+  emailVerifiedAt DateTime?
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecretEnc String?
+  lastLoginAt DateTime?
+  notificationPrefs Json?
+  twoFactorRecoveryCodes RecoveryCode[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model RecoveryCode {
+  id String @id @default(cuid())
+  userId String
+  hash String
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id])
+}

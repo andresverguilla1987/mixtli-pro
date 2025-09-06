@@ -1,0 +1,29 @@
+{
+  "name": "mixtli-notifications",
+  "version": "1.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "seed": "node scripts/seed.mjs",
+    "prisma:gen": "prisma generate",
+    "prisma:migrate": "prisma migrate dev --name init"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ses": "^3.645.0",
+    "@prisma/client": "^5.18.0",
+    "@sendgrid/mail": "^8.1.0",
+    "argon2": "^0.41.1",
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "handlebars": "^4.7.8",
+    "otplib": "^12.0.1",
+    "pdfkit": "^0.14.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "prisma": "^5.18.0"
+  }
+}
