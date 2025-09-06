@@ -250,3 +250,22 @@ app.get('/.well-known/jwks.json', async (_req, res) => {
   const jwks = await getJWKS();
   res.json(jwks);
 });
+
+
+// OpenID Connect Discovery
+app.get('/.well-known/openid-configuration', (req, res) => {
+  const issuer = process.env.JWT_ISS || 'https://mixtli.local';
+  const base = issuer.replace(/\/$/, '');
+  res.json({
+    issuer,
+    authorization_endpoint: base + '/api/auth/login',
+    token_endpoint: base + '/api/auth/login',
+    jwks_uri: base + '/.well-known/jwks.json',
+    response_types_supported: ['code','token','id_token'],
+    subject_types_supported: ['public'],
+    id_token_signing_alg_values_supported: ['RS256','HS256'],
+    scopes_supported: ['openid','profile','email'],
+    token_endpoint_auth_methods_supported: ['client_secret_basic','client_secret_post'],
+    claims_supported: ['sub','email','name','iat','exp']
+  });
+});

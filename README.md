@@ -318,3 +318,25 @@ Workflow `rotate-keys.yml`:
 - Tras merge a `main`, tu `/.well-known/jwks.json` expondrá el nuevo `KID` (no olvides desplegar).
 
 > Nota: Los privados viven en el repo para demo. En producción, guarda **private.pem** en un **secret manager** (AWS KMS, GCP KMS, Vault) y solo versiona la parte pública/manifest.
+
+
+## OpenID Connect Discovery
+La API expone `/.well-known/openid-configuration` para clientes OIDC/OAuth2.
+
+Ejemplo (si `JWT_ISS=https://idp.mixtli.com`):
+```json
+{
+  "issuer": "https://idp.mixtli.com",
+  "authorization_endpoint": "https://idp.mixtli.com/api/auth/login",
+  "token_endpoint": "https://idp.mixtli.com/api/auth/login",
+  "jwks_uri": "https://idp.mixtli.com/.well-known/jwks.json",
+  "response_types_supported": ["code","token","id_token"],
+  "subject_types_supported": ["public"],
+  "id_token_signing_alg_values_supported": ["RS256","HS256"],
+  "scopes_supported": ["openid","profile","email"],
+  "token_endpoint_auth_methods_supported": ["client_secret_basic","client_secret_post"],
+  "claims_supported": ["sub","email","name","iat","exp"]
+}
+```
+
+Esto permite que clientes estándar (OAuth2/OIDC) se configuren automáticamente usando la URL del issuer.
