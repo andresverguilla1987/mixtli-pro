@@ -17,6 +17,12 @@ import morgan from 'morgan';
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use(limiter);
 
+// Rate limit más estricto para /api/auth/*
+// Burst corto: 10 req/min + 50 req/15min
+const authMinuteLimiter = rateLimit({ windowMs: 60 * 1000, max: Number(process.env.RATE_LIMIT_AUTH_PER_MIN || 10), standardHeaders: true, legacyHeaders: false });
+const authWindowLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: Number(process.env.RATE_LIMIT_AUTH_MAX || 50), standardHeaders: true, legacyHeaders: false });
+app.use('/api/auth', authMinuteLimiter, authWindowLimiter);
+
 // Logs en JSON
 app.use(morgan('combined'));
 
@@ -26,12 +32,12 @@ app.use(express.json());
 const origins = (process.env.CORS_ORIGINS || '').split(',').filter(Boolean);
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || origins.length === 0 || origins.includes(origin)) return cb(null, true);
-    return cb(null, true); // permisivo para pruebas
+    if (!origin) return cb(null, true); // non-browser or same-origin
+    if (origins.includes(origin)) return cb(null, true);
+    return cb(new Error('CORS blocked'), false);
   },
   credentials: true
 }));
-
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const ACCESS_TTL = 60 * 60; // 1h
 const REFRESH_TTL = 60 * 60 * 24 * 7; // 7d
