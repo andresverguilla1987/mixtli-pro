@@ -266,3 +266,14 @@ En el host de la **API** dejé un bloque comentado para restringir por IP:
 # respond @api_not_allowed 403
 ```
 Descomenta y ajusta los CIDRs si quieres que la API solo responda a ciertas IPs/redes.
+
+
+## Allow/Deny a nivel API (Express)
+- **TRUST_PROXY=true**: respeta `X-Forwarded-For` (requerido detrás de Caddy).
+- **Global**:
+  - `IP_ALLOWLIST`: CSV de IPs o CIDRs que **sí** pasan (si se define, los demás quedan fuera).
+  - `IP_DENYLIST`: CSV de IPs o CIDRs **bloqueadas** (prioridad sobre allow).
+- **Auth** (`/api/auth/*`):
+  - `IP_ALLOWLIST_AUTH` y `IP_DENYLIST_AUTH` aplican **además** de los globales.
+
+> Soporta IPv4 exacto (`203.0.113.25`) y CIDR (`203.0.113.0/24`). Para IPv6, se puede integrar luego con `ipaddr.js` o `cidr-matcher`.

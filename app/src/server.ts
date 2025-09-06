@@ -10,6 +10,64 @@ import { z } from 'zod';
 import { prisma } from './prisma.js';
 
 const app = express();
+// Confía en encabezados del proxy para X-Forwarded-For / req.ips
+if ((process.env.TRUST_PROXY || 'true') === 'true') {
+  app.set('trust proxy', true);
+}
+
+// Utilidades IP (IPv4)
+function ipv4ToInt(ip: string): number | null {
+  const m = ip.match(/^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$/);
+  if (!m) return null;
+  const parts = m.slice(1).map(n => parseInt(n, 10));
+  if (parts.some(n => n < 0 || n > 255)) return null;
+  return (parts[0]<<24) + (parts[1]<<16) + (parts[2]<<8) + parts[3];
+}
+function ipInCidr(ip: string, cidr: string): boolean {
+  const [range, bitsStr] = cidr.split('/');
+  const bits = parseInt(bitsStr || '32', 10);
+  const ipInt = ipv4ToInt(ip);
+  const rangeInt = ipv4ToInt(range);
+  if (ipInt === null || rangeInt === null || bits < 0 || bits > 32) return false;
+  const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
+  return (ipInt & mask) === (rangeInt & mask);
+}
+function ipMatches(ip: string, list: string[]): boolean {
+  for (const entry of list) {
+    if (entry.includes('/')) { if (ipInCidr(ip, entry)) return true; }
+    else if (ip === entry) return true;
+  }
+  return false;
+}
+function csv(str?: string): string[] {
+  return (str || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+function clientIp(req: any): string {
+  // Con trust proxy, Express llena req.ips (cadena), si no, usa req.ip
+  const xff = (req.headers['x-forwarded-for'] || '') as string;
+  const first = xff.split(',')[0]?.trim();
+  return (req.ips && req.ips[0]) || first || req.ip || req.socket?.remoteAddress || '';
+}
+
+// Global allow/deny lists
+const ALLOW = csv(process.env.IP_ALLOWLIST);
+const DENY  = csv(process.env.IP_DENYLIST);
+
+// Middleware global
+app.use((req, res, next) => {
+  const ip = clientIp(req);
+  // Si está en deny => fuera
+  if (ip && ipMatches(ip, DENY)) {
+    return res.status(403).json({ message: 'Forbidden (denylist)', code: 'IP_BLOCKED' });
+  }
+  // Si hay allowlist y no está incluido => fuera
+  if (ALLOW.length > 0 && ip && !ipMatches(ip, ALLOW)) {
+    return res.status(403).json({ message: 'Forbidden (allowlist)', code: 'IP_NOT_ALLOWED' });
+  }
+  return next();
+});
+
+
 import rateLimit from 'express-rate-limit';
 import morgan from 'morgan';
 
@@ -57,6 +115,21 @@ const RegisterSchema = z.object({
 const LoginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+});
+
+
+// Allowlist/denylist específico para /api/auth/*
+const ALLOW_AUTH = csv(process.env.IP_ALLOWLIST_AUTH);
+const DENY_AUTH  = csv(process.env.IP_DENYLIST_AUTH);
+app.use('/api/auth', (req, res, next) => {
+  const ip = clientIp(req);
+  if (ip && ipMatches(ip, DENY_AUTH)) {
+    return res.status(403).json({ message: 'Forbidden (denylist-auth)', code: 'IP_BLOCKED_AUTH' });
+  }
+  if (ALLOW_AUTH.length > 0 && ip && !ipMatches(ip, ALLOW_AUTH)) {
+    return res.status(403).json({ message: 'Forbidden (allowlist-auth)', code: 'IP_NOT_ALLOWED_AUTH' });
+  }
+  return next();
 });
 
 app.post('/api/auth/register', async (req, res) => {
