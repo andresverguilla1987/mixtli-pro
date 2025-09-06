@@ -97,6 +97,29 @@ export default function App() {
 
       <section style={{padding: 12, border: '1px solid #ddd', borderRadius: 8, marginBottom: 16}}>
         <h2>2) Authorize (PKCE)</h2>
+      <section style={{padding: 12, border: '1px solid #ddd', borderRadius: 8, marginBottom: 16}}>
+        <h2>2.1) Login con Mixtli (redirect)</h2>
+        <p>Hace GET a <code>/oauth/authorize</code> y redirige a <code>redirect_uri</code> con <code>?code=</code>.</p>
+        <button onClick={async ()=>{
+          if (!access) { alert('Primero haz login para obtener Bearer'); return; }
+          const verifier = randomString(64);
+          const challenge = await sha256base64url(verifier);
+          localStorage.setItem('pkce_verifier', verifier);
+          const state = randomString(16);
+          const params = new URLSearchParams({
+            response_type: 'code',
+            client_id: CLIENT_ID,
+            redirect_uri: REDIRECT_URI,
+            code_challenge: challenge,
+            code_challenge_method: 'S256',
+            scope: 'openid profile email',
+            state,
+            access_token: access // DEMO: para que el backend identifique al usuario
+          }).toString();
+          window.location.href = `${API}/oauth/authorize?${params}`;
+        }}>Login con Mixtli</button>
+      </section>
+    
         <button onClick={startAuthorize} disabled={!access}>Obtener code</button>
         <p><b>code:</b> {code || '(sin code)'}</p>
       </section>

@@ -11,7 +11,9 @@ import { z } from 'zod';
 import { prisma } from './prisma.js';
 
 /* --- OAuth2 in-memory store --- */
-const oauthCodes = new Map<string, any>(); // code -> {sub, client_id, redirect_uri, code_challenge, method, scope, exp}
+const oauthCodes = new Map<string, any>();
+/* --- OAuth consent store --- */
+const oauthConsent = new Map<string, boolean>(); // key: sub::client_id -> approved // code -> {sub, client_id, redirect_uri, code_challenge, method, scope, exp}
 function randUrlSafe(len: number) {
   const buf = Buffer.alloc(len);
   for (let i=0;i<len;i++) buf[i] = Math.floor(Math.random()*256);
@@ -122,8 +124,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const ACCESS_TTL = 60 * 60; // 1h
 
 function bearerUser(req: any): { sub: string, email?: string, role?: string } | null {
+  // DEMO: también aceptamos ?access_token=... en query para flujos redirect
+  const qtok = (req.query && (req.query.access_token as string)) || '';
   const auth = String(req.headers['authorization'] || '');
-  const m = auth.match(/^Bearer\s+(.+)$/i);
+  const m = auth.match(/^Bearer\s+(.+)$/i) || (qtok ? [qtok, qtok] : null);
   if (!m) return null;
   // No verificamos firma aquí por velocidad; endpoints críticos ya validan al emitir/refresh
   try { const parts = m[1].split('.'); const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8')); return { sub: payload.sub, email: payload.email, role: payload.role }; } catch { return null; }
@@ -370,4 +374,64 @@ app.post('/oauth/token', async (req, res) => {
   // Emitir tokens
   const tokens = await signTokens({ sub: data.sub, scope: data.scope, client_id });
   return res.json(tokens);
+});
+
+
+// GET /oauth/authorize (redirect style) - DEMO
+app.get('/oauth/authorize', async (req, res) => {
+  const user = bearerUser(req);
+  const { response_type, client_id, redirect_uri, code_challenge, code_challenge_method = 'S256', scope = 'openid profile email', state } = req.query as any || {};
+
+  if (!user) return res.status(401).send('Unauthorized (need Bearer or ?access_token=...)');
+
+  if (response_type !== 'code') return res.status(400).send('unsupported_response_type');
+
+  const allowedClient = (process.env.OAUTH_CLIENT_ID || 'mixtli-web');
+  const allowedRedirects = String(process.env.OAUTH_REDIRECT_URIS || 'http://localhost:5174/callback').split(',').map(s => s.trim());
+  if (client_id !== allowedClient) return res.status(400).send('invalid_client');
+  if (!allowedRedirects.includes(String(redirect_uri))) return res.status(400).send('invalid_redirect_uri');
+  if (!code_challenge || !['S256','plain'].includes(code_challenge_method)) return res.status(400).send('invalid_request');
+
+  // Consent check
+  const key = `${user.sub}::${client_id}`;
+  const approved = oauthConsent.get(key);
+  if (!approved) {
+    // Render simple consent page
+    const qs = new URLSearchParams(req.query as any).toString();
+    const approveUrl = `/oauth/consent?approve=1&${qs}`;
+    const denyUrl = `/oauth/consent?approve=0&${qs}`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.end(`<!doctype html>
+<html><head><meta charset="utf-8"><title>Consentimiento</title></head>
+<body style="font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width:720px; margin:40px auto;">
+  <h1>Mixtli - Consentimiento</h1>
+  <p>El cliente <b>${client_id}</b> solicita acceso con scope: <code>${scope}</code>.</p>
+  <p><a href="${approveUrl}"><button>Aprobar</button></a> <a href="${denyUrl}"><button>Denegar</button></a></p>
+  <p style="color:#666">Demo: se usa el access_token del usuario en query o Authorization header.</p>
+</body></html>`);
+  }
+
+  // Already approved: issue code and redirect
+  const code = randUrlSafe(32);
+  const exp = Date.now() + 5 * 60 * 1000;
+  oauthCodes.set(code, { sub: user.sub, client_id, redirect_uri, code_challenge, method: code_challenge_method, scope, exp });
+  const u = new URL(String(redirect_uri));
+  u.searchParams.set('code', code);
+  if (state) u.searchParams.set('state', String(state));
+  return res.redirect(u.toString());
+});
+
+// Consent endpoint
+app.get('/oauth/consent', (req, res) => {
+  const user = bearerUser(req);
+  if (!user) return res.status(401).send('Unauthorized');
+  const { approve } = req.query as any;
+  const { client_id } = req.query as any;
+  if (!client_id) return res.status(400).send('invalid_client');
+  const key = `${user.sub}::${client_id}`;
+  oauthConsent.set(key, approve === '1');
+  // Redirect back to /oauth/authorize with same params to proceed
+  const params = new URLSearchParams(req.query as any);
+  params.delete('approve');
+  return res.redirect(`/oauth/authorize?${params.toString()}`);
 });

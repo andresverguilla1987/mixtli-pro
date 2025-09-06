@@ -372,3 +372,9 @@ Esto permite que clientes estándar (OAuth2/OIDC) se configuren automáticamente
   # Abrir: http://localhost:5174
   ```
 - Asegúrate de incluir `http://localhost:5174/callback` en `OAUTH_REDIRECT_URIS` del API.
+
+
+### Consentimiento + Redirect (demo)
+- Se añadió `GET /oauth/authorize` con **página de consentimiento** simple.
+- Para demo, el backend acepta `?access_token=` en la URL para identificar al usuario (ya logueado). **No usar así en producción**; en prod usar **sesión** (cookie HttpOnly) y UI de login/consent real.
+- Tras aprobar, redirige a `redirect_uri?code=...&state=...`.
