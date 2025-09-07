@@ -1,0 +1,52 @@
+---
+- name: Allow DB/Redis from my current public IP (auto)
+  hosts: servers
+  become: true
+  vars:
+    # Puertos a abrir (solo TCP). Ajusta si quieres.
+    ports_list: [5432, 6379]
+  vars_prompt: []
+  tasks:
+    - name: Detect controller public IP (using curl)
+      run_once: true
+      delegate_to: localhost
+      vars:
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+      shell: |
+        set -e
+        if command -v curl >/dev/null 2>&1; then
+          curl -s https://ifconfig.me || curl -s https://api.ipify.org
+        else
+          python3 - <<'PY'
+import urllib.request
+for url in ("https://ifconfig.me", "https://api.ipify.org"):
+    try:
+        print(urllib.request.urlopen(url, timeout=5).read().decode().strip())
+        break
+    except Exception:
+        pass
+PY
+        fi
+      register: myip_raw
+
+    - name: Set fact with my public IP
+      set_fact:
+        my_public_ip: "{{ myip_raw.stdout_lines[-1] | default(myip_raw.stdout) | trim }}"
+
+    - name: Debug my public IP
+      debug:
+        var: my_public_ip
+
+    - name: Ensure UFW present
+      apt:
+        name: ufw
+        state: present
+
+    - name: Allow ports from my public IP
+      loop: "{{ ports_list }}"
+      loop_control:
+        loop_var: port_item
+      command: ufw allow from {{ my_public_ip }} to any port {{ port_item }} proto tcp
+
+    - name: Enable UFW
+      command: ufw --force enable
