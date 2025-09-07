@@ -1,0 +1,14 @@
+[DEFAULT]
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+destemail = {{ destemail | default('') }}
+sender = fail2ban@{{ ansible_fqdn | default('server') }}
+mta = sendmail
+action = %(action_mwl)s
+
+[sshd]
+enabled = true
+port    = {{ allow_ssh_port }}
+logpath = %(sshd_log)s
+backend = systemd

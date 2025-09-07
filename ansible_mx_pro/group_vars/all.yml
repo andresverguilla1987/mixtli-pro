@@ -1,0 +1,9 @@
+---
+create_user: "deploy"
+allow_ssh_port: 2222
+open_ports: [80, 443, 3000, 8080]
+timezone_str: "America/Mexico_City"
+enable_fail2ban: true
+enable_auditd: true
+enable_unattended: true
+destemail: ""

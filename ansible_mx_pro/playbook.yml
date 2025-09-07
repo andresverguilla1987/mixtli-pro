@@ -1,0 +1,8 @@
+---
+- name: Harden Ubuntu/Debian servers (MX PRO)
+  hosts: servers
+  become: true
+  vars_files:
+    - group_vars/all.yml
+  roles:
+    - hardening
