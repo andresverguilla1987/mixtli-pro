@@ -1207,3 +1207,115 @@ declare txt text; clr text; begin
   return NEW;
 end; $$;
 ```
+
+
+---
+# V7.4 — FX updater (cron), KMS signatures, Políticas (op/diarias) + métricas
+Generado: 2025-09-07 05:12
+
+## Novedades
+- **Actualizador FX (cron)**: Edge `fx-update` que trae tipos de cambio y **upsert** a `fx_rates`. Lista para **programar cada 12h**.
+- **Firmas con AWS KMS** para auditoría: Edge `audit-sign-kms` genera **firma base64** del CSV; el zip incluye `admin_actions.sig`.
+- **Políticas por tenant**: tope **por operación** y **diario por usuario**, con logs en `policy_events` y métricas en el dashboard (**Bloqueos 24h**).
+- UI: sección **Políticas** en pestaña **Tenants** para configurar límites.
+
+## SQL — Políticas por tenant (op/día) y eventos
+```sql
+-- Limites por tenant
+create table if not exists public.policy_limits(
+  tenant_id uuid primary key references public.tenants(id) on delete cascade,
+  max_op_cents bigint default 0,            -- 0 = sin tope
+  max_daily_user_cents bigint default 0,    -- 0 = sin tope
+  updated_at timestamptz default now()
+);
+
+-- Eventos de políticas (bloqueos)
+create table if not exists public.policy_events(
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid,
+  user_id uuid,
+  kind text not null,         -- 'max_op' | 'max_daily_user'
+  amount_cents bigint,
+  created_at timestamptz default now(),
+  details jsonb
+);
+alter table public.policy_events enable row level security;
+create policy view_policy_events on public.policy_events
+  for select to authenticated using (public.is_admin() or public.has_role('reports'));
+
+-- Helpers
+create or replace function public.policy_get(tenant uuid) returns policy_limits language sql stable as $$
+  select * from policy_limits where tenant_id = tenant;
+$$;
+
+create or replace function public.daily_user_spend_cents(p_user uuid) returns bigint language sql stable as $$
+  select coalesce(sum(amount_cents),0) from public.wallet_ledger
+   where user_id = p_user and created_at >= date_trunc('day', now());
+$$;
+
+-- Enforcements en purchases + wallet_ledger (además de team_can_spend de V7.2)
+create or replace function public.enforce_policies_purchase() returns trigger
+language plpgsql as $$
+declare lim policy_limits; v_daily bigint; begin
+  if NEW.tenant_id is not null then
+    select * into lim from policy_limits where tenant_id = NEW.tenant_id;
+    if lim.max_op_cents is not null and lim.max_op_cents > 0 and NEW.amount_cents > lim.max_op_cents then
+      insert into policy_events(tenant_id, user_id, kind, amount_cents, details) values (NEW.tenant_id, NEW.user_id, 'max_op', NEW.amount_cents, jsonb_build_object('purchase_id', NEW.id));
+      raise exception 'max per operation exceeded';
+    end if;
+    if lim.max_daily_user_cents is not null and lim.max_daily_user_cents > 0 then
+      select public.daily_user_spend_cents(NEW.user_id) into v_daily;
+      if v_daily + coalesce(NEW.amount_cents,0) > lim.max_daily_user_cents then
+        insert into policy_events(tenant_id, user_id, kind, amount_cents, details) values (NEW.tenant_id, NEW.user_id, 'max_daily_user', NEW.amount_cents, jsonb_build_object('purchase_id', NEW.id, 'accum', v_daily));
+        raise exception 'daily user limit exceeded';
+      end if;
+    end if;
+  end if;
+  return NEW;
+end; $$;
+
+drop trigger if exists trg_enforce_policies_purchase on public.purchases;
+create trigger trg_enforce_policies_purchase before insert on public.purchases
+for each row execute function public.enforce_policies_purchase();
+
+create or replace function public.enforce_policies_wallet() returns trigger
+language plpgsql as $$
+declare lim policy_limits; v_daily bigint; begin
+  if NEW.tenant_id is not null and NEW.type in ('spend','purchase') then
+    select * into lim from policy_limits where tenant_id = NEW.tenant_id;
+    if lim.max_op_cents is not null and lim.max_op_cents > 0 and NEW.amount_cents > lim.max_op_cents then
+      insert into policy_events(tenant_id, user_id, kind, amount_cents, details) values (NEW.tenant_id, NEW.user_id, 'max_op', NEW.amount_cents, jsonb_build_object('ledger_id', NEW.id));
+      raise exception 'max per operation exceeded';
+    end if;
+    if lim.max_daily_user_cents is not null and lim.max_daily_user_cents > 0 then
+      select public.daily_user_spend_cents(NEW.user_id) into v_daily;
+      if v_daily + coalesce(NEW.amount_cents,0) > lim.max_daily_user_cents then
+        insert into policy_events(tenant_id, user_id, kind, amount_cents, details) values (NEW.tenant_id, NEW.user_id, 'max_daily_user', NEW.amount_cents, jsonb_build_object('ledger_id', NEW.id, 'accum', v_daily));
+        raise exception 'daily user limit exceeded';
+      end if;
+    end if;
+  end if;
+  return NEW;
+end; $$;
+
+drop trigger if exists trg_enforce_policies_wallet on public.wallet_ledger;
+create trigger trg_enforce_policies_wallet before insert on public.wallet_ledger
+for each row execute function public.enforce_policies_wallet();
+```
+
+## Edge — FX updater
+- `fx-update` obtiene tipos de cambio de tu proveedor (configurable) y **upsert** a `fx_rates`.
+- Programa con **cron** (ej. cada 12h).
+
+### Despliegue
+```bash
+supabase functions deploy fx-update audit-sign-kms
+
+# Secrets necesarios
+supabase functions secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
+supabase functions secrets set FX_API_URL=https://open.er-api.com/v6/latest/USD   # ejemplo gratis
+# O usa tu proveedor: FX_API_URL=https://api.currencyapi.com/v3/latest  FX_API_KEY=ca_live_xxx
+
+# Programar cada 12 horas (Supabase Scheduled Triggers)
+supabase functions schedule create fx-update --cron "0 */12 * * *"
+```

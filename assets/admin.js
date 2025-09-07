@@ -357,6 +357,7 @@ if (isSecond){
     if (ROLES.kyc) await loadKyc();
     await (typeof applyBrand==='function' ? applyBrand() : Promise.resolve());
     await (typeof refreshTeams==='function' ? refreshTeams() : Promise.resolve());
+    await (typeof loadPolicies==='function' ? loadPolicies() : Promise.resolve());
   })();
 })();
 
@@ -632,6 +633,38 @@ tenantSel?.addEventListener('change', applyBrand);
     }
     const csv = toCSV(acts||[]);
     const zip = new JSZip(); zip.file('admin_actions.csv', csv);
-    const blob = await zip.generateAsync({ type:'blob' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'audit_logs.zip'; a.click();
+    // KMS firma opcional: firmamos el CSV y agregamos .sig
+    try{ const b64 = await blobToBase64(new Blob([csv])); const r = await fetch('/functions/v1/audit-sign-kms', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ b64 }) }); const j = await r.json(); if (j?.ok && j.sig){ zip.file('admin_actions.sig', j.sig); } }catch(e){}
+    const blob2 = await zip.generateAsync({ type:'blob' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob2); a.download = 'audit_logs.zip'; a.click();
+
   });
+
+// --- Políticas por tenant ---
+const polMaxOp = document.getElementById('polMaxOp');
+const polMaxDaily = document.getElementById('polMaxDaily');
+const polSave = document.getElementById('polSave');
+const polMsg = document.getElementById('polMsg');
+
+async function loadPolicies(){
+  if (!CURRENT_TENANT || CURRENT_TENANT==='ALL') { polMaxOp.value=''; polMaxDaily.value=''; return; }
+  const { data } = await sb.from('policy_limits').select('*').eq('tenant_id', CURRENT_TENANT).single();
+  polMaxOp.value = data?.max_op_cents ?? '';
+  polMaxDaily.value = data?.max_daily_user_cents ?? '';
+}
+
+polSave?.addEventListener('click', async ()=>{
+  if (!CURRENT_TENANT || CURRENT_TENANT==='ALL'){ alert('Selecciona un tenant'); return; }
+  const max_op = parseInt(polMaxOp.value||'0',10) || 0;
+  const max_daily = parseInt(polMaxDaily.value||'0',10) || 0;
+  const { error } = await sb.from('policy_limits').upsert({ tenant_id: CURRENT_TENANT, max_op_cents: max_op, max_daily_user_cents: max_daily, updated_at: new Date().toISOString() });
+  polMsg.textContent = error ? error.message : 'Políticas guardadas';
+});
+
+tenantSel?.addEventListener('change', loadPolicies);
+
+async function blobToBase64(blob){
+  return new Promise((resolve,reject)=>{
+    const r = new FileReader(); r.onloadend=()=>resolve(String(r.result).split(',')[1]); r.onerror=reject; r.readAsDataURL(blob);
+  });
+}

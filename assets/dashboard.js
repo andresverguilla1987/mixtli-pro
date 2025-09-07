@@ -39,6 +39,10 @@
     // cohortes: por mes de alta en 'profiles' vs compras en pur
     const { data: profs } = await sb.from('profiles').select('user_id,created_at').limit(10000);
     const thisMonth = (now.toISOString()).slice(0,7);
+
+    // bloqueos 24h
+    const d1 = new Date(now.getTime() - 1*86400000).toISOString();
+    const { data: blocks } = await sb.from('policy_events').select('id').gte('created_at', d1); el('blocks24').textContent = (blocks||[]).length;
     const cohortMap = {};
     (profs||[]).forEach(p => {
       const m = (p.created_at||'').slice(0,7);
