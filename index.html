@@ -3,139 +3,39 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mixtli USB Cloud — Landing</title>
-  <meta name="description" content="Envía y recibe archivos grandes. Seguro, rápido y global.">
+  <title>Mixtli — Inicio</title>
   <link rel="icon" href="assets/logo.svg">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = { theme: { extend: { colors: { brand: { 500:'#6366F1' }}}}};
-  </script>
-  <style>.glass{backdrop-filter:blur(10px);background:color-mix(in srgb,white 8%,transparent);}</style>
+  <script>tailwind.config={theme:{extend:{colors:{brand:{500:'#6366F1'}}}}}</script>
 </head>
 <body class="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
-  <header class="sticky top-0 z-40 border-b border-white/10 bg-slate-950/60 glass">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+  <header class="border-b border-white/10 bg-slate-950/60">
+    <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <img src="assets/logo.svg" class="h-8 w-8 rounded-xl shadow" alt="logo">
         <span class="font-bold">Mixtli</span>
-        <span class="text-xs px-2 py-1 rounded-full bg-brand-500/15 text-brand-300 border border-brand-500/20">USB Cloud</span>
       </div>
       <nav class="hidden md:flex items-center gap-6 text-sm text-slate-300">
-        <a href="#features" class="hover:text-brand-300">Características</a>
-        <a href="#security" class="hover:text-brand-300">Seguridad</a>
-        <a href="#pricing" class="hover:text-brand-300">Precios</a>
-        <a href="trial.html" class="hover:text-brand-300">Prueba gratis</a>
+        <a href="auth.html" class="hover:text-brand-300">Prueba gratis</a>
+        <a href="dashboard.html" class="hover:text-brand-300">Dashboard</a>
       </nav>
       <div class="flex items-center gap-2">
-        <a href="trial.html" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm">Probar gratis</a>
+        <a href="auth.html" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm">Entrar / Registrarme</a>
       </div>
     </div>
   </header>
 
-  <section class="relative overflow-hidden">
-    <div class="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-500/20 via-transparent to-transparent"></div>
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 md:py-24 grid md:grid-cols-2 gap-12 items-center">
-      <div class="space-y-6">
-        <span class="inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full border border-brand-500/30 text-brand-300">New • Multi‑platform</span>
-        <h1 class="text-4xl md:text-5xl font-extrabold leading-tight">Mixtli USB Cloud</h1>
-        <p class="text-slate-300 text-lg">Envía y recibe archivos grandes al instante — web, Android, iOS y Huawei. Seguro desde el día uno.</p>
-        <div class="flex flex-wrap gap-3">
-          <a href="trial.html" class="px-5 py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-white font-semibold shadow-lg shadow-brand-900/40">Probar gratis</a>
-          <a href="#" class="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20">Descargar app</a>
-        </div>
-        <p class="text-xs text-slate-400 flex items-center gap-2">
-          <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697A3.001 3.001 0 0112 6h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          Confiado por equipos, escuelas y creadores
-        </p>
+  <main class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-20 grid md:grid-cols-2 gap-12 items-center">
+    <div class="space-y-6">
+      <h1 class="text-4xl md:text-5xl font-extrabold leading-tight">Mixtli USB Cloud</h1>
+      <p class="text-slate-300 text-lg">Envía y recibe archivos grandes al instante — web, Android, iOS y Huawei. Seguro desde el día uno.</p>
+      <div class="flex flex-wrap gap-3">
+        <a href="auth.html" class="px-5 py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-white font-semibold shadow-lg">Probar gratis</a>
+        <a href="#" class="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20">Descargar app</a>
       </div>
-      <div class="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
-        <div class="flex items-center gap-2 text-sm mb-4">
-          <svg class="w-5 h-5 text-brand-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M23 7l-7 5-7-5 7-5 7 5z"/><path d="M17 12l6-3-7-5-7 5 6 3"/><path d="M17 12l-6 3-7-5 6-3"/><path d="M7 16l-6-3"/><path d="M17 16l6-3"/></svg>
-          <span class="text-slate-300">Live transfers</span>
-        </div>
-        <div class="rounded-xl bg-black/30 p-4"><svg id="spark" viewBox="0 0 300 120" class="w-full h-36 md:h-44"></svg></div>
-        <div class="grid grid-cols-3 gap-3 text-center mt-4">
-          <div class="rounded-lg border border-white/10 p-3"><div class="text-xs text-slate-400">Latency</div><div class="font-semibold">&lt;150ms</div></div>
-          <div class="rounded-lg border border-white/10 p-3"><div class="text-xs text-slate-400">Uptime</div><div class="font-semibold">99.9%</div></div>
-          <div class="rounded-lg border border-white/10 p-3"><div class="text-xs text-slate-400">Regions</div><div class="font-semibold">Global</div></div>
-        </div>
-      </div>
+      <p class="text-xs text-slate-400">Confiado por equipos, escuelas y creadores</p>
     </div>
-  </section>
-
-  <section id="features" class="py-16 md:py-24">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div class="text-center space-y-3">
-        <span class="text-xs px-3 py-1 rounded-full bg-white/5 border border-white/10">Features</span>
-        <h2 class="text-3xl md:text-4xl font-bold">Rápido. Simple. Global.</h2>
-        <p class="text-slate-300 max-w-2xl mx-auto">Una experiencia de transferencia pensada para crecer a miles sin perder la magia.</p>
-      </div>
-      <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <div class="rounded-xl border border-white/10 bg-white/5 p-6">Ultra‑rápido</div>
-        <div class="rounded-xl border border-white/10 bg-white/5 p-6">Multiplataforma</div>
-        <div class="rounded-xl border border-white/10 bg-white/5 p-6">Admin simple</div>
-        <div class="rounded-xl border border-white/10 bg-white/5 p-6">Alertas</div>
-        <div class="rounded-xl border border-white/10 bg-white/5 p-6">Integraciones</div>
-        <div class="rounded-xl border border-white/10 bg-white/5 p-6">API abierta</div>
-      </div>
-    </div>
-  </section>
-
-  <section id="security" class="py-16 md:py-24 bg-white/5">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div class="text-center space-y-3">
-        <span class="text-xs px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">MX PRO</span>
-        <h2 class="text-3xl md:text-4xl font-bold">Seguridad de nivel pro</h2>
-        <p class="text-slate-300 max-w-2xl mx-auto">Hardening, alertas y buenas prácticas desde el inicio.</p>
-      </div>
-      <div class="mt-10 grid gap-6 lg:grid-cols-3">
-        <div class="rounded-xl border border-white/10 bg-black/30 p-6">SSH 2222, UFW, sysctl, Fail2Ban, auditd</div>
-        <div class="rounded-xl border border-white/10 bg-black/30 p-6">Sin contraseñas (llaves SSH, 2FA opcional)</div>
-        <div class="rounded-xl border border-white/10 bg-black/30 p-6">Alertas por correo</div>
-      </div>
-      <div class="mt-8 flex items-center justify-center"><a href="trial.html" class="px-4 py-2 rounded-md bg-white/10 hover:bg-white/20">Probar gratis</a></div>
-    </div>
-  </section>
-
-  <section id="pricing" class="py-16 md:py-24">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-      <span class="text-xs px-3 py-1 rounded-full bg-white/5 border border-white/10">Pricing</span>
-      <h2 class="text-3xl md:text-4xl font-bold mt-3">Planes claros, sin sorpresas</h2>
-      <p class="text-slate-300 max-w-2xl mx-auto">Empieza gratis. Escala cuando lo necesites.</p>
-      <div class="mt-10 grid gap-6 md:grid-cols-3">
-        <div class="rounded-2xl border border-white/10 bg-white/5 p-6">$0 Free</div>
-        <div class="rounded-2xl border border-brand-500/40 bg-brand-500/10 p-6 shadow-lg">$9 Pro</div>
-        <div class="rounded-2xl border border-white/10 bg-white/5 p-6">$29 Teams</div>
-      </div>
-    </div>
-  </section>
-
-  <section id="contact" class="py-16">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid md:grid-cols-2 gap-8 items-center">
-      <div>
-        <h3 class="text-2xl font-bold">Recibe novedades y acceso anticipado</h3>
-        <p class="text-slate-300 mt-2">Beta privada con cupos limitados.</p>
-      </div>
-      <form class="flex gap-2" onsubmit="return false;">
-        <input id="email" type="email" required placeholder="tu@correo.com" class="h-11 w-full px-4 rounded-md bg-white/10 border border-white/10 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand-500">
-        <button id="notifyBtn" class="h-11 px-4 rounded-md bg-brand-500 hover:bg-brand-400 text-white">Avisarme</button>
-      </form>
-    </div>
-  </section>
-
-  <footer class="py-10 border-t border-white/10">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-slate-400 text-sm">
-      <div class="flex items-center gap-3">
-        <img src="assets/logo.svg" class="h-6 w-6 rounded-lg" alt="logo">
-        <span class="font-semibold text-slate-200">Mixtli</span>
-        <span>© <span id="year"></span></span>
-      </div>
-      <a href="trial.html" class="text-brand-300 hover:underline">Prueba gratis</a>
-    </div>
-  </footer>
-
-  <script>
-    const data=[12,20,18,26,32,41,38],svg=document.getElementById('spark'),w=300,h=120,pad=10,max=Math.max(...data),min=Math.min(...data),x=i=>pad+i*((w-pad*2)/(data.length-1)),y=v=>h-pad-((v-min)/(max-min))*(h-pad*2);let d='';data.forEach((v,i)=>{d+=(i===0?'M':'L')+x(i)+' '+y(v)+' ';});const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',d.trim());path.setAttribute('fill','none');path.setAttribute('stroke','#A5B4FC');path.setAttribute('stroke-width','3');path.setAttribute('stroke-linecap','round');svg.appendChild(path);document.getElementById('year').textContent=new Date().getFullYear();document.getElementById('notifyBtn').addEventListener('click',()=>{const e=document.getElementById('email').value;if(!e)return;alert('Gracias, te avisamos pronto: '+e);});
-  </script>
+    <div class="rounded-2xl border border-white/10 bg-white/5 p-6">Demo de interfaz limpia lista para convencer a los clientes 😎</div>
+  </main>
 </body>
 </html>
