@@ -1,33 +1,64 @@
-# Mixtli — Auth Proto (Registro real o Demo)
-Generado: 2025-09-07 02:58
+# Mixtli — Auth + Storage (Supabase) — **Registro real y archivos recientes**
+Generado: 2025-09-07 03:06
 
-Este paquete te da **registro/inicio de sesión** y un **dashboard** básico con dos modos:
-1) **Modo REAL (Supabase)** → Registro e inicio reales (email+password) usando Supabase Auth.
-2) **Modo DEMO (localStorage)** → Para ver la interfaz sin backend.
+Este paquete activa **registro/login reales con Supabase Auth** y **subida/listado** de archivos en **Supabase Storage**.
+También tiene modo **demo** (sin backend) por si quieres ver la UI rápido.
 
-## Cómo publicar
-- Netlify / Vercel (Static) / cualquier hosting estático → arrastra el ZIP o carpeta.
-- No requiere build.
+---
 
-## 0) Configurar el modo en `assets/config.js`
+## 0) Configurar `assets/config.js`
 ```js
-window.CONFIG = {{
-  mode: "demo", // "demo" o "supabase"
-  supabaseUrl: "", // p.ej. https://xxxx.supabase.co
-  supabaseAnonKey: "" // tu anon key
-}}
+window.CONFIG = {
+  mode: "supabase",                 // "supabase" o "demo"
+  supabaseUrl: "https://XXXX.supabase.co",
+  supabaseAnonKey: "ey...tu_anon_key...",
+  storageBucket: "files"            // bucket ya creado en Supabase Storage
+}
 ```
-> **Demo** funciona sin nada extra. Para **real**, crea un proyecto en Supabase y pon URL + anon key aquí.
+> En **modo demo** NO sube a la nube; solo simula y guarda la lista en localStorage.
 
-## 1) Supabase (modo REAL) — Pasos
-1. Crea proyecto en supabase.com → copia **Project URL** y **anon key** (Settings → API).
-2. (Opcional dev) En **Auth → Email** desactiva *Confirmación por correo* para que el login funcione inmediato.
-3. Edita `assets/config.js` y pon `mode: "supabase"`, y tus claves.
-4. Sube el sitio (Netlify/Vercel). Abre `auth.html` → Regístrate → te llevará a `dashboard.html` con sesión.
+---
 
-## 2) Demo (sin backend) — Pasos
-- Deja `mode: "demo"` en `assets/config.js`.
-- Regístrate en `auth.html` (guarda en localStorage) → entra directo al dashboard.
+## 1) Supabase — Storage (una sola vez)
+1. En tu proyecto Supabase → **Storage → Create new bucket** → nombre: `files` (recomendado), **Private**.
+2. Ve a **SQL** y ejecuta estas **políticas** para acceso por carpeta del usuario (usa su UID como prefijo):
+```sql
+alter table storage.objects enable row level security;
 
-## Seguridad
-- En modo real, el **anon key** de Supabase se puede exponer en cliente (es público). Controla accesos con Row Level Security (RLS) si usas DB.
+-- Insertar solo en su propia carpeta: files/<uid>/...
+create policy "obj_insert_own_folder" on storage.objects
+for insert to authenticated
+with check (
+  bucket_id = 'files'
+  and split_part(name, '/', 1) = auth.uid()::text
+);
+
+-- Listar/leer solo su carpeta
+create policy "obj_select_own_folder" on storage.objects
+for select to authenticated
+using (
+  bucket_id = 'files'
+  and split_part(name, '/', 1) = auth.uid()::text
+);
+
+-- (Opcional) borrar solo su carpeta
+create policy "obj_delete_own_folder" on storage.objects
+for delete to authenticated
+using (
+  bucket_id = 'files'
+  and split_part(name, '/', 1) = auth.uid()::text
+);
+```
+> Si prefieres algo rápido para demo, puedes crear el bucket como **Public** y omitir políticas (no recomendado en producción).
+
+---
+
+## 2) Publicar (Netlify / Vercel static / cualquier hosting)
+- Sube **este ZIP** tal cual (no requiere build). Abre `index.html` → `auth.html` y regístrate.
+- Tras login te manda a `dashboard.html`. Ahí puedes **subir** y ver al instante **tus archivos**.
+
+---
+
+## 3) Notas
+- Los enlaces se generan con **signed URLs** (caducidad 1h). Se copian al portapapeles con un clic.
+- El path que usamos es `files/<UID>/<timestamp>_<filename>` para evitar colisiones y mantener orden.

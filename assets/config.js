@@ -1,5 +1,6 @@
 window.CONFIG = {
-  mode: "demo", // "demo" o "supabase"
-  supabaseUrl: "",       // p.ej. https://xxxx.supabase.co
-  supabaseAnonKey: ""    // tu anon key
+  mode: "supabase", // "supabase" o "demo"
+  supabaseUrl: "",       // https://xxxx.supabase.co
+  supabaseAnonKey: "",   // tu anon key
+  storageBucket: "files" // bucket de storage
 };

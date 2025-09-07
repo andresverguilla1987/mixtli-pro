@@ -49,7 +49,7 @@
 
     try {
       if (sb) {
-        const { data, error } = await sb.auth.signUp({ email, password: pass });
+        const { error } = await sb.auth.signUp({ email, password: pass });
         if (error) throw error;
         localStorage.setItem("mx_session", JSON.stringify({ email }));
         msg.textContent = "Cuenta creada. Redirigiendo al dashboard...";
@@ -74,7 +74,7 @@
 
     try {
       if (sb) {
-        const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+        const { error } = await sb.auth.signInWithPassword({ email, password: pass });
         if (error) throw error;
         localStorage.setItem("mx_session", JSON.stringify({ email }));
         msg.textContent = "Sesión iniciada. Redirigiendo...";
