@@ -986,3 +986,144 @@ dqAssign?.addEventListener('click', async ()=>{
   const { error } = await sb.from('deposit_queues').upsert({ deposit_id: dep, queue_id: qid, assigned_at: new Date().toISOString(), assigned_by: (await sb.auth.getUser()).data.user.email });
   dqMsg.textContent = error ? error.message : 'Asignado';
 });
+
+// ===== Ops (SLA & Calendarios) =====
+const bhDay = document.getElementById('bhDay');
+const bhStart = document.getElementById('bhStart');
+const bhEnd = document.getElementById('bhEnd');
+const bhTZ = document.getElementById('bhTZ');
+const bhSave = document.getElementById('bhSave');
+const bhCopyWeek = document.getElementById('bhCopyWeek');
+const bhMsg = document.getElementById('bhMsg');
+
+const holDate = document.getElementById('holDate');
+const holName = document.getElementById('holName');
+const holAdd = document.getElementById('holAdd');
+const holList = document.getElementById('holList');
+
+const escQueue = document.getElementById('escQueue');
+const escThreshold = document.getElementById('escThreshold');
+const escTarget = document.getElementById('escTarget');
+const escPrio = document.getElementById('escPrio');
+const escSave = document.getElementById('escSave');
+const escMsg = document.getElementById('escMsg');
+const btnEscalate = document.getElementById('btnEscalate');
+
+bhSave?.addEventListener('click', async ()=>{
+  if (!CURRENT_TENANT || CURRENT_TENANT==='ALL'){ alert('Selecciona tenant'); return; }
+  const rec = { tenant_id: CURRENT_TENANT, weekday: parseInt(bhDay.value,10), start_time: bhStart.value, end_time: bhEnd.value, timezone: bhTZ.value||'UTC' };
+  const { error } = await sb.from('business_hours').upsert(rec, { onConflict: 'tenant_id,weekday' });
+  bhMsg.textContent = error ? error.message : 'Guardado';
+});
+bhCopyWeek?.addEventListener('click', async ()=>{
+  if (!CURRENT_TENANT || CURRENT_TENANT==='ALL'){ alert('Selecciona tenant'); return; }
+  for (const wd of [1,2,3,4,5]){
+    await sb.from('business_hours').upsert({ tenant_id: CURRENT_TENANT, weekday: wd, start_time: bhStart.value, end_time: bhEnd.value, timezone: bhTZ.value||'UTC' });
+  }
+  bhMsg.textContent = 'Copiado Lun–Vie';
+});
+
+holAdd?.addEventListener('click', async ()=>{
+  if (!CURRENT_TENANT || CURRENT_TENANT==='ALL'){ alert('Selecciona tenant'); return; }
+  const { error } = await sb.from('holidays').upsert({ tenant_id: CURRENT_TENANT, day: holDate.value, name: holName.value||null });
+  if (error){ alert(error.message); return; }
+  loadHolidays();
+});
+async function loadHolidays(){
+  if (!CURRENT_TENANT || CURRENT_TENANT==='ALL'){ holList.innerHTML=''; return; }
+  const { data } = await sb.from('holidays').select('*').eq('tenant_id', CURRENT_TENANT).order('day',{ascending:true}).limit(365);
+  holList.innerHTML = (data||[]).map(h => `<li>${h.day} — ${h.name||''}</li>`).join('') || '<li class="text-slate-400">Sin feriados</li>';
+}
+
+escSave?.addEventListener('click', async ()=>{
+  const rec = { queue_id: escQueue.value.trim(), threshold_minutes: parseInt(escThreshold.value||'0',10)||0, target: escTarget.value, priority: parseInt(escPrio.value||'3',10)||3, active: true };
+  const { error } = await sb.from('queue_escalations').insert(rec);
+  escMsg.textContent = error ? error.message : 'Guardado';
+});
+
+btnEscalate?.addEventListener('click', async ()=>{
+  const { data, error } = await sb.rpc('escalate_overdue');
+  alert(error ? error.message : `Escalados: ${data}`);
+});
+
+// ===== Agentes =====
+const agEmail = document.getElementById('agEmail');
+const agAdd = document.getElementById('agAdd');
+const agQueue = document.getElementById('agQueue');
+const agMap = document.getElementById('agMap');
+const agMsg = document.getElementById('agMsg');
+
+agAdd?.addEventListener('click', async ()=>{
+  const email = agEmail.value.trim(); if (!email) return;
+  const { data: p } = await sb.from('profiles').select('user_id').eq('email', email).single();
+  if (!p){ agMsg.textContent = 'Usuario no encontrado'; return; }
+  const { error } = await sb.from('agents').upsert({ user_id: p.user_id, active: true });
+  agMsg.textContent = error ? error.message : 'Agente activado';
+});
+
+agMap?.addEventListener('click', async ()=>{
+  const email = agEmail.value.trim(); const qid = agQueue.value.trim(); if (!email || !qid) return;
+  const { data: p } = await sb.from('profiles').select('user_id').eq('email', email).single();
+  if (!p){ agMsg.textContent = 'Usuario no encontrado'; return; }
+  const { error } = await sb.from('agent_queues').upsert({ user_id: p.user_id, queue_id: qid });
+  agMsg.textContent = error ? error.message : 'Mapeado';
+});
+
+// ===== Reportes operativos =====
+async function loadOpsReports(){
+  // Trae depósitos pendientes para heatmap y aging
+  const { data: dq } = await sb.from('deposit_queues').select('deposit_id,assigned_at,queue_id').limit(5000);
+  const { data: dep } = await sb.from('bank_deposits').select('id,status,tenant_id,created_at').in('id', (dq||[]).map(x=>x.deposit_id));
+  const map = {}; (dep||[]).forEach(d=>map[d.id]=d);
+
+  // Heatmap: hora x día (pendientes)
+  const grid = Array.from({length:7},()=>Array(24).fill(0));
+  (dq||[]).forEach(x=>{
+    const d = new Date(x.assigned_at); const dow = d.getDay(); const h = d.getHours();
+    const st = map[x.deposit_id]?.status;
+    if (st && ['pending','pending_second','on_hold'].includes(st)){ grid[dow][h]++; }
+  });
+  renderHeatmap(grid);
+
+  // Aging buckets (minutos desde asignación; aproximado real sin business calc en UI)
+  const now = Date.now();
+  const buckets = { '0-30':0,'30-60':0,'60-120':0,'120-240':0,'240+':0 };
+  (dq||[]).forEach(x=>{
+    const st = map[x.deposit_id]?.status;
+    if (!st || !['pending','pending_second','on_hold'].includes(st)) return;
+    const mins = Math.floor((now - new Date(x.assigned_at).getTime())/60000);
+    if (mins<30) buckets['0-30']++; else if (mins<60) buckets['30-60']++; else if (mins<120) buckets['60-120']++; else if (mins<240) buckets['120-240']++; else buckets['240+']++;
+  });
+  renderAging(buckets);
+
+  // Funnel: pending -> approved/rejected en última semana
+  const weekAgo = new Date(Date.now()-7*86400000).toISOString();
+  const { data: fdep } = await sb.from('bank_deposits').select('status,created_at').gte('created_at', weekAgo);
+  const funnel = { pending:0, approved:0, rejected:0 };
+  (fdep||[]).forEach(d=>{
+    if (d.status==='approved') funnel.approved++; else if (d.status==='rejected') funnel.rejected++; else funnel.pending++;
+  });
+  renderFunnel(funnel);
+}
+
+function renderHeatmap(grid){
+  const ctx = document.getElementById('heatmap'); if (!ctx) return;
+  const data = {
+    labels: ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],
+    datasets: Array.from({length:7}).map((_,i)=>({ label: ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][i], data: grid[i] }))
+  };
+  new Chart(ctx, { type: 'bar', data: { labels: Array.from({length:24}, (_,h)=>h+':00'), datasets: data.datasets.map((ds,i)=>({ label: ds.label, data: ds.data, stack: 'h'+i })) }, options: { responsive:true, plugins:{ legend:{ display:false }}, scales:{ x:{ stacked:true }, y:{ stacked:true }}}});
+}
+
+function renderAging(bk){
+  const ctx = document.getElementById('aging'); if (!ctx) return;
+  new Chart(ctx, { type:'bar', data:{ labels:Object.keys(bk), datasets:[{ label:'Casos', data:Object.values(bk) }]}, options:{ responsive:true } });
+}
+function renderFunnel(fn){
+  const ctx = document.getElementById('funnel'); if (!ctx) return;
+  new Chart(ctx, { type:'bar', data:{ labels:Object.keys(fn), datasets:[{ label:'Depósitos (7d)', data:Object.values(fn) }]}, options:{ responsive:true } });
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  if (document.getElementById('ops')) loadOpsReports();
+});

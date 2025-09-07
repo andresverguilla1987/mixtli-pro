@@ -1812,3 +1812,175 @@ $$;
 - **Queues** (nueva pestaña): crea/edita colas, **métricas**, y reasigna depósitos.
 - **Depósitos**: checkbox por fila + botones **Aprobar seleccionados / Rechazar seleccionados** con **Deshacer 10s** (snackbar).
 
+
+
+---
+# V7.9 — SLAs por horario/feriados + Escalaciones, Auto-asignación a agentes, Reportes operativos
+Generado: 2025-09-07 05:32
+
+## Novedades
+- **SLA reales por horario** (business hours) y **feriados por tenant**; cálculo de minutos hábiles y **deadline** de SLA.
+- **Escalaciones** por cola (threshold → Slack/Discord/Push) con prioridad configurable.
+- **Auto-asignación a agentes** (round-robin / carga) por cola y métricas de carga.
+- **Reportes operativos**: heatmap por hora/día, aging buckets y funnel de aprobaciones.
+
+## SQL — Horarios, feriados y SLAs
+```sql
+create table if not exists public.business_hours(
+  tenant_id uuid,
+  weekday int not null,            -- 0=domingo .. 6=sábado
+  start_time time not null,
+  end_time time not null,
+  timezone text default 'UTC',
+  primary key (tenant_id, weekday)
+);
+create table if not exists public.holidays(
+  tenant_id uuid,
+  day date not null,
+  name text,
+  primary key (tenant_id, day)
+);
+
+-- Minutos hábiles entre 2 timestamps
+create or replace function public.business_minutes_between(p_start timestamptz, p_end timestamptz, p_tenant uuid)
+returns int language plpgsql stable as $$
+declare d date; cur_start timestamptz; cur_end timestamptz; tot int := 0; tz text;
+        bh record; wd int; st timestamptz; en timestamptz; s timestamptz; e timestamptz;
+begin
+  if p_end <= p_start then return 0; end if;
+  tz := coalesce((select timezone from business_hours where tenant_id=p_tenant limit 1), 'UTC');
+  d := date_trunc('day', p_start)::date;
+  while d <= date_trunc('day', p_end)::date loop
+    if not exists(select 1 from holidays where tenant_id=p_tenant and day=d) then
+      wd := extract(dow from d);
+      for bh in select * from business_hours where tenant_id=p_tenant and weekday=wd loop
+        st := (d::text || ' ' || bh.start_time::text || ' ' || tz)::timestamptz;
+        en := (d::text || ' ' || bh.end_time::text || ' ' || tz)::timestamptz;
+        s := greatest(st, p_start); e := least(en, p_end);
+        if e > s then tot := tot + floor(extract(epoch from (e - s))/60.0)::int; end if;
+      end loop;
+    end if;
+    d := d + interval '1 day';
+  end loop;
+  return tot;
+end; $$;
+
+-- Deadline sumando minutos hábiles
+create or replace function public.business_deadline(p_start timestamptz, p_minutes int, p_tenant uuid)
+returns timestamptz language plpgsql stable as $$
+declare acc int := 0; cur timestamptz := p_start; step int := 60; nxt timestamptz;
+begin
+  if p_minutes <= 0 then return p_start; end if;
+  -- avanza de a 60 min hábiles; refina al final
+  while acc < p_minutes loop
+    nxt := cur + interval '60 minutes';
+    acc := acc + public.business_minutes_between(cur, nxt, p_tenant);
+    cur := nxt;
+  end loop;
+  -- retrocede el exceso refinando por minutos
+  while acc > p_minutes loop
+    nxt := cur - interval '1 minute';
+    if public.business_minutes_between(nxt, cur, p_tenant) > 0 then acc := acc - 1;
+    end if;
+    cur := nxt;
+  end loop;
+  return cur;
+end; $$;
+```
+
+## SQL — Escalaciones por cola
+```sql
+create table if not exists public.queue_escalations(
+  id uuid primary key default gen_random_uuid(),
+  queue_id uuid not null references public.queues(id) on delete cascade,
+  threshold_minutes int not null,
+  target text not null default 'slack',      -- slack|discord|push
+  priority smallint default 3,
+  active boolean default true,
+  created_at timestamptz default now()
+);
+
+-- Registrar jobs para depósitos que ya excedieron SLA
+create or replace function public.escalate_overdue() returns int
+language plpgsql as $$
+declare cnt int := 0; rec record; dep record; tid uuid; ddl timestamptz; breached boolean; qm record;
+begin
+  for qm in
+    select q.id as qid, q.name, q.sla_minutes, dq.deposit_id, dq.assigned_at, d.tenant_id
+    from queues q
+    join deposit_queues dq on dq.queue_id = q.id
+    join bank_deposits d on d.id = dq.deposit_id
+    where d.status in ('pending','pending_second','on_hold')
+  loop
+    ddl := public.business_deadline(qm.assigned_at, (select sla_minutes from queues where id=qm.qid), qm.tenant_id);
+    if now() > ddl then
+      for rec in select * from queue_escalations where queue_id=qm.qid and active loop
+        insert into jobs(topic, payload, priority)
+          values (rec.target, jsonb_build_object('text', 'SLA vencido en '||qm.name||' para depósito '||qm.deposit_id, 'url','/admin.html?tab=deposits'), rec.priority);
+        cnt := cnt + 1;
+      end loop;
+    end if;
+  end loop;
+  return cnt;
+end; $$;
+```
+
+## SQL — Agentes y auto-asignación
+```sql
+create table if not exists public.agents(
+  user_id uuid primary key,
+  active boolean default true,
+  last_assigned timestamptz,
+  current_load int default 0
+);
+create table if not exists public.agent_queues(
+  user_id uuid references public.agents(user_id) on delete cascade,
+  queue_id uuid references public.queues(id) on delete cascade,
+  primary key (user_id, queue_id)
+);
+create table if not exists public.deposit_assignments(
+  deposit_id uuid primary key references public.bank_deposits(id) on delete cascade,
+  user_id uuid references public.agents(user_id) on delete set null,
+  assigned_at timestamptz default now(),
+  released_at timestamptz
+);
+
+-- Asigna al agente con menor carga (y más antiguo last_assigned) en la cola
+create or replace function public.auto_assign_deposit(p_deposit uuid) returns uuid
+language plpgsql as $$
+declare q uuid; cand record; begin
+  select queue_id into q from deposit_queues where deposit_id = p_deposit;
+  if q is null then return null; end if;
+  select a.user_id into cand
+  from agents a join agent_queues aq on aq.user_id=a.user_id
+  where a.active and aq.queue_id=q
+  order by a.current_load asc, coalesce(a.last_assigned, 'epoch') asc
+  limit 1;
+  if cand.user_id is null then return null; end if;
+  insert into deposit_assignments(deposit_id, user_id) values (p_deposit, cand.user_id)
+  on conflict (deposit_id) do update set user_id=excluded.user_id, assigned_at=now(), released_at=null;
+  update agents set current_load = coalesce(current_load,0)+1, last_assigned=now() where user_id=cand.user_id;
+  return cand.user_id;
+end; $$;
+
+-- Llamar en el trigger de auto-triage existente tras asignar cola
+-- (añade: perform public.auto_assign_deposit(NEW.id);)
+
+-- Al resolver depósito, liberar carga
+create or replace function public.release_assignment(p_deposit uuid) returns void
+language plpgsql as $$
+declare uid uuid; begin
+  select user_id into uid from deposit_assignments where deposit_id = p_deposit;
+  if uid is not null then
+    update agents set current_load = greatest(0, coalesce(current_load,0)-1) where user_id=uid;
+    update deposit_assignments set released_at=now() where deposit_id=p_deposit;
+  end if;
+end; $$;
+
+-- Extiende tu trigger trg_autotriage_deposit para llamar release en approved/rejected
+```
+
+## UI — Dónde tocar
+- **Queues**: nueva sub-sección **SLA y Escalaciones** (crear reglas de escalado) y **Agentes** (alta, mapeo a colas y carga).
+- **Ops (nuevo tab)**: configura **horarios** (por día) y **feriados**; botón **“Escalar ahora”** (ejecuta `escalate_overdue()`).
+- **Ops Reports**: heatmap **hora × día** (depósitos pendientes), **aging buckets** (0–30, 30–60, 60–120, 120–240, 240+ min hábiles) y **funnel** (pending → approved/rejected).
