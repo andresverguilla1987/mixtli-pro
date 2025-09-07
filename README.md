@@ -1,38 +1,63 @@
-# Render Redis Fix (Mixtli)
+# Mixtli — Autopatch Sentry v8 + Redis (se integran solas)
 
-Esto evita `ECONNREFUSED 127.0.0.1:6379` usando una URL de Redis/Key Value de Render (o Upstash, etc.).
-Si no hay `REDIS_URL`, la app arranca igual y solo avisa que Redis está deshabilitado.
+Este paquete migra tu código **automáticamente** para:
+- Pasar de `Sentry.Handlers.*` (v7) a `Sentry v8` con `setupExpressErrorHandler(app)`
+- Cambiar inicialización de Redis a **usar `REDIS_URL`** (y dejar de usar `127.0.0.1:6379`)
 
-## Archivos
-- `apps/api/src/lib/redis.ts` — cliente robusto con autodetección TLS (`rediss://`).
-- `apps/api/src/bootstrap/checks.ts` — chequeo simple en el arranque (log friendly).
+## Qué trae
+- `scripts/migrate-sentry-v8.js`
+- `scripts/migrate-redis-url.js`
+- `render/render-build-autopatch.sh` (para correr en Render antes del build)
+- `apps/api/src/sentry/instrument.ts` (instrumentación temprana de Sentry)
 
-## Cómo integrarlo en tu código
-1) Copia estos archivos a tu repo en las mismas rutas.
-2) En tu `apps/api/src/server.ts` (o donde arrancas el HTTP), antes de `app.listen(...)`:
-   ```ts
-   import { bootChecks } from "./bootstrap/checks";
-   await bootChecks();
+---
+
+## Forma 1 (recomendada): Autopatch en Render (Build Command)
+1) Añade este repo al tuyo (copia los archivos de este ZIP).
+2) En **Build Command** de Render, **antepone** la ejecución del autopatch antes de tu build.
+   Por ejemplo, si tu Build Command actual es:
    ```
-   *(Si tu `server.ts` no es async, mete `bootChecks().catch(console.error)` justo antes del listen.)*
-3) Sustituye tus imports de Redis por el helper cuando lo uses:
-   ```ts
-   import { getRedis } from "./lib/redis";
-   const redis = await getRedis(); // puede ser null si no hay REDIS_URL
-   if (redis) {
-     await redis.set("hola", "mixtli");
-   }
+   bash -lc "cd apps/api && <tu setup> && npm run build"
+   ```
+   cámbialo a:
+   ```
+   bash -lc "bash render/render-build-autopatch.sh && cd apps/api && <tu setup> && npm run build"
+   ```
+   > *No borres tu setup actual; solo agrega `bash render/render-build-autopatch.sh` al inicio.*
+
+3) En **Start Command** puedes mantener lo que ya tengas. Si usas instrumentación temprana:
+   ```
+   cd apps/api && npx prisma migrate deploy && node --import ./dist/sentry/instrument.js dist/server.js
+   ```
+   o con variable de entorno:
+   ```
+   NODE_OPTIONS=--import ./dist/sentry/instrument.js
    ```
 
-## Variables de entorno (Render → Environment)
-- `REDIS_URL` (o `KV_URL`): usa la **Internal Connection String** de tu instancia en Render.
-  - Ejemplo: `rediss://default:password@redis-xxxx.internal.render.com:6379`
-  - Si es `rediss://`, el cliente activa TLS automáticamente.
-- Si no configuras `REDIS_URL`, la app arranca y solo loguea que no hay Redis.
+4) Define en Render tus variables:
+   - `SENTRY_DSN` (y si quieres `SENTRY_TRACES_SAMPLE_RATE`, `SENTRY_PROFILES_SAMPLE_RATE`).
+   - `REDIS_URL` (Internal Connection String de tu Redis/Key-Value en Render).
 
-## Start Command (sin cambios)
-- Si ya usas Sentry instrument con `--import`, mantenlo.
-- Si no, puedes dejar: `cd apps/api && npx prisma migrate deploy && node dist/server.js`
+5) Deploy. El autopatch modificará el **source** antes de compilar.
 
-## Nota
-- Si antes conectabas a `127.0.0.1:6379`, eso no funcionará en Render: Redis corre en otro servicio.
+---
+
+## Forma 2: Autopatch local + commit
+1) Copia los archivos de este ZIP al repo.
+2) Ejecuta:
+   ```bash
+   node scripts/migrate-sentry-v8.js apps/api/src/app.ts
+   node scripts/migrate-redis-url.js apps/api/src
+   ```
+3) Revisa los cambios, haz commit y push.
+4) Ajusta tu Start Command si quieres instrumentación temprana de Sentry.
+5) Deploy.
+
+---
+
+## Notas
+- El migrador de Redis reemplaza patrones comunes de `node-redis` e `ioredis` para usar `process.env.REDIS_URL ?? "redis://127.0.0.1:6379"`.
+- Si tienes stores de sesión/colas que construyen el cliente de otra forma, repite el migrador; si no los toca, te aviso en logs con `NOOP`.
+- El migrador de Sentry también crea `instrument.ts` si no existe.
+- Si quieres, puedes quitar el fallback `"redis://127.0.0.1:6379"` y dejar **solo** `process.env.REDIS_URL` (obliga a definir la variable).
+
