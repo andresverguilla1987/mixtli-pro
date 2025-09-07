@@ -7,12 +7,8 @@ serve(async (req) => {
   try{
     const body = await req.json();
     if (!WEBHOOK) return new Response(JSON.stringify({ ok:false, error:"no webhook" }), { status: 200 });
-    const text = body?.text || "Mixtli: notificación";
-    const res = await fetch(WEBHOOK, {
-      method: "POST",
-      headers: { "Content-Type":"application/json" },
-      body: JSON.stringify({ text })
-    });
+    const payload = body && Object.keys(body).length ? body : { text: 'Mixtli: notificación' };
+    const res = await fetch(WEBHOOK, { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
     return new Response(JSON.stringify({ ok: res.ok }), { headers: { "content-type":"application/json" } });
   }catch(e){
     return new Response(JSON.stringify({ ok:false, error:String(e) }), { status: 200 });

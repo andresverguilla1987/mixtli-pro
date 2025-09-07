@@ -92,7 +92,7 @@
   async function loadDeposits(){
     depRows.innerHTML = "";
     let q = sb.from('bank_deposits').select('*').in('status',['pending','pending_second']);
-    if (CURRENT_TENANT) q = q.eq('tenant_id', CURRENT_TENANT);
+    if (CURRENT_TENANT && CURRENT_TENANT!=='ALL') q = q.eq('tenant_id', CURRENT_TENANT);
     if (depStart.value) q = q.gte('created_at', depStart.value);
     if (depEnd.value) q = q.lte('created_at', depEnd.value);
     q = q.order('created_at',{ascending:false}).range(depPage*DEP_SIZE, depPage*DEP_SIZE + DEP_SIZE - 1);
@@ -208,7 +208,7 @@ if (isSecond){
   async function loadKyc(){
     kycRows.innerHTML = "";
     let q = sb.from('profiles').select('user_id,email,kyc_level,kyc_status,tenant_id').order('updated_at',{ascending:false});
-    if (CURRENT_TENANT) q = q.eq('tenant_id', CURRENT_TENANT);
+    if (CURRENT_TENANT && CURRENT_TENANT!=='ALL') q = q.eq('tenant_id', CURRENT_TENANT);
     const term = (kycQ.value||'').trim();
     if (term){
       if (isUUID(term)) q = q.eq('user_id', term);
@@ -267,6 +267,7 @@ if (isSecond){
   const pList = document.getElementById("pList");
   const pProvider = document.getElementById('pProvider');
   const pZip = document.getElementById('pZip');
+  const pXlsxAll = document.getElementById('pXlsxAll');
 
   const wStart = document.getElementById("wStart");
   const wEnd = document.getElementById("wEnd");
@@ -345,6 +346,8 @@ if (isSecond){
     await loadTenants(sb);
     if (ROLES.deposits) await loadDeposits();
     if (ROLES.kyc) await loadKyc();
+    await (typeof applyBrand==='function' ? applyBrand() : Promise.resolve());
+    await (typeof refreshTeams==='function' ? refreshTeams() : Promise.resolve());
   })();
 })();
 
@@ -457,8 +460,8 @@ async function loadTenants(sb){
     const { data: t } = await sb.from('tenants').select('*').in('id', ids);
     if (t && t.length){
       tenantSel.classList.remove('hidden');
-      tenantSel.innerHTML = t.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');
-      CURRENT_TENANT = t[0].id;
+      if (ROLES.admin){ tenantSel.innerHTML = `<option value="ALL">Todos los tenants</option>` + t.map(x=>`<option value="${x.id}">${x.name}</option>`).join(''); CURRENT_TENANT='ALL'; }
+      else { tenantSel.innerHTML = t.map(x=>`<option value="${x.id}">${x.name}</option>`).join(''); CURRENT_TENANT = t[0].id; }
       tenantSel.addEventListener('change', ()=>{ CURRENT_TENANT = tenantSel.value; if (ROLES.deposits) loadDeposits(); if (ROLES.kyc) loadKyc(); });
     }
   }catch(e){}
@@ -544,3 +547,61 @@ invSend?.addEventListener('click', async ()=>{
 
 // Reaplica brand al cambiar tenant
 tenantSel?.addEventListener('change', applyBrand);
+
+  // Cross-tenant XLSX (admin + selector ALL)
+  pXlsxAll?.addEventListener('click', async ()=>{
+    const { data: pur, error } = await sb.from('purchases').select('*').gte('created_at', pStart.value).lte('created_at', pEnd.value).limit(10000);
+    if (error){ alert(error.message); return; }
+    const { data: tenants } = await sb.from('tenants').select('id,slug,name');
+    const tmap = {}; (tenants||[]).forEach(t=>tmap[t.id]=t.name||t.slug||t.id);
+    // Pivots
+    const byTenant={}, byProvider={}, byMonth={};
+    (pur||[]).forEach(r=>{
+      const amt=(r.amount_cents||0)/100, t=r.tenant_id||'sin-tenant', p=r.provider||'otro', m=(r.created_at||'').slice(0,7);
+      byTenant[t]=(byTenant[t]||0)+amt; byProvider[p]=(byProvider[p]||0)+amt; byMonth[m]=(byMonth[m]||0)+amt;
+    });
+    const rowsTenant = Object.keys(byTenant).map(k=>({ tenant: tmap[k]||k, amount: byTenant[k] }));
+    const rowsProv = Object.keys(byProvider).map(k=>({ provider:k, amount: byProvider[k] }));
+    const rowsMonth = Object.keys(byMonth).sort().map(k=>({ month:k, amount: byMonth[k] }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowsTenant), 'by_tenant');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowsProv), 'by_provider');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rowsMonth), 'by_month');
+    XLSX.writeFile(wb, 'cross-tenant-pivots.xlsx');
+  });
+
+  // Teams UI
+  const teamName = document.getElementById('teamName');
+  const teamLimit = document.getElementById('teamLimit');
+  const teamCreate = document.getElementById('teamCreate');
+  const teamAddEmail = document.getElementById('teamAddEmail');
+  const teamId = document.getElementById('teamId');
+  const teamAdd = document.getElementById('teamAdd');
+  const teamsList = document.getElementById('teamsList');
+
+  async function refreshTeams(){
+    if (!CURRENT_TENANT || CURRENT_TENANT==='ALL') { teamsList.innerHTML=''; return; }
+    const { data:t } = await sb.from('teams').select('*').eq('tenant_id', CURRENT_TENANT).order('created_at',{ascending:false}).limit(200);
+    const rows = (t||[]).map(x=>`${x.id} • ${x.name} • límite ${(x.monthly_limit_cents||0)/100}`).join('<br>');
+    teamsList.innerHTML = rows || '<span class="text-slate-400">No hay teams</span>';
+  }
+
+  teamCreate?.addEventListener('click', async ()=>{
+    if (!CURRENT_TENANT || CURRENT_TENANT==='ALL'){ alert('Selecciona un tenant'); return; }
+    const name = (teamName.value||'').trim(); const lim = parseInt(teamLimit.value||'0',10) || 0;
+    const { error } = await sb.from('teams').insert({ tenant_id: CURRENT_TENANT, name, monthly_limit_cents: lim });
+    if (error){ alert(error.message); return; }
+    teamName.value=''; teamLimit.value=''; refreshTeams();
+  });
+
+  teamAdd?.addEventListener('click', async ()=>{
+    const email = (teamAddEmail.value||'').trim(); const tid = (teamId.value||'').trim();
+    if (!email || !tid){ alert('Falta email o Team ID'); return; }
+    const { data: prof } = await sb.from('profiles').select('user_id').eq('email', email).single();
+    if (!prof){ alert('Usuario no encontrado'); return; }
+    const { error } = await sb.from('user_teams').insert({ user_id: prof.user_id, team_id: tid });
+    if (error){ alert(error.message); return; }
+    teamAddEmail.value=''; teamId.value=''; alert('Agregado');
+  });
+
+  tenantSel?.addEventListener('change', refreshTeams);

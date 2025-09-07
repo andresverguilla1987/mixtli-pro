@@ -962,3 +962,121 @@ for each row execute function public.link_tenant_on_profile();
 supabase functions deploy discord-notify
 supabase functions secrets set DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/XXX/YYY
 ```
+
+
+---
+# V7.2 — ACL por Tenant, Embeds Slack/Discord, Export cross-tenant, Teams con límites
+Generado: 2025-09-07 05:04
+
+## Novedades
+- **ACL por Tenant** (reports/kyc/deposits/admin) vía `tenant_roles` + `has_tenant_cap()` y RLS actualizadas.
+- **Embeds ricos** en Slack/Discord (jobs admiten `attachments/blocks` o `embeds`).
+- **Export cross-tenant (XLSX)** con pivots: ingresos por **tenant**, **proveedor** y **mes**.
+- **Teams/subcuentas** con límites mensuales; asignación de miembros por correo.
+
+## SQL — Roles por tenant y ACL
+```sql
+-- Catálogo de roles por tenant y capacidades
+create table if not exists public.tenant_roles(
+  role text primary key,
+  can_reports boolean default false,
+  can_kyc boolean default false,
+  can_deposits boolean default false,
+  can_admin boolean default false
+);
+
+insert into tenant_roles(role, can_reports, can_kyc, can_deposits, can_admin) values
+  ('owner', true, true, true, true),
+  ('manager', true, true, true, false),
+  ('agent', false, false, true, false)
+on conflict (role) do nothing;
+
+-- Función: ¿usuario actual tiene capacidad 'cap' en tenant dado?
+create or replace function public.has_tenant_cap(cap text, tid uuid) returns boolean
+language sql stable as $$
+  select
+    public.is_admin() or exists(
+      select 1
+      from public.user_tenants ut
+      join public.tenant_roles tr on tr.role = ut.role
+      where ut.user_id = auth.uid() and ut.tenant_id = tid and (
+        (cap='admin' and tr.can_admin) or
+        (cap='reports' and tr.can_reports) or
+        (cap='kyc' and tr.can_kyc) or
+        (cap='deposits' and tr.can_deposits)
+      )
+    );
+$$;
+
+-- Políticas por tenant (ejemplos; ajusta según tus existentes)
+drop policy if exists tenant_view_deposits on public.bank_deposits;
+create policy tenant_view_deposits on public.bank_deposits
+  for select to authenticated using (
+    tenant_id is null or public.is_admin() or public.has_tenant_cap('deposits', tenant_id)
+  );
+
+drop policy if exists tenant_view_purchases on public.purchases;
+create policy tenant_view_purchases on public.purchases
+  for select to authenticated using (
+    tenant_id is null or public.is_admin() or public.has_tenant_cap('reports', tenant_id)
+  );
+
+drop policy if exists tenant_view_wallet on public.wallet_ledger;
+create policy tenant_view_wallet on public.wallet_ledger
+  for select to authenticated using (
+    tenant_id is null or public.is_admin() or public.has_tenant_cap('reports', tenant_id)
+  );
+
+drop policy if exists tenant_profiles_select on public.profiles;
+create policy tenant_profiles_select on public.profiles
+  for select to authenticated using (
+    tenant_id is null or public.is_admin() or public.has_tenant_cap('kyc', tenant_id)
+  );
+```
+
+## SQL — Teams & Límites
+```sql
+create table if not exists public.teams(
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  name text not null,
+  monthly_limit_cents bigint default 0,
+  active boolean default true,
+  created_at timestamptz default now()
+);
+create table if not exists public.user_teams(
+  user_id uuid not null,
+  team_id uuid not null references public.teams(id) on delete cascade,
+  role text default 'member',
+  primary key (user_id, team_id)
+);
+
+-- Extiende tablas para referenciar team
+alter table public.purchases add column if not exists team_id uuid;
+alter table public.wallet_ledger add column if not exists team_id uuid;
+
+-- Helper: gasto del mes por team
+create or replace function public.team_month_spend_cents(p_team uuid) returns bigint language sql stable as $$
+  select coalesce(sum(amount_cents),0) from public.wallet_ledger
+  where team_id = p_team and created_at >= date_trunc('month', now());
+$$;
+
+-- ¿puede gastar este equipo?
+create or replace function public.team_can_spend(p_team uuid, p_amount_cents bigint) returns boolean
+language sql stable as $$
+  select (select monthly_limit_cents from public.teams where id=p_team) = 0
+     or ( public.team_month_spend_cents(p_team) + coalesce(p_amount_cents,0) ) <=
+        (select monthly_limit_cents from public.teams where id=p_team);
+$$;
+revoke all on function public.team_can_spend(uuid, bigint) from public;
+grant execute on function public.team_can_spend(uuid, bigint) to authenticated;
+```
+
+## Webhooks — Embeds
+- `slack-notify` ahora acepta payload libre (`text`, `attachments`, `blocks`).
+- `discord-notify` acepta `content` y/o `embeds`.
+
+### Despliegue
+```bash
+supabase functions deploy slack-notify discord-notify
+```
