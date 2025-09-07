@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Rule {
+  id        String   @id @default(cuid())
+  name      String
+  content   Json
+  version   Int      @default(1)
+  createdBy String
+  approvedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  entity    String
+  entityId  String
+  action    String
+  diff      Json
+  actor     String
+  approvedBy String?
+  createdAt DateTime @default(now())
+}
+
+model FraudEvent {
+  id        String   @id @default(cuid())
+  label     String   // "fraud" | "legit"
+  features  Json
+  createdAt DateTime @default(now())
+}
+
+model JobShift {
+  id        String   @id @default(cuid())
+  agentId   String
+  day       DateTime
+  startMin  Int
+  endMin    Int
+  createdAt DateTime @default(now())
+}
