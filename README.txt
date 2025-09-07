@@ -1984,3 +1984,32 @@ end; $$;
 - **Queues**: nueva sub-sección **SLA y Escalaciones** (crear reglas de escalado) y **Agentes** (alta, mapeo a colas y carga).
 - **Ops (nuevo tab)**: configura **horarios** (por día) y **feriados**; botón **“Escalar ahora”** (ejecuta `escalate_overdue()`).
 - **Ops Reports**: heatmap **hora × día** (depósitos pendientes), **aging buckets** (0–30, 30–60, 60–120, 120–240, 240+ min hábiles) y **funnel** (pending → approved/rejected).
+
+
+---
+# V8.0 — Skills + On‑call, WFM (forecast & staffing), Export BI (BigQuery)
+Generado: 2025-09-07 05:38
+
+Novedades
+- Asignación por skills + on‑call (prioriza agentes con turno activo y skill requerido por cola).
+- WFM: parámetros (AHT, ocupación), forecast por hora 24h y staffing requerido.
+- Export BI (Star) a BigQuery (vistas DIM/FACT y función edge de export).
+
+SQL — Skills & On‑call (resumen)
+- Tablas: skills, agent_skills, oncall_rotations, oncall_members, oncall_shifts.
+- queues.required_skill (opcional).
+- Funciones: is_oncall(user, queue, ts), auto_assign_deposit_v2(deposit_id).
+
+SQL — WFM
+- Tablas: wfm_params(tenant_id, queue_id, aht_sec, sla_sec, target_sl, occupancy, interval_min).
+- wfm_forecast(date_hour, queue_id, arrivals, required_agents, ...).
+- Vista arrivals_hourly basada en deposit_queues.assigned_at.
+
+Edge — wfm-forecast
+- Calcula promedio de llegadas históricas (últimas 4 semanas, misma hora) y required_agents = ceil(arrivals * AHT / (interval*60*occupancy)).
+- Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+
+BI — Star + BigQuery
+- DIMs: dim_tenant, dim_queue, dim_user.
+- FACTs: fact_deposits, fact_purchases (RPCs bi_fact_deposits(), bi_fact_purchases()).
+- Edge bq-export usa @google-cloud/bigquery con GOOGLE_APPLICATION_CREDENTIALS_JSON.

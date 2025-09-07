@@ -1127,3 +1127,40 @@ function renderFunnel(fn){
 document.addEventListener('DOMContentLoaded', ()=>{
   if (document.getElementById('ops')) loadOpsReports();
 });
+
+// ===== WFM =====
+const wfmQueue = document.getElementById('wfmQueue');
+const wfmAHT = document.getElementById('wfmAHT');
+const wfmOcc = document.getElementById('wfmOcc');
+const wfmSave = document.getElementById('wfmSave');
+const wfmForecast = document.getElementById('wfmForecast');
+
+wfmSave?.addEventListener('click', async ()=>{
+  const qid = (wfmQueue.value||'').trim(); if (!qid || !CURRENT_TENANT || CURRENT_TENANT==='ALL'){ alert('Selecciona tenant y queue'); return; }
+  const rec = { tenant_id: CURRENT_TENANT, queue_id: qid, aht_sec: parseInt(wfmAHT.value||'300',10)||300, occupancy: parseFloat(wfmOcc.value||'0.85')||0.85 };
+  const { error } = await sb.from('wfm_params').upsert(rec);
+  alert(error ? error.message : 'Guardado');
+});
+wfmForecast?.addEventListener('click', async ()=>{
+  await fetch('/functions/v1/wfm-forecast', { method:'POST', body: '{}' });
+  const start = new Date(); start.setHours(0,0,0,0); const end = new Date(); end.setHours(23,59,59,999);
+  const { data } = await sb.from('wfm_forecast').select('*').eq('queue_id', (wfmQueue.value||'').trim()).gte('date_hour', start.toISOString()).lte('date_hour', end.toISOString()).order('date_hour', { ascending: true });
+  const labels = (data||[]).map(r => new Date(r.date_hour).getHours()+':00');
+  const reqs = (data||[]).map(r => r.required_agents||0);
+  const ctx = document.getElementById('wfmChart'); if (ctx){ new Chart(ctx, { type:'line', data:{ labels, datasets:[{ label:'Agentes requeridos', data: reqs }] }, options:{ responsive:true } }); }
+});
+
+// ===== BI Export =====
+const biExportAll = document.getElementById('biExportAll');
+const biExportDep = document.getElementById('biExportDep');
+const biExportPur = document.getElementById('biExportPur');
+const biMsg = document.getElementById('biMsg');
+
+async function callExport(what){
+  const r = await fetch('/functions/v1/bq-export', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ what }) });
+  const j = await r.json();
+  biMsg.textContent = j.ok ? 'Export OK' : ('Error: ' + j.error);
+}
+biExportAll?.addEventListener('click', ()=>callExport('all'));
+biExportDep?.addEventListener('click', ()=>callExport('deposits'));
+biExportPur?.addEventListener('click', ()=>callExport('purchases'));
