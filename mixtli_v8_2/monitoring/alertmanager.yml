@@ -1,0 +1,12 @@
+route:
+  receiver: email-me
+  group_by: ['alertname']
+receivers:
+  - name: email-me
+    email_configs:
+      - to: you@example.com
+        from: alerts@example.com
+        smarthost: smtp.example.com:587
+        auth_username: smtp_user
+        auth_password: smtp_pass
+        require_tls: true

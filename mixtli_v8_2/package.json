@@ -1,0 +1,16 @@
+{
+  "name": "mixtli-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@9.6.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter @mixtli/api dev",
+    "prisma:generate": "pnpm --filter @mixtli/api prisma:generate",
+    "prisma:migrate:dev": "pnpm --filter @mixtli/api prisma:migrate:dev",
+    "seed": "pnpm --filter @mixtli/api seed"
+  }
+}

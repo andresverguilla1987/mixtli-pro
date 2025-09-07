@@ -1,0 +1,28 @@
+groups:
+- name: mixtli-slo
+  rules:
+  - record: api:requests_total:rate5m
+    expr: sum(rate(http_requests_total[5m]))
+
+  - record: api:errors_total:rate5m
+    expr: sum(rate(http_requests_total{status=~"5.."}[5m]))
+
+  - record: api:error_ratio:5m
+    expr: (api:errors_total:rate5m) / clamp_min(api:requests_total:rate5m, 1)
+
+  # Burn rate multi ventana para SLO 99.9%
+  - alert: SLOFastBurn
+    expr: api:error_ratio:5m > (1 - 0.999) * 14.4
+    for: 5m
+    labels: {severity: critical}
+    annotations:
+      summary: "SLO fast burn (99.9%)"
+      description: "Error budget se quema rápido (5m)."
+
+  - alert: SLOSlowBurn
+    expr: avg_over_time(api:error_ratio:5m[1h]) > (1 - 0.999) * 6
+    for: 2h
+    labels: {severity: warning}
+    annotations:
+      summary: "SLO slow burn (99.9%)"
+      description: "Error budget sostenido alto (1h ventana)."

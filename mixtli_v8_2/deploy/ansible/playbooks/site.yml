@@ -1,0 +1,9 @@
+---
+- hosts: mixtli
+  become: yes
+  roles:
+    - base
+    - nginx
+    - certbot
+    - app
+    - cloudflared    - cloudsql_proxy

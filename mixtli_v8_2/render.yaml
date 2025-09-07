@@ -1,0 +1,57 @@
+# Render Blueprint for Mixtli V8.2 (A–C)
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: mixtli-api
+    env: docker
+    plan: starter
+    numInstances: 1
+    autoDeploy: yes
+    dockerfilePath: docker/Dockerfile.api
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: JWT_SECRET
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: SENDGRID_FROM
+        value: noreply@mixtli.local
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mixtli-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: mixtli-redis
+          type: redis
+  - type: worker
+    name: mixtli-worker
+    env: docker
+    plan: starter
+    autoDeploy: yes
+    dockerfilePath: docker/Dockerfile.worker
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: SENDGRID_FROM
+        value: noreply@mixtli.local
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mixtli-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: mixtli-redis
+          type: redis
+
+databases:
+  - name: mixtli-db
+    plan: starter
+
+redis:
+  - name: mixtli-redis
+    plan: starter

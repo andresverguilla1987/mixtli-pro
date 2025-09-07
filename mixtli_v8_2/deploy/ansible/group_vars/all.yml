@@ -1,0 +1,22 @@
+# Variables globales
+domain: "api.tu-dominio.com"
+admin_email: "admin@tu-dominio.com"
+# Provider para DNS-01: cloudflare | route53 | http01
+tls_provider: "http01"
+
+# Si usas Cloudflare (DNS-01)
+cloudflare_api_token: "CF_TOKEN_AQUI"
+cloudflare_credentials_path: "/etc/letsencrypt/cloudflare.ini"
+
+# Si usas Route53 (DNS-01) con instancia EC2 que tenga instance profile, no necesitas credenciales locales.
+# tls_provider: "route53"
+
+# Compose
+compose_file: "docker-compose.prod.no-nginx.yml"  # usa Nginx en host
+repo_path: "/opt/mixtli/src"                      # ruta del repo en la VM
+
+# UFW
+ufw_allow:
+  - "22"
+  - "80"
+  - "443"

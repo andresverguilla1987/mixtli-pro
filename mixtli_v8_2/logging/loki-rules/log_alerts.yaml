@@ -1,0 +1,10 @@
+groups:
+- name: logs-alerts
+  rules:
+  - alert: High5xxFromLogs
+    expr: sum(rate({compose_service="mixtli_api"} | json | status >= 500 [5m])) > 1
+    for: 10m
+    labels: {severity: warning}
+    annotations:
+      summary: "5xx alto en logs"
+      description: "La tasa de 5xx en logs supera 1/s (5m) durante 10m."

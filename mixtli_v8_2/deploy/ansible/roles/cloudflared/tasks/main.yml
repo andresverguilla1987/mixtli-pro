@@ -1,0 +1,38 @@
+---
+- name: Descargar cloudflared .deb
+  get_url:
+    url: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+    dest: /tmp/cloudflared.deb
+
+- name: Instalar cloudflared
+  apt:
+    deb: /tmp/cloudflared.deb
+
+- name: Crear carpeta config
+  file:
+    path: /etc/cloudflared
+    state: directory
+    mode: '0755'
+
+- name: Copiar config.yml (si ya tienes TUNNEL_ID, reemplaza en vars)
+  copy:
+    dest: /etc/cloudflared/config.yml
+    content: |
+      tunnel: {{ cloudflare_tunnel_id | default("REEMPLAZA_TUNNEL_ID") }}
+      credentials-file: /root/.cloudflared/{{ cloudflare_tunnel_id | default("REEMPLAZA_TUNNEL_ID") }}.json
+      ingress:
+        - hostname: {{ domain }}
+          service: http://127.0.0.1:8080
+        - service: http_status:404
+    mode: '0644'
+
+- name: Instalar servicio systemd
+  command: cloudflared service install
+  args:
+    creates: /etc/systemd/system/cloudflared.service
+
+- name: Habilitar y arrancar cloudflared
+  systemd:
+    name: cloudflared
+    enabled: yes
+    state: started

@@ -1,0 +1,11 @@
+# fly worker app config
+app = "mixtli-worker"      # cambia este nombre: flyctl apps create mixtli-worker
+primary_region = "dfw"
+
+[build]
+  dockerfile = "../../docker/Dockerfile.worker"
+  context = "../.."
+
+# No expone puertos; es un proceso de background
+[processes]
+  worker = "node dist/worker.js"

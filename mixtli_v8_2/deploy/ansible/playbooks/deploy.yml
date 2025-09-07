@@ -1,0 +1,15 @@
+---
+- hosts: mixtli
+  become: yes
+  tasks:
+    - name: Pull repo changes
+      git:
+        repo: "https://github.com/tu-user/tu-repo.git"
+        dest: "{{ repo_path }}"
+        version: "main"
+        update: yes
+
+    - name: Rebuild & up
+      command: docker compose -f {{ compose_file }} up -d --build
+      args:
+        chdir: "{{ repo_path }}"
