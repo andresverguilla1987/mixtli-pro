@@ -782,3 +782,125 @@ supabase functions secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
 supabase functions secrets set RESEND_API_KEY=re_xxx
 supabase functions secrets set SLACK_WEBHOOK_URL=https://hooks.slack.com/services/XXX/YYY/ZZZ
 ```
+
+
+---
+# V7.0 — TOTP (Google Auth), Jobs server-side, Dashboard financiero, Multi-tenant
+Generado: 2025-09-07 04:57
+
+## Novedades
+- **TOTP 2FA** para admins (Google Auth / Authy): setup con QR y verificación en cada aprobación (si está activo).
+- **Jobs server-side**: cola `jobs` + Edge `jobs-runner` para despachar webhooks (Slack/Discord/Email) por cambios en BD.
+- **Dashboard financiero** (admin): MRR, Ingresos, ARPU, churn, split por proveedor, cohortes básicas.
+- **Multi-tenant / Resellers**: tablas `tenants` y `user_tenants`, selector de tenant en Admin, branding por tenant.
+
+## SQL — Tablas / Triggers / RLS
+```sql
+-- Tenancy
+create table if not exists public.tenants(
+  id uuid primary key default gen_random_uuid(),
+  slug text unique not null,
+  name text not null,
+  brand_primary text default '#7c3aed',
+  brand_logo_url text
+);
+create table if not exists public.user_tenants(
+  user_id uuid not null,
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  role text default 'member',
+  primary key (user_id, tenant_id)
+);
+
+-- Enlaza entidades a tenant (agrega columna si no existe)
+alter table public.bank_deposits add column if not exists tenant_id uuid;
+alter table public.purchases add column if not exists tenant_id uuid;
+alter table public.wallet_ledger add column if not exists tenant_id uuid;
+alter table public.profiles add column if not exists tenant_id uuid;
+
+-- RLS por tenant (además de roles admin)
+create or replace function public.my_tenants() returns setof uuid
+language sql stable as $$
+  select ut.tenant_id from public.user_tenants ut where ut.user_id = auth.uid();
+$$;
+
+-- Ejemplo de políticas (ajusta según tus existentes)
+drop policy if exists tenant_view_deposits on public.bank_deposits;
+create policy tenant_view_deposits on public.bank_deposits
+  for select to authenticated using (
+    tenant_id is null or tenant_id in (select * from public.my_tenants()) or public.is_admin()
+  );
+
+-- Jobs: cola y trigger
+create table if not exists public.jobs(
+  id uuid primary key default gen_random_uuid(),
+  topic text not null,            -- 'slack','discord','email'
+  payload jsonb not null,
+  run_after timestamptz default now(),
+  attempts int default 0,
+  max_attempts int default 5,
+  status text default 'queued',   -- queued, running, done, failed
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table public.jobs enable row level security;
+create policy jobs_admin_view on public.jobs
+  for select to authenticated using (public.is_admin() or public.has_role('reports'));
+
+-- Hook: encolar notificaciones de depósitos
+create or replace function public.enqueue_deposit_job() returns trigger language plpgsql as $$
+begin
+  if TG_OP = 'UPDATE' then
+    if NEW.status <> OLD.status then
+      if NEW.status = 'pending_second' then
+        insert into jobs(topic, payload) values ('slack', jsonb_build_object('text', 'Depósito '||NEW.id||' pending_second'));
+      elsif NEW.status = 'approved' then
+        insert into jobs(topic, payload) values ('slack', jsonb_build_object('text', 'Depósito '||NEW.id||' aprobado'));
+      elsif NEW.status = 'rejected' then
+        insert into jobs(topic, payload) values ('slack', jsonb_build_object('text', 'Depósito '||NEW.id||' rechazado'));
+      end if;
+    end if;
+  end if;
+  return NEW;
+end; $$;
+
+drop trigger if exists trg_bank_deposits_jobs on public.bank_deposits;
+create trigger trg_bank_deposits_jobs
+after update on public.bank_deposits
+for each row execute function public.enqueue_deposit_job();
+
+-- TOTP
+create table if not exists public.admin_totp(
+  actor_email text primary key,
+  secret_base32 text not null,
+  enabled boolean default true,
+  created_at timestamptz default now()
+);
+-- Optionally add backup codes table
+create table if not exists public.admin_backup_codes(
+  actor_email text not null,
+  code_hash text not null,
+  used boolean default false,
+  created_at timestamptz default now()
+);
+create index if not exists admin_backup_idx on public.admin_backup_codes(actor_email, used);
+
+-- Seguridad: solo admins pueden ver/gestionar totp
+alter table public.admin_totp enable row level security;
+create policy totp_admin_only on public.admin_totp
+  for all using (public.is_admin()) with check (public.is_admin());
+alter table public.admin_backup_codes enable row level security;
+create policy totp_codes_admin_only on public.admin_backup_codes
+  for all using (public.is_admin()) with check (public.is_admin());
+```
+
+## Edge Functions nuevas
+- `totp-setup` — genera secreto base32 y `otpauth://` para QR, guarda por email.
+- `totp-verify` — valida un TOTP para el admin actual.
+- `jobs-runner` — procesa `jobs` por lotes y llama `slack-notify` / email / discord.
+
+### Despliegue
+```bash
+supabase functions deploy totp-setup totp-verify jobs-runner
+supabase functions secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
+# (Slack y Resend ya configurados en V6.9)
+```

@@ -23,8 +23,10 @@
         <span class="text-xs px-2 py-1 rounded-full bg-pink-500/15 text-pink-300 border border-pink-500/20">ADMIN</span>
       </a>
       <div class="flex items-center gap-3 text-sm">
+        <select id="tenantSel" class="h-9 px-2 rounded-md bg-white/10 border border-white/10 hidden"></select>
         <a href="dashboard.html" class="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20">Dashboard</a>
         <span id="adminEmail" class="text-slate-300"></span>
+        <button id="totpBtn" class="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20">TOTP</button>
         <button id="logoutBtn" class="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20">Salir</button>
       </div>
     </div>
@@ -143,5 +145,25 @@
       </div>
     </section>
   </main>
+
+  <div id="totpModal" class="fixed inset-0 z-50 hidden items-center justify-center">
+    <div class="absolute inset-0 bg-black/60"></div>
+    <div class="relative z-10 w-[560px] max-w-[92vw] rounded-2xl border border-white/10 bg-slate-900 p-5">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold">Configurar TOTP</h3>
+        <button id="totpClose" class="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20">X</button>
+      </div>
+      <div class="mt-4 text-sm space-y-3">
+        <p>Escanea el QR en Google Authenticator o ingresa el secreto manualmente.</p>
+        <img id="totpQR" class="w-48 h-48 border border-white/10"/>
+        <div>Secreto: <code id="totpSecret"></code></div>
+        <div class="flex gap-2">
+          <input id="totpCode" placeholder="Código 6 dígitos" class="h-10 px-3 rounded-md bg-white/10 border border-white/10"/>
+          <button id="totpVerify" class="px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white">Verificar</button>
+        </div>
+        <div id="totpMsg" class="text-xs text-slate-400"></div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

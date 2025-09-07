@@ -89,6 +89,7 @@
   async function loadDeposits(){
     depRows.innerHTML = "";
     let q = sb.from('bank_deposits').select('*').in('status',['pending','pending_second']);
+    if (CURRENT_TENANT) q = q.eq('tenant_id', CURRENT_TENANT);
     if (depStart.value) q = q.gte('created_at', depStart.value);
     if (depEnd.value) q = q.lte('created_at', depEnd.value);
     q = q.order('created_at',{ascending:false}).range(depPage*DEP_SIZE, depPage*DEP_SIZE + DEP_SIZE - 1);
@@ -120,17 +121,26 @@
         // Primera aprobación (o final si no requiere dual)
                 // OTP gate for high amounts
         const { data: lim } = await sb.rpc('get_deposit_limits');
+        // Preferir TOTP si está habilitado
+        let preferTotp = false;
+        try { const { data:u } = await sb.auth.getUser(); const email = u?.user?.email; const chk = await fetch('/functions/v1/totp-verify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, code: '000000' }) }); const jj = await chk.json(); preferTotp = (jj.error === 'not_enabled') ? false : true; } catch(e) {}
+
         const needOtp = (r.expected_cents||0) >= (lim?.dual_required_above_cents || 0);
         let okOtp = true;
         if (needOtp){
           const { data:u } = await sb.auth.getUser();
           const email = u?.user?.email;
           if (!email){ alert('Sesión inválida'); return; }
-          await sendOTP(email);
-          const code = prompt('Se envió un código a tu email. Ingrésalo:');
-          if (!code){ return; }
-          okOtp = await checkOTP(sb, code);
-          if (!okOtp){ alert('OTP incorrecto/expirado'); return; }
+          if (preferTotp){
+            const code = prompt('Ingresa tu código TOTP (App)'); if (!code) return;
+            const r = await fetch('/functions/v1/totp-verify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, code }) });
+            const j = await r.json(); if (!j.ok){ alert('TOTP inválido'); return; }
+          } else {
+            await sendOTP(email);
+            const code = prompt('Se envió un código a tu email. Ingrésalo:'); if (!code) return;
+            okOtp = await checkOTP(sb, code);
+            if (!okOtp){ alert('OTP incorrecto/expirado'); return; }
+          }
         }
 if (isSecond){
           const { data: res2, error: e2 } = await sb.rpc('admin_finalize_bank_deposit', { p_ref: r.id });
@@ -194,7 +204,8 @@ if (isSecond){
 
   async function loadKyc(){
     kycRows.innerHTML = "";
-    let q = sb.from('profiles').select('user_id,email,kyc_level,kyc_status').order('updated_at',{ascending:false});
+    let q = sb.from('profiles').select('user_id,email,kyc_level,kyc_status,tenant_id').order('updated_at',{ascending:false});
+    if (CURRENT_TENANT) q = q.eq('tenant_id', CURRENT_TENANT);
     const term = (kycQ.value||'').trim();
     if (term){
       if (isUUID(term)) q = q.eq('user_id', term);
@@ -328,6 +339,7 @@ if (isSecond){
     const u = await requireAdmin();
     if (!u) return;
     await loadRoles();
+    await loadTenants(sb);
     if (ROLES.deposits) await loadDeposits();
     if (ROLES.kyc) await loadKyc();
   })();
@@ -429,3 +441,56 @@ function renderCharts(rows){
     options: { responsive: true, scales: { y: { beginAtZero: true } } }
   });
 }
+
+
+// --- Tenants: load & filter ---
+const tenantSel = document.getElementById('tenantSel');
+let CURRENT_TENANT = null;
+async function loadTenants(sb){
+  try{
+    const { data: ut } = await sb.from('user_tenants').select('tenant_id').eq('user_id', (await sb.auth.getUser()).data.user.id);
+    if (!ut || !ut.length){ return; }
+    const ids = ut.map(x=>x.tenant_id);
+    const { data: t } = await sb.from('tenants').select('*').in('id', ids);
+    if (t && t.length){
+      tenantSel.classList.remove('hidden');
+      tenantSel.innerHTML = t.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');
+      CURRENT_TENANT = t[0].id;
+      tenantSel.addEventListener('change', ()=>{ CURRENT_TENANT = tenantSel.value; if (ROLES.deposits) loadDeposits(); if (ROLES.kyc) loadKyc(); });
+    }
+  }catch(e){}
+}
+
+// --- TOTP setup modal ---
+const totpBtn = document.getElementById('totpBtn');
+const totpModal = document.getElementById('totpModal');
+const totpClose = document.getElementById('totpClose');
+const totpQR = document.getElementById('totpQR');
+const totpSecret = document.getElementById('totpSecret');
+const totpCode = document.getElementById('totpCode');
+const totpVerifyBtn = document.getElementById('totpVerify');
+const totpMsg = document.getElementById('totpMsg');
+
+function showTotp(v){ totpModal.classList.toggle('hidden', !v); totpModal.classList.toggle('flex', v); }
+
+totpBtn?.addEventListener('click', async ()=>{
+  const { data:u } = await sb.auth.getUser();
+  const email = u?.user?.email; if (!email) return;
+  const r = await fetch('/functions/v1/totp-setup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, issuer:'Mixtli' }) });
+  const j = await r.json();
+  if (!j.ok){ alert('Error TOTP'); return; }
+  totpSecret.textContent = j.secret;
+  // usa API charts QR simple (placeholder) — en prod usa una lib de QR
+  totpQR.src = 'https://api.qrserver.com/v1/create-qr-code/?size=192x192&data=' + encodeURIComponent(j.uri);
+  showTotp(true);
+});
+
+totpClose?.addEventListener('click', ()=>showTotp(false));
+totpVerifyBtn?.addEventListener('click', async ()=>{
+  const { data:u } = await sb.auth.getUser();
+  const email = u?.user?.email; if (!email) return;
+  const code = totpCode.value;
+  const r = await fetch('/functions/v1/totp-verify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, code }) });
+  const j = await r.json();
+  totpMsg.textContent = j.ok ? '✅ TOTP verificado' : '❌ Código inválido';
+});

@@ -1,144 +1,80 @@
-/* Dashboard V6: uso de cuota + bloqueo de subida + lista simple */
 (() => {
-  const cfg = window.CONFIG || { mode: "demo" };
-  const bucket = cfg.storageBucket || "files";
-  let sb = null;
-  if (cfg.mode === "supabase" && cfg.supabaseUrl && cfg.supabaseAnonKey && window.supabase) {
-    sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+  const cfg = window.CONFIG || {};
+  if (cfg.mode !== "supabase"){ console.warn("Dashboard requiere Supabase."); return; }
+  const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+
+  const el = (id)=>document.getElementById(id);
+
+  async function load(){
+    const now = new Date();
+    const d30 = new Date(now.getTime() - 30*86400000).toISOString();
+    const { data: pur } = await sb.from('purchases').select('*').gte('created_at', d30).limit(5000);
+    const rev = (pur||[]).reduce((a,r)=> a + (r.amount_cents||0)/100, 0);
+    const users = new Set((pur||[]).map(r=>r.user_id)).size || 1;
+    el('rev30').textContent = money(rev);
+    el('arpu').textContent = money(rev / users);
+
+    // MRR estimado = suma proMonthly últimos 30 días (simples)
+    const subs = (pur||[]).filter(r => (r.sku||'').toLowerCase().includes('promonthly'));
+    const mrr = subs.reduce((a,r)=> a + (r.amount_cents||0)/100, 0);
+    el('mrr').textContent = money(mrr);
+
+    // churn aprox con recargas: 1 - (#usuarios con compra en últimos 30d / #usuarios con compra en previos 30-60d)
+    const d60 = new Date(now.getTime() - 60*86400000).toISOString();
+    const { data: prev } = await sb.from('purchases').select('user_id,created_at').gte('created_at', d60).lt('created_at', d30).limit(5000);
+    const prevUsers = new Set((prev||[]).map(r=>r.user_id));
+    const currentUsers = new Set((pur||[]).map(r=>r.user_id));
+    const retained = Array.from(prevUsers).filter(u => currentUsers.has(u)).length;
+    const churn = prevUsers.size ? (1 - retained / prevUsers.size) : 0;
+    el('churn').textContent = (churn*100).toFixed(1) + '%';
+
+    // charts
+    renderCharts([...(pur||[]), ...(prev||[])]);
+
+    // cohortes: por mes de alta en 'profiles' vs compras en pur
+    const { data: profs } = await sb.from('profiles').select('user_id,created_at').limit(10000);
+    const thisMonth = (now.toISOString()).slice(0,7);
+    const cohortMap = {};
+    (profs||[]).forEach(p => {
+      const m = (p.created_at||'').slice(0,7);
+      if (!cohortMap[m]) cohortMap[m] = { total:0, active:0 };
+      cohortMap[m].total++;
+      const hasBuy = (pur||[]).some(r => r.user_id === p.user_id);
+      if (hasBuy) cohortMap[m].active++;
+    });
+    const rows = Object.keys(cohortMap).sort().map(m => {
+      const c = cohortMap[m]; const pct = c.total ? Math.round(100*c.active/c.total) : 0;
+      return `<div class="flex justify-between"><span>${m}</span><span>${pct}%</span></div>`;
+    }).join('');
+    document.getElementById('cohorts').innerHTML = rows || '<div class="text-slate-400">Cohortes no disponibles</div>';
   }
 
-  const fileInput = document.getElementById("fileInput");
-  const uploadBtn = document.getElementById("uploadBtn");
-  const uploadMsg = document.getElementById("uploadMsg");
-  const fileGrid = document.getElementById("fileGrid");
-  const userEmailEl = document.getElementById("userEmail");
-  const usageBar = document.getElementById("usageBar");
-  const usageLabel = document.getElementById("usageLabel");
-  const logoutBtn = document.getElementById("logoutBtn");
+  function money(v){ return new Intl.NumberFormat('es-MX',{ style:'currency', currency:'MXN' }).format(v || 0); }
 
-  function toast(m){ uploadMsg.textContent=m; setTimeout(()=>{ if(uploadMsg.textContent===m) uploadMsg.textContent=""; },1800); }
-  function bytesToSize(bytes){ if (!bytes&&bytes!==0) return "0 B"; const u=["B","KB","MB","GB"]; let i=0,v=bytes; while(v>=1024&&i<u.length-1){v/=1024;i++;} return v.toFixed(1)+" "+u[i]; }
-  const GB = 1024*1024*1024;
+  function renderCharts(rows){
+    const byMonth = {};
+    const byProv = {};
+    rows.forEach(r => {
+      const m = (r.created_at||'').slice(0,7);
+      const amt = (r.amount_cents||0)/100;
+      byMonth[m] = (byMonth[m]||0) + amt;
+      byProv[r.provider||''] = (byProv[r.provider||'']||0) + amt;
+    });
+    const mLabels = Object.keys(byMonth).sort();
+    const mData = mLabels.map(k => byMonth[k]);
+    const pLabels = Object.keys(byProv);
+    const pData = pLabels.map(k => byProv[k]);
 
-  async function getSession(){
-    if (sb){ const { data } = await sb.auth.getUser(); return data?.user || null; }
-    const s = JSON.parse(localStorage.getItem("mx_session") || "null");
-    return s ? { email:s.email, id:"demo-user" } : null;
+    const ctx1 = document.getElementById('byMonth')?.getContext('2d');
+    const ctx2 = document.getElementById('byProvider')?.getContext('2d');
+    if (!ctx1 || !ctx2) return;
+
+    if (window._d1) window._d1.destroy();
+    if (window._d2) window._d2.destroy();
+
+    window._d1 = new Chart(ctx1, { type:'line', data:{ labels:mLabels, datasets:[{ label:'Ingresos', data:mData }] }, options:{ responsive:true, scales:{ y:{ beginAtZero:true }}} });
+    window._d2 = new Chart(ctx2, { type:'bar', data:{ labels:pLabels, datasets:[{ label:'Proveedor', data:pData }] }, options:{ responsive:true, scales:{ y:{ beginAtZero:true }}} });
   }
 
-  async function ensureProfile(user){
-    if (sb){
-      const { data } = await sb.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
-      if (!data){
-        await sb.from("profiles").insert({ user_id:user.id, email:user.email });
-        return { quota_gb:2, bonus_gb:0, used_bytes:0 };
-      }
-      return data;
-    } else {
-      const prof = JSON.parse(localStorage.getItem("mx_profile") || "null");
-      if (!prof){ const p={ quota_gb:2, bonus_gb:0, used_bytes:0 }; localStorage.setItem("mx_profile", JSON.stringify(p)); return p; }
-      return prof;
-    }
-  }
-
-  async function getUsedBytes(user){
-    if (sb){
-      const { data } = await sb.from("file_index").select("size_bytes").eq("user_id", user.id);
-      let sum=0; (data||[]).forEach(r=> sum += (r.size_bytes||0)); return sum;
-    } else {
-      const items = JSON.parse(localStorage.getItem("mx_files")||"[]");
-      let sum=0; items.forEach(i=> sum += (i.size||0)); return sum;
-    }
-  }
-
-  function renderUsage(profile, used){
-    const totalGB = (profile.quota_gb||0) + (profile.bonus_gb||0);
-    const totalBytes = totalGB * GB;
-    const pct = totalBytes>0 ? Math.min(100, Math.round(used*100/totalBytes)) : 0;
-    usageBar.style.width = pct + "%";
-    usageBar.style.background = pct>=100? "#ef4444" : (pct>=80? "#f59e0b" : "#22c55e");
-    usageLabel.textContent = `${(used/GB).toFixed(2)} / ${totalGB} GB`;
-    return { pct, totalBytes };
-  }
-
-  async function listFiles(user){
-    fileGrid.innerHTML="";
-    if (sb){
-      const { data, error } = await sb.storage.from(bucket).list(user.id, { limit: 1000, sortBy:{column:"created_at",order:"desc"} });
-      if (error){ toast(error.message); return; }
-      for (const item of data||[]){
-        const path = `${user.id}/${item.name}`;
-        const row=document.createElement("div"); row.className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm flex items-center justify-between gap-2";
-        row.innerHTML = `<div class="truncate">${item.name}</div><a class="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20" target="_blank">Abrir</a>`;
-        try { const r = await sb.storage.from(bucket).createSignedUrl(path, 3600); row.querySelector("a").href = r.data?.signedUrl || "#"; } catch(e){}
-        fileGrid.appendChild(row);
-      }
-    } else {
-      const items = JSON.parse(localStorage.getItem("mx_files")||"[]").slice(-50).reverse();
-      for (const it of items){
-        const row=document.createElement("div"); row.className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm flex items-center justify-between gap-2";
-        row.innerHTML = `<div class="truncate">${it.name}</div><a class="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20" target="_blank">Abrir</a>`;
-        if (it.dataUrl){
-          (async ()=>{ const res = await fetch(it.dataUrl); const blob = await res.blob(); const u = URL.createObjectURL(blob); row.querySelector("a").href = u; })();
-        } else {
-          row.querySelector("a").href = it.previewUrl || "#";
-        }
-        fileGrid.appendChild(row);
-      }
-    }
-  }
-
-  uploadBtn.addEventListener("click", async ()=>{
-    const files = fileInput.files;
-    if (!files || !files.length){ toast("Selecciona archivos"); return; }
-    const user = await getSession(); if (!user){ window.location.href="auth.html"; return; }
-
-    const prof = await ensureProfile(user);
-    const used = await getUsedBytes(user);
-    const { totalBytes } = renderUsage(prof, used);
-    let incoming = 0; for (const f of files) incoming += f.size;
-    if (totalBytes === 0 || used + incoming > totalBytes){
-      toast("🚫 Te pasas de tu cuota. Compra GB en 'Planes y Recargas'.");
-      return;
-    }
-
-    for (const f of files){
-      const filename = `${Date.now()}_${f.name}`;
-      const path = `${user.id}/${filename}`;
-      if (sb){
-        const { error } = await sb.storage.from(bucket).upload(path, f, { upsert: true, cacheControl: "3600" });
-        if (error){ toast(error.message); return; }
-        await sb.from("file_index").upsert({ user_id:user.id, path, size_bytes:f.size });
-      } else {
-        const items = JSON.parse(localStorage.getItem("mx_files")||"[]");
-        const fr = new FileReader();
-        await new Promise((res, rej)=>{ fr.onload=()=>res(None); fr.onerror=rej; fr.readAsDataURL(f); });
-        items.push({ name: filename, size: f.size, path, dataUrl: fr.result, at: Date.now() });
-        localStorage.setItem("mx_files", JSON.stringify(items));
-        const prof2 = JSON.parse(localStorage.getItem("mx_profile")||'{"quota_gb":2,"bonus_gb":0,"used_bytes":0}');
-        prof2.used_bytes = (prof2.used_bytes||0) + f.size;
-        localStorage.setItem("mx_profile", JSON.stringify(prof2));
-      }
-    }
-    toast("Subidas ✔");
-    await refreshUsage();
-    await listFiles(user);
-  });
-
-  async function refreshUsage(){
-    const user = await getSession();
-    if (!user){ window.location.href="auth.html"; return; }
-    userEmailEl.textContent = user.email || "";
-    const prof = await ensureProfile(user);
-    const used = await getUsedBytes(user);
-    renderUsage(prof, used);
-  }
-
-  logoutBtn.addEventListener("click", async ()=>{ if (sb) await sb.auth.signOut(); localStorage.removeItem("mx_session"); window.location.href = "index.html"; });
-
-  (async function init(){
-    await refreshUsage();
-    const user = await getSession(); if (!user) return;
-    await listFiles(user);
-  })();
+  load();
 })();
