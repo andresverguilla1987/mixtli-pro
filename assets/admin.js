@@ -91,7 +91,7 @@
 
   async function loadDeposits(){
     depRows.innerHTML = "";
-    let q = sb.from('bank_deposits').select('*').in('status',['pending','pending_second']);
+    let q = sb.from('bank_deposits').select('*').in('status',['pending','pending_second','on_hold']);
     if (CURRENT_TENANT && CURRENT_TENANT!=='ALL') q = q.eq('tenant_id', CURRENT_TENANT);
     if (depStart.value) q = q.gte('created_at', depStart.value);
     if (depEnd.value) q = q.lte('created_at', depEnd.value);
@@ -744,4 +744,117 @@ fSearch?.addEventListener('click', async ()=>{
     const v = byMonth[m]; const color = v===3 ? 'bg-rose-600' : v===2 ? 'bg-amber-500' : 'bg-emerald-600';
     return `<div class="p-3 rounded-md ${color} text-white text-xs">${m}</div>`;
   }).join('') || '<div class="text-slate-400">Sin señales</div>';
+});
+
+// --- Swipe Mode ---
+const swipeBtn = document.getElementById('swipeMode');
+const swipeOverlay = document.getElementById('swipeOverlay');
+const swipeCard = document.getElementById('swipeCard');
+const swipeInfo = document.getElementById('swipeInfo');
+const swipeApprove = document.getElementById('swipeApprove');
+const swipeReject = document.getElementById('swipeReject');
+const swipeClose = document.getElementById('swipeClose');
+
+let _swipeQueue = []; let _current = 0; let _pos = {x:0,y:0}; let _drag=false;
+
+swipeBtn?.addEventListener('click', ()=>{
+  // Construye cola desde la tabla actual (pDataDeposits si existe)
+  try{
+    const rows = Array.from(document.querySelectorAll('#depTable tbody tr')).map(tr => tr._rowData).filter(Boolean);
+    _swipeQueue = rows; _current = 0;
+    if (!_swipeQueue.length){ alert('No hay depósitos pendientes'); return; }
+    showSwipe();
+  }catch(e){ alert('Recarga la lista primero'); }
+});
+
+function showSwipe(){
+  swipeOverlay.classList.remove('hidden');
+  renderSwipe();
+}
+function hideSwipe(){ swipeOverlay.classList.add('hidden'); }
+
+function renderSwipe(){
+  const r = _swipeQueue[_current]; if (!r){ hideSwipe(); return; }
+  swipeInfo.innerHTML = `
+    <div class="flex items-center justify-between">
+      <div class="text-xs px-2 py-1 rounded-full ${r.status==='on_hold'?'bg-amber-500/20 text-amber-300 border border-amber-500/30':'bg-white/5 text-slate-300 border border-white/10'}">${r.status}</div>
+      <div class="text-xs text-slate-400">${_current+1}/${_swipeQueue.length}</div>
+    </div>
+    <div class="mt-2"><span class="text-slate-400">Ref:</span> ${r.id}</div>
+    <div><span class="text-slate-400">Monto:</span> ${(r.expected_cents/100).toFixed(2)} ${(r.currency||'MXN').toUpperCase()}</div>
+    <div><span class="text-slate-400">Usuario:</span> ${r.user_id}</div>
+  `;
+  swipeCard.style.transform = 'translateX(0px) rotate(0deg)';
+  _pos = {x:0,y:0};
+}
+function nextSwipe(){ _current++; renderSwipe(); }
+
+function onDragStart(e){ _drag=true; _pos.x=0; _pos.y=0; }
+function onDragMove(e){
+  if (!_drag) return; const dx = (e.touches? e.touches[0].clientX : e.clientX) - (window.innerWidth/2);
+  _pos.x = dx; const rot = dx/20; swipeCard.style.transform = `translateX(${dx}px) rotate(${rot}deg)`;
+}
+function onDragEnd(){
+  if (!_drag) return; _drag=false;
+  if (_pos.x > 120){ doApprove(); }
+  else if (_pos.x < -120){ doReject(); }
+  else { swipeCard.style.transform = 'translateX(0px) rotate(0deg)'; }
+}
+swipeCard?.addEventListener('pointerdown', onDragStart);
+window.addEventListener('pointermove', onDragMove);
+window.addEventListener('pointerup', onDragEnd);
+swipeCard?.addEventListener('touchstart', onDragStart);
+window.addEventListener('touchmove', onDragMove);
+window.addEventListener('touchend', onDragEnd);
+
+swipeApprove?.addEventListener('click', doApprove);
+swipeReject?.addEventListener('click', doReject);
+swipeClose?.addEventListener('click', hideSwipe);
+
+async function doApprove(){
+  const r = _swipeQueue[_current]; if (!r) return;
+  try{
+    // Reutiliza misma lógica que botones normales (llamadas RPC)
+    const { data: lim } = await sb.rpc('get_deposit_limits');
+    const needOtp = (r.expected_cents||0) >= (lim?.dual_required_above_cents || 0);
+    if (needOtp){
+      const { data:u } = await sb.auth.getUser();
+      const chk = await fetch('/functions/v1/totp-verify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: u?.user?.email, code: '000000' }) }); const jj = await chk.json();
+      if (!(jj.error === 'not_enabled')){ const c = prompt('TOTP'); if (!c) return; const rr = await fetch('/functions/v1/totp-verify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: u?.user?.email, code: c }) }); const j2 = await rr.json(); if (!j2.ok){ alert('TOTP inválido'); return; } }
+      else { await fetch('/functions/v1/send-otp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ to: u?.user?.email }) }); const code = prompt('OTP email'); if (!code) return; const ok = await sb.rpc('admin_check_otp', { p_code: String(code) }); if (ok.error || !ok.data){ alert('OTP inválido'); return; } }
+    }
+    if (r.status==='pending_second'){ const { error } = await sb.rpc('admin_finalize_bank_deposit', { p_ref: r.id }); if (error) throw error; }
+    else { const { data:s, error } = await sb.rpc('admin_approve_bank_deposit_v2', { p_ref: r.id }); if (error) throw error; }
+    nextSwipe();
+  }catch(e){ alert(e.message||String(e)); }
+}
+async function doReject(){
+  const r = _swipeQueue[_current]; if (!r) return;
+  const reason = prompt('Motivo del rechazo'); if (!reason) return;
+  const { error } = await sb.rpc('admin_reject_bank_deposit', { p_ref: r.id, p_reason: reason });
+  if (error){ alert(error.message); return; }
+  nextSwipe();
+}
+
+// --- Rules Editor ---
+const ruleName = document.getElementById('ruleName');
+const ruleJson = document.getElementById('ruleJson');
+const ruleValidate = document.getElementById('ruleValidate');
+const ruleSave = document.getElementById('ruleSave');
+const ruleList = document.getElementById('ruleList');
+const ruleMsg = document.getElementById('ruleMsg');
+const ruleUl = document.getElementById('ruleUl');
+
+ruleValidate?.addEventListener('click', ()=>{
+  try{ JSON.parse(ruleJson.value||'{}'); ruleMsg.textContent = '✅ JSON válido'; }catch(e){ ruleMsg.textContent = '❌ ' + e.message; }
+});
+ruleSave?.addEventListener('click', async ()=>{
+  const name = (ruleName.value||'').trim(); if (!name){ alert('Pon un nombre'); return; }
+  let content; try{ content = JSON.parse(ruleJson.value||'{}'); }catch(e){ alert('JSON inválido'); return; }
+  const { error } = await sb.from('risk_rules').upsert({ name, content, active:true, updated_at: new Date().toISOString() });
+  ruleMsg.textContent = error ? error.message : 'Guardado';
+});
+ruleList?.addEventListener('click', async ()=>{
+  const { data } = await sb.from('risk_rules').select('*').eq('active', true).order('updated_at', { ascending:false }).limit(100);
+  ruleUl.innerHTML = (data||[]).map(r => `<li><b>${r.name}</b> — <code>${JSON.stringify(r.content)}</code></li>`).join('') || '<li class="text-slate-400">Sin reglas</li>';
 });

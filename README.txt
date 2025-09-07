@@ -1619,3 +1619,82 @@ Ejemplo (fragmento):
       'url', '/approve.html?id='||NEW.id||'&stage='||(case when NEW.status='pending_second' then 'final' else 'first' end)
     ), prio);
 ```
+
+
+---
+# V7.7 — Swipe in‑app, Rules editor, Auto‑hold (cola de retención)
+Generado: 2025-09-07 05:23
+
+## Novedades
+- **Swipe approvals (in‑app)**: modo tarjetas con gesto izquierda = **rechazar**, derecha = **aprobar**. Ideal en móvil.
+- **Rules Editor (JSON)**: tabla `risk_rules` y editor UI; reglas activas alimentan un `risk_apply_rules()` para subir score o forzar **auto‑hold**.
+- **Auto‑hold**: si banda = `high` o si una regla fuerza hold → estado `on_hold` y envío a cola prioritaria.
+
+## SQL — Rules + Auto‑hold
+```sql
+-- Reglas de riesgo
+create table if not exists public.risk_rules(
+  name text primary key,
+  content jsonb not null,          -- JSON con reglas
+  active boolean default true,
+  updated_at timestamptz default now()
+);
+alter table public.risk_rules enable row level security;
+create policy rules_admin on public.risk_rules
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- Estado on_hold para depósitos (si no existe lógicamente en tu app)
+-- (No requiere DDL si usas free-form en status; si tienes enum, agrégalo)
+-- alter type deposit_status add value 'on_hold';
+
+-- Aplica reglas a un depósito; devuelve efecto: 'none'|'raise'|'hold'
+create or replace function public.risk_apply_rules(p_ref uuid) returns text
+language plpgsql as $$
+declare v jsonb; dep record; effect text := 'none'; begin
+  select * into dep from bank_deposits where id = p_ref;
+  for v in select content from risk_rules where active loop
+    -- Ejemplos simples: monto >= X, moneda, país de perfil, proveedor bancario
+    if (v->>'type') = 'amount_gte' and dep.expected_cents >= ((v->>'cents')::bigint) then
+      effect := coalesce(v->>'effect','raise');  -- 'raise' suma score; 'hold' fuerza hold
+    end if;
+    if (v->>'type') = 'currency_is' and upper(coalesce(dep.currency,'')) = upper(v->>'code') then
+      effect := greatest(effect, coalesce(v->>'effect','raise'));
+    end if;
+  end loop;
+  return effect;
+end; $$;
+
+-- Extiende assess_and_enqueue para aplicar reglas y auto‑hold
+create or replace function public.assess_and_enqueue(p_ref uuid) returns text
+language plpgsql as $$
+declare sc numeric; band text; prio smallint := 5; txt text; eff text; begin
+  sc := public.risk_score_deposit(p_ref);
+  eff := public.risk_apply_rules(p_ref);
+  if eff = 'raise' then sc := sc + 3; end if;
+
+  if sc >= 12 or eff = 'hold' then band := 'high'; prio := 1;
+  elsif sc >= 7 then band := 'medium'; prio := 3;
+  else band := 'low'; prio := 5;
+  end if;
+
+  insert into risk_assessments(ref_id, score, band, factors)
+    values (p_ref, sc, band, jsonb_build_object('rules_effect', eff))
+  on conflict do nothing;
+
+  -- Auto‑hold si high
+  if band = 'high' then
+    update bank_deposits set status='on_hold' where id = p_ref and status in ('pending','pending_second');
+    txt := 'Depósito '||p_ref||' en hold por riesgo alto';
+    insert into jobs(topic, payload, priority) values ('push', jsonb_build_object('title','En revisión','text', txt, 'url','/admin.html?tab=deposits'), prio);
+  else
+    txt := 'Riesgo '||band||' ('||sc||') en depósito '||p_ref;
+    insert into jobs(topic, payload, priority) values ('slack', jsonb_build_object('text', txt), prio);
+  end if;
+  return band;
+end; $$;
+```
+
+## UI — Dónde usarlo
+- **Admin → Depósitos**: botón **“Modo Swipe”** (mobile‑first). Cards con gesto izquierda/derecha o botones.
+- **Admin → Rules** (nueva pestaña): textarea JSON con **Validar** y **Guardar**. Reglas activas **ya** influyen en riesgo/hold.
+- **Cola `on_hold`**: los depósitos en estado `on_hold` se muestran junto a pendientes con badge **HOLD**.
