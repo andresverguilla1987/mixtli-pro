@@ -48,3 +48,8 @@ window.CONFIG = {
 - Para mover una carpeta completa en Supabase, el cliente hará *move* archivo por archivo (limitado por API).
 - En **demo**, todo vive en localStorage y URLs tipo `blob:` para previews.
 - Usa `start_server.bat` para abrir `http://localhost:5500` con doble clic.
+
+
+IMPORTANTE:
+- Abre siempre con http://localhost:5500 (no con file://) para evitar bloqueos del navegador.
+- En DEMO, desde V5.1 guardamos los archivos como data URL para que 'Abrir' funcione tras recargar (archivos muy grandes pueden no caber en localStorage).

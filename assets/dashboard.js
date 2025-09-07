@@ -82,6 +82,23 @@
   function bytesToSize(bytes){ if (!bytes&&bytes!==0) return ""; const u=["B","KB","MB","GB"]; let i=0,v=bytes; while(v>=1024&&i<u.length-1){v/=1024;i++;} return v.toFixed(1)+" "+u[i]; }
   function joinPath(a,b){ if(!a) return b; if(!a.endsWith("/")) a+="/"; return a+b; }
   function parentOf(p){ const parts=p.split("/"); parts.pop(); return parts.join("/")+"/"; }
+  // --- DEMO persistence helpers (V5.1) ---
+  async function fileToDataURL(file){
+    return new Promise((res, rej)=>{
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result);
+      fr.onerror = rej;
+      fr.readAsDataURL(file);
+    });
+  }
+  async function dataURLToObjectURL(dataUrl){
+    try {
+      const r = await fetch(dataUrl);
+      const b = await r.blob();
+      return URL.createObjectURL(b);
+    } catch(e){ return ""; }
+  }
+
 
   // UI toggles
   listBtn.addEventListener("click", ()=>{ view="list"; render(); });
@@ -234,7 +251,7 @@
     const tags = buildTagChips(item);
     const right=document.createElement("div"); right.className="flex items-center gap-2 text-xs text-slate-400";
     const sizeSpan=document.createElement("span"); sizeSpan.textContent=item.size?bytesToSize(item.size):"";
-    const openA=document.createElement("a"); openA.className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-slate-200"; openA.textContent="Abrir"; openA.href=item.url||"#"; openA.target="_blank";
+    const openA=document.createElement("a"); openA.className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-slate-200"; openA.textContent="Abrir"; openA.href=item.url||"#"; openA.target="_blank"; openA.addEventListener('click', (e)=>{ if (!item.url || item.url==='#'){ e.preventDefault(); toast('En modo demo, vuelve a subir el archivo o usa Supabase para links persistentes.'); } }); openA.addEventListener('click', (e)=>{ if (!item.url || item.url==='#'){ e.preventDefault(); toast('En modo demo, vuelve a subir el archivo o usa Supabase para links persistentes.'); } });
     const moveB=document.createElement("button"); moveB.className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-slate-200"; moveB.textContent="Mover"; moveB.addEventListener("click",()=>promptMove([item.path]));
     const copyB=document.createElement("button"); copyB.className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-slate-200"; copyB.textContent="Copiar"; copyB.addEventListener("click",async()=>{ try{ await navigator.clipboard.writeText(item.url||item.path); toast("Link copiado"); }catch(e){ toast("No se pudo copiar"); }});
     const delB=document.createElement("button"); delB.className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-red-300"; delB.textContent="Borrar"; delB.addEventListener("click",async()=>{ await deleteOne(item.path); });
@@ -263,7 +280,7 @@
     const actions=document.createElement("div"); actions.className="flex items-center justify-between gap-2 text-xs text-slate-400";
     const left=document.createElement("div"); left.className="flex items-center gap-2"; const sizeSpan=document.createElement("span"); sizeSpan.textContent=item.size?bytesToSize(item.size):""; left.append(sizeSpan); checkbox(left, item.path);
     const right=document.createElement("div"); right.className="flex items-center gap-2";
-    const openA=document.createElement("a"); openA.className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-slate-200"; openA.textContent="Abrir"; openA.href=item.url||"#"; openA.target="_blank";
+    const openA=document.createElement("a"); openA.className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-slate-200"; openA.textContent="Abrir"; openA.href=item.url||"#"; openA.target="_blank"; openA.addEventListener('click', (e)=>{ if (!item.url || item.url==='#'){ e.preventDefault(); toast('En modo demo, vuelve a subir el archivo o usa Supabase para links persistentes.'); } });
     const moveB=document.createElement("button"); moveB.className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-slate-200"; moveB.textContent="Mover"; moveB.addEventListener("click",()=>promptMove([item.path]));
     const copyB=document.createElement("button"); copyB.className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-slate-200"; copyB.textContent="Copiar"; copyB.addEventListener("click",async()=>{ try{ await navigator.clipboard.writeText(item.url||item.path); toast("Link copiado"); }catch(e){ toast("No se pudo copiar"); }});
     const delB=document.createElement("button"); delB.className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-red-300"; delB.textContent="Borrar"; delB.addEventListener("click",async()=>{ await deleteOne(item.path); });
@@ -596,8 +613,8 @@
           if (error) throw error;
         } else {
           const items = JSON.parse(localStorage.getItem("mx_files")||"[]");
-          const previewUrl = URL.createObjectURL(f);
-          items.push({ name: filename, size: f.size, path, previewUrl, at: Date.now() });
+          const dataUrl = await fileToDataURL(f);
+          items.push({ name: filename, size: f.size, path, dataUrl, at: Date.now() });
           localStorage.setItem("mx_files", JSON.stringify(items));
         }
       } catch(e){ toast(e.message || ("Error al subir "+f.name)); return; }
@@ -634,7 +651,13 @@
         const ext = extOf(it.name); const t = typeFromExt(ext);
         const rel = it.path.split("/").slice(1).join("/");
         const prefix = rel.includes("/") ? rel.split("/").slice(0,-1).join("/") + "/" : "";
-        allItems.push({ name:it.name.split("/").pop(), path:it.path, url:it.previewUrl||"#", type:t, createdAt:new Date(it.at||Date.now()).toISOString(), size:it.size||null, tags:[], prefix });
+        const rec = { name:it.name.split("/").pop(), path:it.path, url:"#", type:t, createdAt:new Date(it.at||Date.now()).toISOString(), size:it.size||null, tags:[], prefix };
+        allItems.push(rec);
+        if (it.dataUrl) { dataURLToObjectURL(it.dataUrl).then(u=>{ rec.url=u; render(); }); }
+        else if (it.previewUrl && it.previewUrl.startsWith("blob:")) {
+          // Antiguo formato: blob URL no sobrevive recarga. Sin dataUrl, no podemos rehidratar.
+          // Deja url como '#'. Sugerir re-subida si se intenta abrir.
+        }
       }
     }
     await loadTags();
