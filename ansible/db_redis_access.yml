@@ -1,0 +1,28 @@
+---
+- name: UFW allow DB (5432) and Redis (6379) from specific IPs
+  hosts: servers
+  become: true
+  vars:
+    db_allow_ip: "CHANGEME"
+    redis_allow_ip: "CHANGEME"
+  tasks:
+    - name: Fail if vars not set
+      assert:
+        that:
+          - db_allow_ip != "CHANGEME"
+          - redis_allow_ip != "CHANGEME"
+        fail_msg: "Set db_allow_ip and redis_allow_ip via --extra-vars"
+
+    - name: Ensure UFW present
+      apt:
+        name: ufw
+        state: present
+
+    - name: Allow Postgres from IP
+      command: ufw allow from {{ db_allow_ip }} to any port 5432 proto tcp
+
+    - name: Allow Redis from IP
+      command: ufw allow from {{ redis_allow_ip }} to any port 6379 proto tcp
+
+    - name: Enable UFW
+      command: ufw --force enable
