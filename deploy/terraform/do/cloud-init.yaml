@@ -1,0 +1,85 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - docker.io
+  - docker-compose
+  - git
+  - curl
+  - nginx
+  - apt-transport-https
+runcmd:
+  - systemctl enable docker
+  - systemctl start docker
+  # Tailscale
+  - curl -fsSL https://tailscale.com/install.sh | sh
+  - tailscale up --authkey ${tailscale_authkey} --ssh
+  # Clonar repo
+  - mkdir -p /opt/mixtli && cd /opt/mixtli
+  - git clone --depth=1 --branch ${branch} ${repo_url} /opt/mixtli/src || true
+  - cd /opt/mixtli/src
+  # Crea .env.prod si no existe
+  - test -f .env.prod || cp .env.prod .env.prod
+  # Levantar stack con docker compose (prod)
+  - docker compose -f docker-compose.prod.yml up -d --build
+  # Nginx reverse proxy a contenedor Nginx (opcional: directo al api:8080)
+  - rm -f /etc/nginx/sites-enabled/default
+  - bash -lc 'cat >/etc/nginx/sites-available/mixtli.conf <<EOF
+server {
+  listen 80 default_server;
+  location / {
+    proxy_pass http://127.0.0.1:80;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+EOF'
+  - ln -s /etc/nginx/sites-available/mixtli.conf /etc/nginx/sites-enabled/mixtli.conf
+  - systemctl restart nginx
+
+write_files:
+  - path: /etc/systemd/system/mixtli.service
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Mixtli docker compose
+      After=docker.service
+      Requires=docker.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=true
+      WorkingDirectory=/opt/mixtli/src
+      ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d
+      ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml down
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/mixtli-redeploy.service
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Redeploy Mixtli from Git
+      After=network-online.target
+
+      [Service]
+      Type=oneshot
+      WorkingDirectory=/opt/mixtli/src
+      ExecStart=/usr/bin/git pull --rebase
+      ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d --build
+
+  - path: /usr/local/bin/mixtli-redeploy
+    permissions: "0755"
+    owner: root:root
+    content: |
+      #!/usr/bin/env bash
+      systemctl start mixtli-redeploy.service
+
+runcmd:
+  - systemctl enable mixtli.service
+  - systemctl start mixtli.service
