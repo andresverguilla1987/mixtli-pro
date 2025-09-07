@@ -11,20 +11,30 @@
   const btnStripe = document.getElementById("methodStripe");
   const btnMP = document.getElementById("methodMP");
   const btnPP = document.getElementById("methodPP");
+  const btnCR = document.getElementById("methodCR");
+  const cryptoProviders = document.getElementById("cryptoProviders");
 
   let method = "stripe";
   btnStripe.classList.add("bg-white/20");
 
+  let cryptoProv = "coinbase";
   function setMethod(m){
     method = m;
     btnStripe.classList.toggle("bg-white/20", m==="stripe");
     btnMP.classList.toggle("bg-white/20", m==="mercadopago");
     btnPP.classList.toggle("bg-white/20", m==="paypal");
+    btnCR.classList.toggle("bg-white/20", m==="crypto");
+    cryptoProviders.classList.toggle("hidden", m!=="crypto");
     renderCards();
   }
   btnStripe.onclick = ()=>setMethod("stripe");
   btnMP.onclick = ()=>setMethod("mercadopago");
   btnPP.onclick = ()=>setMethod("paypal");
+  btnCR.onclick = ()=>setMethod("crypto");
+  // crypto provider toggle
+  cryptoProviders.querySelectorAll("button").forEach(b=>{
+    b.addEventListener("click", ()=>{ cryptoProv = b.dataset.prov; cryptoProviders.querySelectorAll("button").forEach(x=>x.classList.remove("bg-white/20")); b.classList.add("bg-white/20"); renderCards(); });
+  });
 
   // Try guess country from locale
   try {
@@ -44,6 +54,10 @@
   }
 
   function linkFor(country, methodKey, prodKey){
+    if (methodKey === "crypto"){
+      const map = ((((cfg.billing || {}).links || {}).crypto || {})[cryptoProv] || {})[country] || {};
+      return map[prodKey] || "";
+    }
     const map = (((cfg.billing || {}).links || {})[methodKey] || {})[country] || {};
     return map[prodKey] || "";
   }

@@ -13,6 +13,35 @@ window.CONFIG = {
     },
     // Links por país y pasarela (rellena con tus Payment Links / Botones)
     links: {
+      crypto: {
+        coinbase: {
+          MX: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          AR: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          BR: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          CL: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          CO: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          PE: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          INT:{ topup10: "", topup50: "", topup100: "", proMonthly: "" }
+        },
+        nowpayments: {
+          MX: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          AR: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          BR: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          CL: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          CO: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          PE: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          INT:{ topup10: "", topup50: "", topup100: "", proMonthly: "" }
+        },
+        btcpay: {
+          MX: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          AR: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          BR: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          CL: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          CO: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          PE: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+          INT:{ topup10: "", topup50: "", topup100: "", proMonthly: "" }
+        }
+      },
       stripe: {
         MX: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
         AR: { topup10: "", topup50: "", topup100: "", proMonthly: "" },

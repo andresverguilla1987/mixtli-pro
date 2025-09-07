@@ -324,3 +324,23 @@ grant execute on function public.buy_gb_with_wallet(uuid, numeric) to authentica
 2) Usuario transfiere con esa referencia (o sube comprobante).
 3) Admin valida y cambia `status = approved` → un job/función suma `balance_cents` y registra en `wallet_ledger`.
 4) Usuario ve saldo acreditado y puede **Pagar con saldo**.
+
+
+---
+# V6.3 — Cripto (Coinbase Commerce, NOWPayments, BTCPay)
+Generado: 2025-09-07 04:24
+
+## Qué agrega
+- **Método "Crypto"** en Billing con sub-proveedor: **Coinbase Commerce**, **NOWPayments**, **BTCPay Server**.
+- Config por producto en `assets/config.js` → `billing.links.crypto.*` (puedes usar páginas hospedadas/checkout).
+- Webhooks de ejemplo:
+  - `supabase/functions/coinbase-webhook/index.ts`
+  - `supabase/functions/nowpayments-webhook/index.ts`
+  - `supabase/functions/btcpay-webhook/index.ts`
+- Soporta `metadata.intent = 'wallet_topup' | 'gb_purchase'` + `user_id` y `sku` (o `gb`).
+
+## Notas rápidas
+- Recomendado usar **stablecoins** (USDC/USDT) para minimizar volatilidad.
+- Si usas **BTCPay self-hosted**, setea `storeId` y habilita webhook de `InvoiceSettled`.
+- Para **Coinbase Commerce**, valida firma `X-CC-Webhook-Signature` con tu `COINBASE_WEBHOOK_SECRET`.
+- Para **NOWPayments**, usa IPN y valida `x-nowpayments-sig` con `NOWPAYMENTS_IPN_SECRET`.
