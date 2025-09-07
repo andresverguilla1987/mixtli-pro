@@ -1,58 +1,47 @@
+// apps/api/src/app.ts — Migrado a Sentry v8+ (Express, ESM/TypeScript)
+// Reemplaza tu archivo con este si hoy truena por `Sentry.Handlers.*`
+
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import * as Sentry from "@sentry/node";
-import { nodeProfilingIntegration } from "@sentry/profiling-node";
-import { metricsMiddleware, metricsRouter } from "./metrics.js";
-import { PrismaClient } from "@prisma/client";
-import { router as wfmRouter } from "./wfm.js";
-import { router as scoringRouter } from "./scoring.js";
-import { router as rulesRouter } from "./rules.js";
-import { router as auditRouter } from "./audit.js";
-import fs from "fs";
-import { createOpenApi } from "./swagger.js";
 
-const app = express();
-const prisma = new PrismaClient();
+export const app = express();
 
-Sentry.init({
-  dsn: process.env.SENTRY_DSN || undefined,
-  tracesSampleRate: 0.2,
-  integrations: [nodeProfilingIntegration()],
-  environment: process.env.APP_ENV || "production",
-});
-
-const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
-
+// Middlewares base
 app.use(cors());
-app.use(Sentry.Handlers.requestHandler());
-app.use(express.json({ limit: "2mb" }));
-app.use(morgan("tiny"));
-app.use(metricsMiddleware);
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.get("/health", async (_req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: "ok", time: new Date().toISOString() });
-  } catch (e) {
-    res.status(500).json({ status: "error", error: (e as Error).message });
+// --- Rutas (coloca tus routers reales aquí) ---
+app.get("/__health", (_req, res) => {
+  res.json({ ok: true, service: "mixtli-api", ts: new Date().toISOString() });
+});
+// Ejemplos para guiarte: descomenta y ajusta si ya los tienes
+// import authRouter from "./routes/auth";
+// app.use("/api/auth", authRouter);
+// import filesRouter from "./routes/files";
+// app.use("/api/files", filesRouter);
+// ----------------------------------------------
+
+// Sentry v8: único handler de errores (sustituye a Handlers.*)
+// Colócalo DESPUÉS de definir tus rutas, y ANTES de tu error-handler propio.
+Sentry.setupExpressErrorHandler(app);
+
+// 404 (si no coincide ninguna ruta)
+app.use((_req, res) => {
+  res.status(404).json({ error: "Not Found" });
+});
+
+// Error handler propio (después del de Sentry)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: any, _req: any, res: any, _next: any) => {
+  if (process.env.NODE_ENV !== "production") {
+    console.error("[API ERROR]", err);
   }
+  const status = (typeof err?.status === "number" && err.status) || 500;
+  res.status(status).json({ error: "Internal Server Error" });
 });
 
-app.use("/wfm", wfmRouter);
-app.use("/scoring", scoringRouter);
-app.use("/rules", rulesRouter);
-app.use("/audit", auditRouter);
-
-// Serve OpenAPI spec
-app.get("/openapi.yaml", (_req, res) => {
-  const spec = createOpenApi();
-  res.type("text/yaml").send(spec);
-});
-
-app.use(metricsRouter);
-app.use(Sentry.Handlers.errorHandler());
-
-
-
-export { app, prisma, PORT };
+export default app;

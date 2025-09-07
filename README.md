@@ -1,23 +1,35 @@
-# Hotfix: Strip Sentry v7 Handlers en Render
+# Fix directo para `apps/api/src/app.ts` (Sentry v8)
 
-## ¿Para qué sirve?
-Si tu build sigue generando `dist/app.js` con:
-- `app.use(Sentry.Handlers.requestHandler())`
-- `app.use(Sentry.Handlers.tracingHandler())`
-- `app.use(Sentry.Handlers.errorHandler())`
+Este paquete te deja un `app.ts` ya migrado a Sentry v8+ y un `instrument.ts` opcional.
 
-este script los elimina **en tiempo de arranque** antes de ejecutar tu servidor, para que no crashee en Sentry v8+.
-Es un parche temporal para levantar el servicio de inmediato.
+## Pasos
+1) **Copia** `apps/api/src/app.ts` de este ZIP sobre tu repo (reemplaza el actual).
+2) (Opcional) Copia `apps/api/src/sentry/instrument.ts` si quieres instrumentación temprana.
+3) **Borra cualquier resto** de API vieja en tu fuente (por si quedaron en otros archivos):
+   - `Sentry.Handlers.requestHandler(...)`
+   - `Sentry.Handlers.tracingHandler(...)`
+   - `Sentry.Handlers.errorHandler(...)`
+4) **Rebuild** y **deploy**.
 
-## Cómo usarlo en Render
-1. Sube este archivo al repo (por ejemplo en `render/render-start-with-sentry-hotfix.sh`).
-2. Dale permisos de ejecución (Render lo clona con permisos, pero localmente puedes: `git update-index --chmod=+x render/render-start-with-sentry-hotfix.sh`).
-3. En Render, cambia el **Start Command** a:
-```
-bash render/render-start-with-sentry-hotfix.sh
-```
-4. Re-deploy. Con esto tu servicio ya no reventará por `Handlers.*`.
+### Render — Start Command
+- Simple (sin instrumentación temprana):
+  ```
+  cd apps/api && npx prisma migrate deploy && node dist/server.js
+  ```
+- Con instrumentación temprana (recomendado):
+  ```
+  cd apps/api && npx prisma migrate deploy && node --import ./dist/sentry/instrument.js dist/server.js
+  ```
+  o con variable de entorno:
+  ```
+  NODE_OPTIONS=--import ./dist/sentry/instrument.js
+  ```
 
-## Recomendación a mediano plazo
-- Migra el código fuente a Sentry v8 (usa `Sentry.setupExpressErrorHandler(app)` y carga instrumentación con `--import`).
-- O fija `@sentry/node@^7` si prefieres mantener la API antigua.
+### Tips
+- Si tu build toma artefactos viejos, limpia antes de compilar:
+  - En el Build Command antepone: `rm -rf apps/api/dist && ...`
+  - O usa “Clear build cache & deploy” en Render.
+- Asegúrate de tener `@sentry/node` >= 8 en `apps/api`.
+
+### Compatibilidad
+- Express / TypeScript / Node 22 (ESM). Si usas CommonJS, adapta los imports.
