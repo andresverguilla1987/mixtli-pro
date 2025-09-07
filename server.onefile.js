@@ -1,24 +1,18 @@
-/**
- * One‑file Demo Server (no DB) — drop‑in for Render
- * Endpoints:
- *  - GET /                           -> health JSON
- *  - POST /security/2fa/setup        -> { otpauth, qrDataUrl }
- *  - POST /security/2fa/enable       -> { enabled: true, recoveryCodes: [...] }
- *  - POST /events/login              -> { sent: true, dryRun: true }
- *  - GET /debug/mail-log             -> { items: [...] }
- */
+// server.onefile.js (TOTP con tolerancia ±30s)
 import 'dotenv/config';
 import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import { authenticator } from 'otplib';
 import qrcode from 'qrcode';
-import PDFDocument from 'pdfkit'; // (no usado aquí pero listo si luego expones /backup/pdf)
+import PDFDocument from 'pdfkit';
+
+// ✅ tolerancia de reloj: acepta códigos del paso anterior/siguiente (±30s)
+authenticator.options = { window: 1 };
 
 // ---- In‑memory store (demo) ----
-const users = new Map(); // email -> { id, email, name, twoFactorSecret?, twoFactorEnabled?, recoveryCodes? }
-const mailLog = [];      // array of { ts, mode, to, subject, htmlPreview }
-
+const users = new Map();
+const mailLog = [];
 function getUser(email, name='Admin Demo') {
   let u = users.get(email);
   if (!u) {
@@ -41,17 +35,14 @@ app.use(cors({ origin: true }));
 app.options('*', cors({ origin: true }));
 app.use(bodyParser.json({ limit: '1mb' }));
 
-// Attach "demo user" from header
 app.use((req, _res, next) => {
   const email = req.header('X-User-Email') || 'admin@mixtli.test';
   req.user = getUser(email);
   next();
 });
 
-// Health
 app.get('/', (_req, res) => res.json({ status: 'ok', app: process.env.APP_NAME || 'Mixtli Pro', time: new Date().toISOString() }));
 
-// 2FA Setup
 app.post('/security/2fa/setup', async (req, res) => {
   const user = req.user;
   const secret = authenticator.generateSecret();
@@ -61,7 +52,6 @@ app.post('/security/2fa/setup', async (req, res) => {
   res.json({ otpauth, qrDataUrl });
 });
 
-// 2FA Enable
 app.post('/security/2fa/enable', (req, res) => {
   const user = req.user;
   if (!user.twoFactorSecret) return res.status(400).json({ error: 'No hay secreto pendiente' });
@@ -73,7 +63,6 @@ app.post('/security/2fa/enable', (req, res) => {
   res.json({ enabled: true, recoveryCodes: user.recoveryCodes });
 });
 
-// Evento: Nuevo login (DRY)
 app.post('/events/login', (req, res) => {
   const user = req.user;
   const subject = 'Nuevo inicio de sesión';
@@ -82,10 +71,9 @@ app.post('/events/login', (req, res) => {
   res.json({ sent: true, dryRun: true });
 });
 
-// Mail log para la demo
 app.get('/debug/mail-log', (_req, res) => {
   res.json({ items: mailLog });
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`🧪 One‑file demo server on ${port}`));
+app.listen(port, () => console.log(`🧪 One‑file demo server (window=1) on ${port}`));
