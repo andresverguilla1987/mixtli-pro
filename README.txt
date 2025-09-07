@@ -344,3 +344,51 @@ Generado: 2025-09-07 04:24
 - Si usas **BTCPay self-hosted**, setea `storeId` y habilita webhook de `InvoiceSettled`.
 - Para **Coinbase Commerce**, valida firma `X-CC-Webhook-Signature` con tu `COINBASE_WEBHOOK_SECRET`.
 - Para **NOWPayments**, usa IPN y valida `x-nowpayments-sig` con `NOWPAYMENTS_IPN_SECRET`.
+
+
+---
+# V6.4 — Crypto FX (auto‑pricing), Depósito cripto por usuario, Recibo por email, KYC básico
+Generado: 2025-09-07 04:28
+
+## Novedades
+- **Auto‑pricing en cripto** (BTC/ETH/USDC) con función `rates-proxy` (Edge) que consulta precios y devuelve montos estimados por producto.
+- **Depósito cripto por usuario**: función `create-crypto-charge` crea un cobro con metadata (`user_id`, `intent`) para Coinbase Commerce / NOWPayments (elige proveedor). Para BTCPay puedes usar `btcpay-webhook` y un app de checkout con metadata.
+- **Recibo por email**: función `send-receipt` (Resend/SendGrid) para enviar correo de confirmación (opcional adjuntar PDF).
+- **KYC/AML básico**: campos en `profiles` (`kyc_level`, `kyc_status`) + tabla `kyc_verifications`; límites de depósito/mes por nivel y aviso en UI.
+
+## SQL extra (KYC)
+```sql
+alter table public.profiles add column if not exists kyc_level text default 'none';  -- none, basic, full
+alter table public.profiles add column if not exists kyc_status text default 'unverified'; -- unverified, pending, verified, rejected;
+
+create table if not exists public.kyc_verifications (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null,
+  level text not null,        -- basic/full
+  status text default 'pending',
+  submitted_at timestamptz default now(),
+  reviewed_at timestamptz,
+  notes text
+);
+alter table public.kyc_verifications enable row level security;
+create policy "own_kyc" on public.kyc_verifications
+  for select to authenticated using (user_id = auth.uid());
+```
+
+## Edge Functions nuevas
+- `rates-proxy`: consulta CoinGecko (o tu proveedor) y devuelve tasas para BTC, ETH, USDC en USD y opcionalmente MXN/ARS/BRL/CLP/COP/PEN.
+- `create-crypto-charge`: crea un checkout (Coinbase Commerce o NOWPayments) con metadata `user_id`, `intent='wallet_topup'|'gb_purchase'`, `sku` y `amount` (en fiat).
+- `send-receipt`: envía email de recibo (Resend/SendGrid).
+
+### Despliegue
+```bash
+supabase functions deploy rates-proxy
+supabase functions deploy create-crypto-charge
+supabase functions deploy send-receipt
+# secretos
+supabase functions secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
+supabase functions secrets set COINGECKO_API_URL=https://api.coingecko.com/api/v3/simple/price
+supabase functions secrets set COINBASE_API_KEY=xxx COINBASE_API_BASE=https://api.commerce.coinbase.com
+supabase functions secrets set NOWPAYMENTS_API_KEY=xxx NOWPAYMENTS_API_BASE=https://api.nowpayments.io/v1
+supabase functions secrets set RESEND_API_KEY=re_xxx  # o SENDGRID_API_KEY
+```

@@ -254,3 +254,71 @@
 
   loadWallet();
 })();
+
+// --- FX: estimación cripto ---
+(() => {
+  const cfg = window.CONFIG || {};
+  const fxRows = document.getElementById("fxRows");
+  if (!fxRows) return;
+
+  function activeCountry(){ return document.getElementById("countrySel")?.value || "INT"; }
+  function activeCurrency(){ const c = activeCountry(); return (cfg.billing?.currencies?.[c]) || "USD"; }
+  function productPrice(prodKey){
+    const c = activeCountry();
+    const pmap = (cfg.billing?.prices || {})[c] || {};
+    return pmap[prodKey] || 0;
+  }
+
+  async function fetchRates(amount, currency){
+    try {
+      const res = await fetch("/functions/v1/rates-proxy", { method:"POST", body: JSON.stringify({ amount, currency }) });
+      const j = await res.json();
+      if (!j.ok) throw new Error("rates error");
+      return j.out;
+    } catch(e){
+      // Fallback estático si falla
+      const usd = currency.toUpperCase()==="USD" ? amount : amount*0.055; // supón 1 local ~ 0.055 USD (dummy)
+      return { BTC: usd/60000, ETH: usd/2500, USDC: usd/1 };
+    }
+  }
+
+  async function updateFXFor(prodKey){
+    const amt = productPrice(prodKey);
+    const cur = activeCurrency();
+    if (!amt){ fxRows.innerHTML = '<div class="col-span-3 text-slate-400">Configura precios en config.js → billing.prices</div>'; return; }
+    const out = await fetchRates(amt, cur);
+    fxRows.innerHTML = "";
+    [["BTC", out.BTC],["ETH", out.ETH],["USDC", out.USDC]].forEach(([sym,val])=>{
+      const d = document.createElement("div"); d.className="rounded-md border border-white/10 bg-white/5 p-3";
+      d.textContent = `${sym}: ${val?val.toFixed(8):"—"}`;
+      fxRows.appendChild(d);
+    });
+  }
+
+  // Hook: cuando renderizamos cards, añadimos listeners para actualizar FX según producto.
+  const plans = document.getElementById("plans");
+  const observer = new MutationObserver(()=>{
+    plans.querySelectorAll(".rounded-xl").forEach(card => {
+      const label = card.querySelector(".font-semibold")?.textContent || "";
+      const key = label.toLowerCase().includes("10") ? "topup10" :
+                  label.toLowerCase().includes("50") ? "topup50" :
+                  label.toLowerCase().includes("100") ? "topup100" : "proMonthly";
+      card.addEventListener("mouseenter", ()=>updateFXFor(key));
+    });
+  });
+  observer.observe(plans, { childList:true });
+})();
+
+
+// --- KYC banner & simple limits (client-side) ---
+(() => {
+  const banner = document.createElement("div");
+  banner.className = "mt-6 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm";
+  banner.id = "kycBanner";
+  banner.innerHTML = "Límites sin verificación: hasta $2,000 MXN por mes. <button id='kycBtn' class='ml-2 underline'>Verificar identidad</button>";
+  document.querySelector("main").appendChild(banner);
+
+  document.getElementById("kycBtn").addEventListener("click", ()=>{
+    alert("Flujo de KYC pendiente: integra tu proveedor (Truora, Veriff, Stripe Identity). Guardamos status en Supabase (profiles.kyc_status).");
+  });
+})();

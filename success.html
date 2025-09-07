@@ -27,6 +27,10 @@
         <a href="dashboard.html" class="px-4 py-2 rounded-md bg-white/10 hover:bg-white/20">Ir al Dashboard</a>
         <button id="pdfBtn" class="px-4 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white">Descargar PDF</button>
       </div>
+      <div class="mt-4">
+        <button id="mailBtn" class="px-4 py-2 rounded-md bg-white/10 hover:bg-white/20">Enviar por email</button>
+        <span id="mailMsg" class="text-xs text-slate-400 ml-2"></span>
+      </div>
     </div>
   </main>
 
@@ -63,6 +67,15 @@
       let y = 40;
       lines.forEach(t => { doc.text(t, 20, y); y += 10; });
       doc.save('comprobante-mixtli.pdf');
+    });
+    document.getElementById("mailBtn").addEventListener("click", async ()=>{
+      const to = prompt("¿A qué correo te enviamos el recibo?"); if(!to) return;
+      const body = `Proveedor: ${data.provider}\nReferencia: ${data.ref}\nMonto: ${data.amount} ${data.currency}\nConcepto: ${data.concept}\nFecha: ${data.date}`;
+      try{
+        const r = await fetch("/functions/v1/send-receipt", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ to, subject:"Comprobante Mixtli", text: body }) });
+        const j = await r.json();
+        document.getElementById("mailMsg").textContent = j.ok? "Enviado ✅" : (j.error||"Error");
+      }catch(e){ document.getElementById("mailMsg").textContent = "Error"; }
     });
   </script>
 </body>
