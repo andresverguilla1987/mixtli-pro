@@ -1,86 +1,135 @@
-// server.onefile.js (demo: TOTP window=1 + force enable)
+/**
+ * server.onefile.js  (DROP‑IN multi‑adjuntos)
+ * Reemplaza tu server.onefile.js actual.
+ * Soporta /events/send-multipart, /events/send-multipart-multi y /events/send (JSON).
+ * Provider: SendGrid o SES. DRY/LIVE por env.
+ */
 import 'dotenv/config';
 import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
-import { authenticator } from 'otplib';
-import qrcode from 'qrcode';
-
-authenticator.options = { window: 1 }; // tolera +/-30s
-
-// ---- In‑memory store ----
-const users = new Map();
-const mailLog = [];
-function getUser(email, name='Admin Demo') {
-  let u = users.get(email);
-  if (!u) {
-    u = { id: 'mem-' + Math.random().toString(36).slice(2), email, name, twoFactorEnabled: false };
-    users.set(email, u);
-  }
-  return u;
-}
-function genCodes(n=10) {
-  const rnd = () => Math.random().toString(36).slice(2,6);
-  return Array.from({length:n}, () => `${rnd()}-${rnd()}-${rnd()}`);
-}
-function logMail(entry) {
-  mailLog.unshift({ ts: new Date().toISOString(), ...entry });
-  if (mailLog.length > 50) mailLog.pop();
-}
+import multer from 'multer';
 
 const app = express();
 app.use(cors({ origin: true }));
 app.options('*', cors({ origin: true }));
-app.use(bodyParser.json({ limit: '1mb' }));
+app.use(bodyParser.json({ limit: '50mb' })); // para JSON/base64
+const upload = multer({ limits: { fileSize: 40 * 1024 * 1024 } }); // 40MB por archivo
 
-app.use((req, _res, next) => {
-  const email = req.header('X-User-Email') || 'admin@mixtli.test';
-  req.user = getUser(email);
-  next();
-});
+const DRY = String(process.env.DRY_RUN_EMAIL || '') === '1';
+const provider = (process.env.MAIL_PROVIDER || '').toLowerCase();
 
-app.get('/', (_req, res) => res.json({ status: 'ok', app: process.env.APP_NAME || 'Mixtli Pro', time: new Date().toISOString() }));
+const mailLog = [];
+function recordMail(entry) {
+  mailLog.unshift({ ts: new Date().toISOString(), ...entry });
+  if (mailLog.length > 100) mailLog.pop();
+}
 
-app.post('/security/2fa/setup', async (req, res) => {
-  const user = req.user;
-  const secret = authenticator.generateSecret();
-  user.twoFactorSecret = secret;
-  const otpauth = authenticator.keyuri(user.email, process.env.TOTP_ISSUER || 'Mixtli', secret);
-  const qrDataUrl = await qrcode.toDataURL(otpauth);
-  res.json({ otpauth, qrDataUrl });
-});
-
-app.post('/security/2fa/enable', (req, res) => {
-  const user = req.user;
-  if (!user.twoFactorSecret) return res.status(400).json({ error: 'No hay secreto pendiente' });
-
-  const { code } = req.body || {};
-  const force = req.query.force === '1' || req.header('X-Demo-Force') === '1' || process.env.ALLOW_DEMO_FORCE === '1';
-
-  let ok = false;
-  if (force) {
-    ok = true; // bypass para demo
-  } else {
-    ok = authenticator.check(code || '', user.twoFactorSecret);
+async function sendMail({ to, subject, html, text, attachments }) {
+  if (DRY || !provider) {
+    recordMail({ mode: 'DRY', provider: provider || 'none', to, subject,
+      attachments: (attachments||[]).map(a=>({ filename: a.filename, size: a._size || 0, type: a.type || 'application/octet-stream' })),
+      htmlPreview: html?.slice(0, 500)
+    });
+    return { dryRun: true };
   }
+  if (provider === 'sendgrid') {
+    const sg = (await import('@sendgrid/mail')).default;
+    sg.setApiKey(process.env.SENDGRID_API_KEY);
+    const msg = {
+      to,
+      from: { email: process.env.MAIL_FROM_EMAIL, name: process.env.MAIL_FROM_NAME || 'Mixtli' },
+      subject, text, html,
+      attachments: (attachments||[]).map(a => ({
+        content: a.contentBase64 || (a.content ? Buffer.from(a.content).toString('base64') : ''),
+        filename: a.filename,
+        type: a.type || 'application/octet-stream',
+        disposition: a.disposition || 'attachment',
+        content_id: a.cid
+      }))
+    };
+    const out = await sg.send(msg);
+    recordMail({ mode: 'LIVE', provider: 'sendgrid', to, subject, count: out?.length || 1 });
+    return { sent: true };
+  }
+  if (provider === 'ses') {
+    const nodemailer = (await import('nodemailer')).default;
+    const { SESv2Client } = await import('@aws-sdk/client-sesv2');
+    const sesv2 = new SESv2Client({ region: process.env.AWS_REGION || 'us-east-1' });
+    const transporter = nodemailer.createTransport({ SES: { sesv2, aws: {} } });
+    const info = await transporter.sendMail({
+      from: `"${process.env.MAIL_FROM_NAME || 'Mixtli'}" <${process.env.MAIL_FROM_EMAIL}>`,
+      to, subject, text, html,
+      attachments: (attachments||[]).map(a => ({
+        filename: a.filename,
+        content: a.contentBase64 ? Buffer.from(a.contentBase64, 'base64') : a.content,
+        contentType: a.type || 'application/octet-stream',
+        cid: a.cid,
+        contentDisposition: a.disposition || 'attachment'
+      }))
+    });
+    recordMail({ mode: 'LIVE', provider: 'ses', to, subject, messageId: info?.messageId });
+    return { sent: true };
+  }
+  recordMail({ mode: 'DRY', provider: 'unknown', to, subject });
+  return { dryRun: true };
+}
 
-  if (!ok) return res.status(400).json({ error: 'Código inválido', force });
-  user.twoFactorEnabled = true;
-  user.recoveryCodes = genCodes(10);
-  res.json({ enabled: true, recoveryCodes: user.recoveryCodes, force });
+// Health
+app.get('/', (_req, res) => res.json({
+  status: 'ok', app: process.env.APP_NAME || 'Mixtli Pro',
+  mode: DRY ? 'DRY' : 'LIVE', provider: provider || 'none',
+  time: new Date().toISOString()
+}));
+
+// JSON send
+app.post('/events/send', async (req, res) => {
+  try {
+    const { to, subject, html, text, attachments } = req.body || {};
+    if (!to || !subject) return res.status(400).json({ error: 'to y subject son requeridos' });
+    for (const a of (attachments || [])) {
+      if (a?.contentBase64) a._size = Math.floor(a.contentBase64.length * 0.75);
+    }
+    const result = await sendMail({ to, subject, html, text, attachments });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(500).json({ error: 'send_failed', detail: String(e?.message || e) });
+  }
 });
 
-app.post('/events/login', (req, res) => {
-  const user = req.user;
-  const subject = 'Nuevo inicio de sesión';
-  const htmlPreview = `<p>Login detectado para ${user.email} en ${new Date().toLocaleString('es-MX')}</p>`;
-  logMail({ mode: 'DRY', to: user.email, subject, htmlPreview, provider: 'demo' });
-  res.json({ sent: true, dryRun: true });
+// multipart 1 archivo
+app.post('/events/send-multipart', upload.single('attachment'), async (req, res) => {
+  try {
+    const { to, subject, text, html } = req.body || {};
+    if (!to || !subject) return res.status(400).json({ error: 'to y subject son requeridos' });
+    const atts = [];
+    if (req.file) {
+      atts.push({ filename: req.file.originalname, contentBase64: Buffer.from(req.file.buffer).toString('base64'), type: req.file.mimetype, disposition: 'attachment', _size: req.file.size });
+    }
+    const result = await sendMail({ to, subject, html, text, attachments: atts });
+    res.json({ ok: true, ...result, attached: atts.map(a => ({ name: a.filename, size: a._size })) });
+  } catch (e) {
+    res.status(500).json({ error: 'send_failed', detail: String(e?.message || e) });
+  }
 });
 
-app.get('/debug/mail-log', (_req, res) => {
-  res.json({ items: mailLog });
+// multipart varios archivos
+app.post('/events/send-multipart-multi', upload.array('attachments', 10), async (req, res) => {
+  try {
+    const { to, subject, text, html } = req.body || {};
+    if (!to || !subject) return res.status(400).json({ error: 'to y subject son requeridos' });
+    const atts = (req.files || []).map(f => ({
+      filename: f.originalname, contentBase64: Buffer.from(f.buffer).toString('base64'),
+      type: f.mimetype, disposition: 'attachment', _size: f.size
+    }));
+    const result = await sendMail({ to, subject, html, text, attachments: atts });
+    res.json({ ok: true, ...result, attached: atts.map(a => ({ name: a.filename, size: a._size })) });
+  } catch (e) {
+    res.status(500).json({ error: 'send_failed', detail: String(e?.message || e) });
+  }
 });
+
+app.get('/debug/mail-log', (_req, res) => res.json({ items: mailLog }));
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`🧪 One‑file demo server (force-enable ready) on ${port}`));
+app.listen(port, () => console.log(`✉️  server.onefile.js (drop‑in multi) on ${port} mode=${DRY?'DRY':'LIVE'} provider=${provider||'none'}`));
