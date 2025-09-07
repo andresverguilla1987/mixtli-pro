@@ -27,13 +27,24 @@ serve(async (req) => {
     const amount = Math.round(Number(amountObj.value || 0) * 100);
     const custom = resource?.custom_id || resource?.invoice_id || "";
     // Se espera formato custom: "<user_id>|<sku>" o usar metadata en tu integración
-    const [user_id, sku] = (custom || "").split("|");
+    const [user_id, sku, intentRaw] = (custom || "").split("|");
+    const intent = intentRaw || 'gb_purchase';
     const gb = SKU_MAP[sku||""] || 0;
     const provider_ref = String(resource?.id || body?.id || Date.now());
 
-    if (!user_id || !gb) return new Response("ok", { status: 200 });
+    if (!user_id) return new Response("ok", { status: 200 });
 
     await db.from("profiles").upsert({ user_id }, { onConflict: "user_id" });
+
+    if (intent === 'wallet_topup') {
+      await db.from('wallets').upsert({ user_id }, { onConflict: 'user_id' });
+      const { data: w } = await db.from('wallets').select('balance_cents').eq('user_id', user_id).single();
+      const newBal = (w?.balance_cents||0) + (amount||0);
+      await db.from('wallets').update({ balance_cents: newBal, updated_at: new Date().toISOString() }).eq('user_id', user_id);
+      await db.from('wallet_ledger').insert({ user_id, type:'deposit', amount_cents:amount||0, currency, provider:'paypal', provider_ref, description:'Depósito a wallet' });
+      await db.from('purchases').insert({ user_id, provider:'paypal', provider_ref, price_id: sku||'wallet_topup', gb: 0, amount_cents: amount||0, currency });
+      return new Response('ok', { status: 200 });
+    }
     await db.from("purchases").insert({ user_id, provider:"paypal", provider_ref, price_id: sku, gb, amount_cents: amount, currency });
     const { data: prof } = await db.from("profiles").select("bonus_gb").eq("user_id", user_id).single();
     const bonus = (prof?.bonus_gb || 0) + gb;

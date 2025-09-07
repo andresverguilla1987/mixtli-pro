@@ -207,3 +207,120 @@ Generado: 2025-09-07 04:14
 
 ## Países soportados en UI (editable):
 - México (MX, MXN), Argentina (AR, ARS), Brasil (BR, BRL), Chile (CL, CLP), Colombia (CO, COP), Perú (PE, PEN), Internacional (INT, USD).
+
+
+---
+# V6.2 — Wallet (Saldo), Recibos PDF y Depósitos Bancarios
+Generado: 2025-09-07 04:20
+
+## Novedades
+- **Wallet (saldo por usuario)** con **historial** (ledger).
+- **Depósitos** (wallet top-up) vía Stripe/MercadoPago/PayPal **o transferencia bancaria** con referencia.
+- **Pagar con saldo** para comprar GB desde la UI.
+- **Página de éxito** (`success.html`) con recibo descargable **PDF**.
+- Webhooks de Stripe/MP/PayPal aceptan `metadata.intent = 'wallet_topup' | 'gb_purchase'`.
+- **SQL** ampliado: `wallets`, `wallet_ledger`, `bank_deposits` + RLS.
+- Ejemplo de **RPC** para debitar saldo y acreditar GB en una sola transacción.
+
+## SQL adicional (ejecuta en Supabase)
+```sql
+-- Wallet por usuario
+create table if not exists public.wallets (
+  user_id uuid primary key,
+  balance_cents bigint default 0,
+  currency text default 'mxn',
+  updated_at timestamptz default now(),
+  created_at timestamptz default now()
+);
+alter table public.wallets enable row level security;
+create policy "own_wallet" on public.wallets
+  for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Ledger: entradas de saldo
+create table if not exists public.wallet_ledger (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null,
+  type text not null, -- 'deposit','debit','refund','adjust'
+  amount_cents bigint not null, -- positivo para deposit/refund/adjust+, negativo para debit
+  currency text default 'mxn',
+  provider text,      -- stripe/mercadopago/paypal/bank/manual
+  provider_ref text,  -- id transacción
+  description text,
+  created_at timestamptz default now()
+);
+alter table public.wallet_ledger enable row level security;
+create policy "own_wallet_ledger" on public.wallet_ledger
+  for select to authenticated using (user_id = auth.uid());
+
+-- Depósitos bancarios manuales (para transferencias)
+create table if not exists public.bank_deposits (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null,
+  reference text not null,     -- referencia única a mostrar al cliente
+  expected_cents bigint not null,
+  currency text default 'mxn',
+  status text default 'pending', -- pending, approved, rejected
+  proof_url text,              -- opcional: recibo/imagen
+  created_at timestamptz default now(),
+  approved_at timestamptz
+);
+alter table public.bank_deposits enable row level security;
+create policy "own_bank_deposits" on public.bank_deposits
+  for select to authenticated using (user_id = auth.uid());
+
+-- RPC: compra con saldo (atómica)
+create or replace function public.buy_gb_with_wallet(p_user uuid, p_gb numeric)
+returns void language plpgsql security definer as $$
+declare
+  v_price_cents integer := ceil(p_gb * 1000); -- ejemplo: 1GB = $10.00 => ajusta a tu pricing
+  v_balance bigint;
+begin
+  -- lock wallet row
+  insert into wallets(user_id) values (p_user)
+  on conflict (user_id) do nothing;
+
+  update wallets set updated_at = now() where user_id = p_user;
+  select balance_cents into v_balance from wallets where user_id = p_user for update;
+  if v_balance is null then
+    v_balance := 0;
+  end if;
+
+  if v_balance < v_price_cents then
+    raise exception 'Saldo insuficiente';
+  end if;
+
+  -- Debita wallet
+  update wallets set balance_cents = balance_cents - v_price_cents, updated_at = now() where user_id = p_user;
+  insert into wallet_ledger(user_id, type, amount_cents, provider, description)
+    values (p_user, 'debit', -v_price_cents, 'wallet', concat('Compra de ', p_gb, ' GB'));
+
+  -- Acredita GB
+  insert into purchases(user_id, provider, provider_ref, price_id, gb, amount_cents, currency)
+    values (p_user, 'wallet', gen_random_uuid()::text, 'wallet', p_gb, v_price_cents, 'mxn');
+
+  -- Sumar a bonus_gb
+  update profiles set bonus_gb = coalesce(bonus_gb,0) + p_gb, updated_at = now() where user_id = p_user;
+end;
+$$;
+
+revoke all on function public.buy_gb_with_wallet(uuid, numeric) from public;
+grant execute on function public.buy_gb_with_wallet(uuid, numeric) to authenticated;
+```
+
+> Ajusta `v_price_cents` a tu precio por GB. O crea una tabla `sku_prices` y haz lookup.
+
+## Cambios en webhooks
+- Si `metadata.intent == 'wallet_topup'`: **no** acredita GB directo; en su lugar:
+  - upsert en `wallets`, suma `balance_cents`, añade entrada en `wallet_ledger` (`deposit`), y registra `purchases` con `provider` y `amount`.
+- Si `metadata.intent == 'gb_purchase'`: como antes, mapea `sku → GB` y acredita GB.
+
+## UI
+- **Billing** ahora muestra **Saldo** (wallet) y botón **Depositar** (Stripe/MP/PayPal/Transferencia).
+- Botón **Pagar con saldo** en cada recarga para consumir wallet y convertir a GB.
+- **success.html**: muestra detalle (proveedor, monto, referencia) y permite **Descargar PDF**.
+
+## Flujo de Transferencia (bancaria)
+1) Usuario crea solicitud de depósito → se genera `reference` única + monto esperado.
+2) Usuario transfiere con esa referencia (o sube comprobante).
+3) Admin valida y cambia `status = approved` → un job/función suma `balance_cents` y registra en `wallet_ledger`.
+4) Usuario ve saldo acreditado y puede **Pagar con saldo**.

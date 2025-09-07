@@ -20,16 +20,27 @@ serve(async (req) => {
     const user_id = meta.user_id;
     const sku: string = meta.sku || meta.price_id || "";
     const gb = SKU_MAP[sku] || Number(meta.gb || 0);
+    const intent = meta.intent || 'gb_purchase';
     const provider_ref = String(payload?.data?.id || payload?.id || Date.now());
     const currency = meta.currency || payload?.data?.currency_id || "mxn";
     const amount = Number(meta.amount || payload?.data?.transaction_amount || 0) * 100; // cents
 
-    if (!user_id || !gb) {
+    if (!user_id) {
       console.log("Missing user_id or gb; skip");
       return new Response("ok", { status: 200 });
     }
 
     await db.from("profiles").upsert({ user_id }, { onConflict: "user_id" });
+
+    if (intent === 'wallet_topup') {
+      await db.from('wallets').upsert({ user_id }, { onConflict: 'user_id' });
+      const { data: w } = await db.from('wallets').select('balance_cents').eq('user_id', user_id).single();
+      const newBal = (w?.balance_cents||0) + (amount||0);
+      await db.from('wallets').update({ balance_cents: newBal, updated_at: new Date().toISOString() }).eq('user_id', user_id);
+      await db.from('wallet_ledger').insert({ user_id, type:'deposit', amount_cents:amount||0, currency, provider:'mercadopago', provider_ref, description:'Depósito a wallet' });
+      await db.from('purchases').insert({ user_id, provider:'mercadopago', provider_ref, price_id: sku||'wallet_topup', gb: 0, amount_cents: amount||0, currency });
+      return new Response('ok', { status: 200 });
+    }
     await db.from("purchases").insert({ user_id, provider:"mercadopago", provider_ref, price_id: sku, gb, amount_cents: amount, currency });
     const { data: prof } = await db.from("profiles").select("bonus_gb").eq("user_id", user_id).single();
     const bonus = (prof?.bonus_gb || 0) + gb;

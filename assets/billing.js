@@ -96,3 +96,147 @@
 
   renderCards();
 })();
+
+// --- Wallet UI (saldo) ---
+(() => {
+  const cfg = window.CONFIG || { mode: "demo" };
+  let sb = null;
+  if (cfg.mode === "supabase" && cfg.supabaseUrl && cfg.supabaseAnonKey && window.supabase) {
+    sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+  }
+
+  const main = document.querySelector("main");
+  const walletCard = document.createElement("div");
+  walletCard.className = "mt-8 rounded-2xl border border-white/10 bg-white/5 p-5";
+  walletCard.innerHTML = `
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-semibold">Saldo (Wallet)</h2>
+        <p id="walletCur" class="text-xs text-slate-400">-</p>
+      </div>
+      <div class="text-right">
+        <div id="walletBal" class="text-2xl font-extrabold">--</div>
+        <div class="text-xs text-slate-400">Disponible</div>
+      </div>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-2">
+      <button id="walletDeposit" class="px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white">Depositar</button>
+      <button id="walletBank" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Transferencia bancaria</button>
+    </div>
+    <ul id="walletLog" class="mt-4 space-y-2 text-sm"></ul>
+  `;
+  main.appendChild(walletCard);
+
+  function fmt(amountCents, cur="MXN"){
+    const v = (amountCents||0)/100;
+    try { return new Intl.NumberFormat('es-MX', { style:'currency', currency:cur }).format(v); } catch { return v.toFixed(2) + ' ' + cur; }
+  }
+
+  async function getUser(){
+    if (sb){ const { data } = await sb.auth.getUser(); return data?.user || null; }
+    const s = JSON.parse(localStorage.getItem("mx_session")||"null"); return s? { id:"demo-user", email:s.email } : null;
+  }
+
+  async function loadWallet(){
+    const user = await getUser(); if (!user) return;
+    if (sb){
+      const { data: w } = await sb.from("wallets").select("*").eq("user_id", user.id).maybeSingle();
+      const { data: logs } = await sb.from("wallet_ledger").select("*").eq("user_id", user.id).order("created_at",{ascending:false}).limit(15);
+      const cur = w?.currency?.toUpperCase() || "MXN";
+      document.getElementById("walletCur").textContent = cur;
+      document.getElementById("walletBal").textContent = fmt(w?.balance_cents||0, cur);
+      const ul = document.getElementById("walletLog"); ul.innerHTML="";
+      (logs||[]).forEach(r=>{
+        const li=document.createElement("li"); li.className="rounded-md border border-white/10 bg-white/5 px-3 py-2 flex justify-between";
+        li.textContent = `${r.created_at} • ${r.type} • ${fmt(r.amount_cents, r.currency?.toUpperCase()||'MXN')}`;
+        ul.appendChild(li);
+      });
+    } else {
+      const cur = "MXN";
+      const bal = Number(localStorage.getItem("mx_wallet_cents")||"0");
+      document.getElementById("walletCur").textContent = cur;
+      document.getElementById("walletBal").textContent = fmt(bal, cur);
+      const ul = document.getElementById("walletLog"); ul.innerHTML="";
+      const log = JSON.parse(localStorage.getItem("mx_wallet_log")||"[]");
+      log.slice(-15).reverse().forEach(r=>{
+        const li=document.createElement("li"); li.className="rounded-md border border-white/10 bg-white/5 px-3 py-2 flex justify-between";
+        li.textContent = `${r.created_at} • ${r.type} • ${fmt(r.cents, cur)}`;
+        ul.appendChild(li);
+      });
+    }
+  }
+
+  // Depositar (elige método actual del selector de arriba y país)
+  document.getElementById("walletDeposit").addEventListener("click", ()=>{
+    // Reusar el primer card de productos para tomar href activo
+    const anyBtn = document.querySelector("#plans a[href]");
+    if (anyBtn && anyBtn.getAttribute("href")){
+      location.href = anyBtn.getAttribute("href");
+    } else {
+      alert("Configura primero tus links por país y método en config.js o usa Simular compra en DEMO.");
+    }
+  });
+
+  // Transferencia bancaria (flujo manual con referencia)
+  document.getElementById("walletBank").addEventListener("click", async ()=>{
+    const amount = prompt("¿Cuánto quieres depositar? (MXN)");
+    if (!amount) return;
+    const cents = Math.round(Number(amount) * 100);
+    const ref = Math.random().toString().slice(2,10) + "-" + Math.random().toString(36).slice(2,6).toUpperCase();
+    alert("Referencia generada: " + ref + "\\nUsa esta referencia en tu transferencia. Al confirmar, el saldo se acreditará.");
+    // DEMO: registramos pendiente en localStorage
+    if (!sb){
+      const pend = JSON.parse(localStorage.getItem("mx_bank_pend")||"[]");
+      pend.push({ ref, cents, created_at: new Date().toISOString() });
+      localStorage.setItem("mx_bank_pend", JSON.stringify(pend));
+    }
+  });
+
+  // Hook para "Simular compra" también como depósito a wallet si el método actual es 'deposit only'
+  // (dejamos el comportamiento por defecto de sumar GB en productos)
+
+  // Añade botones "Pagar con saldo" a las cards
+  setTimeout(()=>{
+    document.querySelectorAll("#plans .rounded-xl").forEach((card, idx)=>{
+      const btn = document.createElement("button");
+      btn.className = "px-3 py-2 rounded-md bg-white/10 hover:bg-white/20";
+      btn.textContent = "Pagar con saldo";
+      btn.addEventListener("click", async ()=>{
+        // Obtener GB de la tarjeta
+        const title = card.querySelector(".font-semibold")?.textContent || "";
+        const gbMatch = title.match(/(\\d+)\\s*GB/);
+        const gb = gbMatch ? Number(gbMatch[1]) : 0;
+        if (!gb) { alert("No se pudo leer los GB"); return; }
+
+        if (sb){
+          const { data: u } = await sb.auth.getUser();
+          if (!u?.user){ location.href="auth.html"; return; }
+          const { error } = await sb.rpc("buy_gb_with_wallet", { p_user: u.user.id, p_gb: gb });
+          if (error){ alert("Saldo insuficiente o error: " + error.message); return; }
+          alert("✅ Compra con saldo realizada: +" + gb + " GB");
+        } else {
+          // DEMO
+          const pricePerGB = 1000; // $10.00 por GB en centavos (ajusta)
+          const need = gb * pricePerGB;
+          let bal = Number(localStorage.getItem("mx_wallet_cents")||"0");
+          if (bal < need){ alert("Saldo insuficiente"); return; }
+          bal -= need;
+          localStorage.setItem("mx_wallet_cents", String(bal));
+          const log = JSON.parse(localStorage.getItem("mx_wallet_log")||"[]");
+          log.push({ type:"debit", cents:-need, created_at:new Date().toISOString() });
+          localStorage.setItem("mx_wallet_log", JSON.stringify(log));
+          // Acreditar GB
+          const prof = JSON.parse(localStorage.getItem("mx_profile") || '{"quota_gb":2,"bonus_gb":0,"used_bytes":0}');
+          prof.bonus_gb = (prof.bonus_gb||0) + gb;
+          localStorage.setItem("mx_profile", JSON.stringify(prof));
+          alert("✅ Compra con saldo realizada: +" + gb + " GB (DEMO)");
+        }
+        // refrescar saldo
+        loadWallet();
+      });
+      card.querySelector(".mt-2").appendChild(btn);
+    });
+  }, 100);
+
+  loadWallet();
+})();
