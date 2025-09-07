@@ -9,7 +9,7 @@ TIMEZONE="America/Mexico_City"
 ENABLE_UPDATES="1"
 FAIL2BAN="1"
 AUDITD="1"
-EMAIL_TO=""  # si configuras msmtp, añade tu correo aquí
+EMAIL_TO="stitchinucoin@gmail.com"  # alerts email
 
 run() {
   echo "[RUN] $*"

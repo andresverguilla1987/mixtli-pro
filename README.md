@@ -1,25 +1,34 @@
-# MX PRO — Alerts Helper (Fail2Ban → Email via SendGrid/msmtp)
+# MX PRO — Server Security Hardening (valores integrados)
 
-Generated: 2025-09-07T02:24:45
+Generado: 2025-09-07T02:22:07
 
-This helper script sets up **msmtp** and wires **Fail2Ban** to send emails.
-It also updates `harden_mx_pro.sh` (if present in the same directory) to set `EMAIL_TO`.
+Valores **ya integrados** (puedes cambiarlos después si quieres):
+- Usuario sudo: `deploy`
+- Puerto SSH: `2222`
+- Puertos abiertos: `80,443,3000,8080`
+- Zona horaria: `America/Mexico_City`
+- Activado: unattended-upgrades, Fail2Ban, auditd
+- Notificación Fail2Ban por correo: **preparado** (usa `extras/msmtprc.sample` + `DESTEMAIL`)
 
-## Quick start
+## Uso rápido
+**Script (single server):**
 ```bash
-unzip mx_pro_alerts_helper.zip -d mx-alerts && cd mx-alerts
+sudo bash harden_mx_pro.sh
+```
+> Aplica directo con los valores anteriores.
 
-# Example with SendGrid:
-sudo bash setup_alerts_sendgrid.sh --email tu@correo.com --api-key "SG.xxxxx" --from notificaciones@tudominio.com
-# Optional: --host smtp.sendgrid.net --port 587
-
-# Test mail:
-echo "Prueba de alertas MX PRO" | sudo sendmail -v tu@correo.com
+**Ansible (múltiples servers):**
+```bash
+cd ansible_mx_pro
+ansible-playbook -i inventory.ini playbook.yml --ask-become-pass
 ```
 
-The script will:
-- Install `msmtp` and `msmtp-mta`
-- Create `/etc/msmtprc` with your credentials
-- Symlink `sendmail` → `msmtp`
-- Update `/etc/fail2ban/jail.local` `destemail` and restart Fail2Ban
-- If `../harden_mx_pro.sh` exists, it sets `EMAIL_TO="tu@correo.com"` inside it
+## Checklist de verificación
+```bash
+sshd -T | egrep 'port|permitrootlogin|passwordauthentication|maxauthtries|maxsessions|logingracetime'
+sudo ufw status numbered
+sudo fail2ban-client status sshd || true
+sudo sysctl -a | egrep 'kptr_restrict|randomize_va_space|unprivileged_bpf_disabled|rp_filter'
+timedatectl
+systemctl is-active auditd || true
+```

@@ -6,4 +6,4 @@ timezone_str: "America/Mexico_City"
 enable_fail2ban: true
 enable_auditd: true
 enable_unattended: true
-destemail: ""
+destemail: "stitchinucoin@gmail.com"

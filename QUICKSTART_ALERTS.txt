@@ -1,0 +1,22 @@
+# MX PRO ALERTS — QUICKSTART
+
+Alert email prefilled: stitchinucoin@gmail.com
+
+## Script mode
+```bash
+sudo bash harden_mx_pro.sh
+```
+Then set up SMTP (SendGrid/msmtp):
+```bash
+sudo apt-get install -y msmtp msmtp-mta
+sudo cp extras/msmtprc.sample /etc/msmtprc && sudo chmod 600 /etc/msmtprc
+sudo ln -sf /usr/bin/msmtp /usr/sbin/sendmail
+sudo systemctl restart fail2ban
+echo "Prueba de alertas MX PRO" | sudo sendmail -v stitchinucoin@gmail.com
+```
+
+## Ansible mode
+```bash
+cd ansible_mx_pro
+ansible-playbook -i inventory.ini playbook.yml --ask-become-pass
+```
