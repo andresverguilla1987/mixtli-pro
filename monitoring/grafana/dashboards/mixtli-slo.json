@@ -1,0 +1,33 @@
+{
+  "title": "Mixtli SLO",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "Error ratio 5m",
+      "targets": [
+        {
+          "expr": "api:error_ratio:5m",
+          "legendFormat": "error_ratio"
+        }
+      ],
+      "id": 31
+    },
+    {
+      "type": "graph",
+      "title": "Fast burn (threshold)",
+      "targets": [
+        {
+          "expr": "(1 - 0.999) * 14.4",
+          "legendFormat": "threshold"
+        },
+        {
+          "expr": "api:error_ratio:5m",
+          "legendFormat": "ratio"
+        }
+      ],
+      "id": 32
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

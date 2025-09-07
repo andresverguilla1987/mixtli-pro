@@ -8,7 +8,9 @@
     "dev": "tsx watch src/server.ts",
     "seed": "tsx scripts/seed.ts",
     "prisma:generate": "prisma generate",
-    "prisma:migrate:dev": "prisma migrate dev"
+    "prisma:migrate:dev": "prisma migrate dev",
+    "lint": "eslint . --ext .ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@prisma/client": "^5.18.0",
@@ -33,6 +35,11 @@
     "prisma": "^5.18.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.16.2",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "eslint": "^9.10.0",
+    "prettier": "^3.3.3",
+    "vitest": "^2.0.5",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^2.0.16"
   }
 }
