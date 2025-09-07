@@ -482,3 +482,70 @@ create policy if not exists admin_profiles_update on public.profiles
 3) **Depósitos** → aprobar (`admin_approve_bank_deposit`) con un clic.  
    **KYC** → marcar `verified/rejected`.  
    **Reportes** → filtra por fecha y exporta CSV.
+
+
+---
+# V6.7 — Roles granulares + Búsqueda y Paginación en Admin
+Generado: 2025-09-07 04:45
+
+## Novedades
+- **Roles por sección**: `deposits`, `kyc`, `reports` (además de `is_admin`).
+- **Búsqueda** y **paginación** en tabs **Depósitos** y **KYC**, filtros en **Reportes**.
+- Tabs se **ocultan** si el usuario no tiene rol.
+
+## SQL (añadir a Supabase)
+```sql
+create table if not exists public.admin_roles(
+  email text primary key,
+  roles text[] not null default '{}'
+);
+
+create or replace function public.has_role(r text) returns boolean language sql stable as $$
+  select
+    exists(select 1 from public.admin_emails where email = auth.jwt()->>'email')
+    or exists(select 1 from public.admin_roles where email = auth.jwt()->>'email' and r = any(roles));
+$$;
+
+drop policy if exists admin_bank_deposits on public.bank_deposits;
+create policy admin_bank_deposits on public.bank_deposits
+  for select to authenticated using (public.is_admin() or public.has_role('deposits'));
+
+drop policy if exists admin_purchases on public.purchases;
+create policy admin_purchases on public.purchases
+  for select to authenticated using (public.is_admin() or public.has_role('reports'));
+
+drop policy if exists admin_wallet_ledger on public.wallet_ledger;
+create policy admin_wallet_ledger on public.wallet_ledger
+  for select to authenticated using (public.is_admin() or public.has_role('reports'));
+
+drop policy if exists admin_profiles_select on public.profiles;
+create policy admin_profiles_select on public.profiles
+  for select to authenticated using (public.is_admin() or public.has_role('kyc'));
+
+drop policy if exists admin_profiles_update on public.profiles;
+create policy admin_profiles_update on public.profiles
+  for update to authenticated using (public.is_admin() or public.has_role('kyc'))
+  with check (public.is_admin() or public.has_role('kyc'));
+
+create or replace function public.admin_approve_bank_deposit(p_ref uuid, p_amount_cents int)
+returns void language plpgsql security definer as $$
+declare v_user uuid; v_curr text;
+begin
+  if not (public.is_admin() or public.has_role('deposits')) then raise exception 'not allowed'; end if;
+  select user_id, currency into v_user, v_curr from bank_deposits where id = p_ref and status='pending' for update;
+  if v_user is null then raise exception 'deposit not found or already processed'; end if;
+  update bank_deposits set status='approved', approved_at=now() where id = p_ref;
+  insert into wallets(user_id) values (v_user) on conflict (user_id) do nothing;
+  update wallets set balance_cents = coalesce(balance_cents,0) + p_amount_cents, updated_at = now() where user_id = v_user;
+  insert into wallet_ledger(user_id, type, amount_cents, currency, provider, provider_ref, description)
+    values (v_user, 'deposit', p_amount_cents, coalesce(v_curr,'mxn'), 'bank', p_ref::text, 'Depósito bancario aprobado');
+end; $$;
+revoke all on function public.admin_approve_bank_deposit(uuid, int) from public;
+grant execute on function public.admin_approve_bank_deposit(uuid, int) to authenticated;
+
+insert into public.admin_roles(email, roles) values
+  ('deposits@tu-dominio.com', array['deposits']),
+  ('kyc@tu-dominio.com', array['kyc']),
+  ('reportes@tu-dominio.com', array['reports'])
+on conflict (email) do update set roles=excluded.roles;
+```

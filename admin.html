@@ -41,6 +41,16 @@
 
     <section id="deposits" class="tabsec mt-6 hidden">
       <h2 class="font-semibold text-lg">Transferencias pendientes</h2>
+      <div class="mt-3 grid md:grid-cols-4 gap-3 text-sm">
+        <input id="depQ" class="h-9 px-2 rounded-md bg-white/10 border border-white/10" placeholder="Buscar: ref, user, email">
+        <input id="depStart" type="date" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
+        <input id="depEnd" type="date" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
+        <div class="flex items-center gap-2">
+          <button id="depSearch" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Buscar</button>
+          <button id="depPrev" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Prev</button>
+          <button id="depNext" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Next</button>
+        </div>
+      </div>
       <div class="mt-3 overflow-x-auto rounded-xl border border-white/10">
         <table class="w-full text-sm">
           <thead class="bg-white/5">
@@ -60,6 +70,14 @@
 
     <section id="kyc" class="tabsec mt-6 hidden">
       <h2 class="font-semibold text-lg">KYC — usuarios</h2>
+      <div class="mt-3 grid md:grid-cols-3 gap-3 text-sm">
+        <input id="kycQ" class="h-9 px-2 rounded-md bg-white/10 border border-white/10" placeholder="Buscar: email o user id">
+        <div class="flex items-center gap-2">
+          <button id="kycSearch" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Buscar</button>
+          <button id="kycPrev" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Prev</button>
+          <button id="kycNext" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Next</button>
+        </div>
+      </div>
       <div class="mt-3 overflow-x-auto rounded-xl border border-white/10">
         <table class="w-full text-sm">
           <thead class="bg-white/5">
@@ -81,6 +99,19 @@
       <div class="mt-3 grid md:grid-cols-2 gap-4">
         <div class="rounded-xl border border-white/10 p-4">
           <div class="font-semibold">Compras</div>
+          <div class="mt-2 text-sm"><label>Proveedor: </label>
+            <select id="pProvider" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
+              <option value="">Todos</option>
+              <option>stripe</option>
+              <option>mercadopago</option>
+              <option>paypal</option>
+              <option>coinbase</option>
+              <option>nowpayments</option>
+              <option>btcpay</option>
+              <option>wallet</option>
+              <option>bank</option>
+            </select>
+          </div>
           <div class="mt-3 flex items-center gap-2 text-sm">
             <input id="pStart" type="date" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
             <input id="pEnd" type="date" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">

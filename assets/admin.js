@@ -5,12 +5,40 @@
     document.getElementById("modeWarn").classList.remove("hidden");
     return;
   }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
   if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
     document.getElementById("modeWarn").classList.remove("hidden");
     document.getElementById("modeWarn").innerHTML = 'Configura <b>supabaseUrl</b> y <b>supabaseAnonKey</b>.';
     return;
   }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
   const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+
+  let ROLES = { admin:false, deposits:false, kyc:false, reports:false };
+  async function loadRoles(){
+    const { data:adm } = await sb.rpc('is_admin');
+    ROLES.admin = !!adm;
+    for (const r of ['deposits','kyc','reports']){
+      const { data } = await sb.rpc('has_role', { r });
+      ROLES[r] = !!data || ROLES.admin;
+    }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
+    document.querySelector('[data-tab="deposits"]').classList.toggle('hidden', !ROLES.deposits);
+    document.getElementById('deposits').classList.toggle('hidden', !ROLES.deposits);
+    document.querySelector('[data-tab="kyc"]').classList.toggle('hidden', !ROLES.kyc);
+    document.getElementById('kyc').classList.toggle('hidden', !ROLES.kyc);
+    document.querySelector('[data-tab="reports"]').classList.toggle('hidden', !ROLES.reports);
+    document.getElementById('reports').classList.toggle('hidden', !ROLES.reports);
+  }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
 
   const tabs = document.querySelectorAll(".tab");
   const sections = document.querySelectorAll(".tabsec");
@@ -18,6 +46,9 @@
     sections.forEach(s => s.classList.toggle("hidden", s.id !== id));
     tabs.forEach(t => t.classList.toggle("bg-white/20", t.dataset.tab === id));
   }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
   tabs.forEach(t => t.addEventListener("click", () => showTab(t.dataset.tab)));
   showTab("deposits");
 
@@ -36,19 +67,46 @@
       guard.textContent = "No eres admin o faltan políticas. Pide acceso.";
       return null;
     }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
     return data.user;
   }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
 
   // --- Deposits tab ---
   const depRows = document.getElementById("depRows");
+  const depQ = document.getElementById('depQ');
+  const depStart = document.getElementById('depStart');
+  const depEnd = document.getElementById('depEnd');
+  const depSearch = document.getElementById('depSearch');
+  const depPrev = document.getElementById('depPrev');
+  const depNext = document.getElementById('depNext');
+  let depPage = 0; const DEP_SIZE = 50;
+
   async function loadDeposits(){
     depRows.innerHTML = "";
-    const { data, error } = await sb.from("bank_deposits").select("*").eq("status","pending").order("created_at",{ascending:false}).limit(100);
+    let q = sb.from('bank_deposits').select('*').eq('status','pending');
+    if (depStart.value) q = q.gte('created_at', depStart.value);
+    if (depEnd.value) q = q.lte('created_at', depEnd.value);
+    q = q.order('created_at',{ascending:false}).range(depPage*DEP_SIZE, depPage*DEP_SIZE + DEP_SIZE - 1);
+    const { data, error } = await q;
     if (error){ depRows.innerHTML = `<tr><td class="p-2 text-red-400" colspan="6">${error.message}</td></tr>`; return; }
+    const ids = (data||[]).map(d=>d.user_id).filter(Boolean);
+    let emailMap = {};
+    if (ids.length){
+      const { data: profs } = await sb.from('profiles').select('user_id,email').in('user_id', ids);
+      (profs||[]).forEach(p => emailMap[p.user_id]=p.email||'');
+    }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
     (data||[]).forEach(r => {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td class="p-2">${r.id}</td>
-        <td class="p-2">${r.user_id}</td>
+        <td class="p-2">${r.user_id}<br><span class='text-slate-400 text-xs'>${emailMap[r.user_id]||''}</span></td>
         <td class="p-2">${(r.expected_cents/100).toFixed(2)}</td>
         <td class="p-2">${(r.currency||'mxn').toUpperCase()}</td>
         <td class="p-2">${new Date(r.created_at).toLocaleString()}</td>
@@ -61,17 +119,62 @@
       });
       depRows.appendChild(tr);
     });
+    const qtxt = (depQ.value||'').trim().toLowerCase();
+    if (qtxt){
+      Array.from(depRows.children).forEach(tr=>{
+        const txt = tr.textContent.toLowerCase();
+        tr.style.display = txt.includes(qtxt) ? '' : 'none';
+      });
+    }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
     if (!data || data.length===0){
       depRows.innerHTML = `<tr><td class="p-3 text-slate-400" colspan="6">No hay pendientes.</td></tr>`;
     }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
   }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
+  depSearch.addEventListener('click', ()=>{ depPage=0; loadDeposits(); });
+  depPrev.addEventListener('click', ()=>{ if (depPage>0){ depPage--; loadDeposits(); } });
+  depNext.addEventListener('click', ()=>{ depPage++; loadDeposits(); });
 
   // --- KYC tab ---
   const kycRows = document.getElementById("kycRows");
+  const kycQ = document.getElementById('kycQ');
+  const kycSearch = document.getElementById('kycSearch');
+  const kycPrev = document.getElementById('kycPrev');
+  const kycNext = document.getElementById('kycNext');
+  let kycPage=0; const KYC_SIZE=50;
+  function isUUID(v){ return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v); }
+
   async function loadKyc(){
     kycRows.innerHTML = "";
-    const { data, error } = await sb.from("profiles").select("user_id,email,kyc_level,kyc_status").order("updated_at",{ascending:false}).limit(200);
+    let q = sb.from('profiles').select('user_id,email,kyc_level,kyc_status').order('updated_at',{ascending:false});
+    const term = (kycQ.value||'').trim();
+    if (term){
+      if (isUUID(term)) q = q.eq('user_id', term);
+      else q = q.ilike('email', '%' + term + '%');
+    }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
+    q = q.range(kycPage*KYC_SIZE, kycPage*KYC_SIZE+KYC_SIZE-1);
+    const { data, error } = await q;
     if (error){ kycRows.innerHTML = `<tr><td class="p-2 text-red-400" colspan="5">${error.message}</td></tr>`; return; }
+    const ids = (data||[]).map(d=>d.user_id).filter(Boolean);
+    let emailMap = {};
+    if (ids.length){
+      const { data: profs } = await sb.from('profiles').select('user_id,email').in('user_id', ids);
+      (profs||[]).forEach(p => emailMap[p.user_id]=p.email||'');
+    }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
     (data||[]).forEach(r => {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td class="p-2">${r.user_id}</td>
@@ -91,6 +194,9 @@
       kycRows.appendChild(tr);
     });
   }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
 
   // --- Reports tab ---
   function fmtDate(d){ return (new Date(d)).toISOString().slice(0,10); }
@@ -99,6 +205,7 @@
   const pFetch = document.getElementById("pFetch");
   const pCsv = document.getElementById("pCsv");
   const pList = document.getElementById("pList");
+  const pProvider = document.getElementById('pProvider');
 
   const wStart = document.getElementById("wStart");
   const wEnd = document.getElementById("wEnd");
@@ -114,7 +221,9 @@
   let pData = [], wData = [];
 
   pFetch.addEventListener("click", async ()=>{
-    const { data, error } = await sb.from("purchases").select("*").gte("created_at", pStart.value).lte("created_at", pEnd.value).order("created_at",{ascending:false}).limit(1000);
+    let q = sb.from('purchases').select('*').gte('created_at', pStart.value).lte('created_at', pEnd.value);
+    if (pProvider.value) q = q.eq('provider', pProvider.value);
+    const { data, error } = await q.order('created_at',{ascending:false}).limit(1000);
     if (error){ pList.innerHTML = `<li class="text-red-400">${error.message}</li>`; return; }
     pData = data||[];
     pList.innerHTML = "";
@@ -145,6 +254,9 @@
     const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
     return [cols.join(","), ...arr.map(r => cols.map(c => esc(r[c])).join(","))].join("\n");
   }
+  kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
+  kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
+  kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
   pCsv.addEventListener("click", ()=>{
     const csv = toCSV(pData);
     const blob = new Blob([csv], { type:"text/csv;charset=utf-8" });
@@ -166,7 +278,8 @@
   (async function init(){
     const u = await requireAdmin();
     if (!u) return;
-    await loadDeposits();
-    await loadKyc();
+    await loadRoles();
+    if (ROLES.deposits) await loadDeposits();
+    if (ROLES.kyc) await loadKyc();
   })();
 })();
