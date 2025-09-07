@@ -6,7 +6,7 @@
   <title>Mixtli — Inicio</title>
   <link rel="icon" href="assets/logo.svg">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config={theme:{extend:{colors:{brand:{500:'#6366F1'}}}}}</script>
+  <script>tailwind.config={theme:{extend:{colors:{brand:{500:'#6366F1',600:'#5558ee'},ok:'#22c55e',warn:'#f59e0b',danger:'#ef4444'}}}}}</script>
 </head>
 <body class="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
   <header class="border-b border-white/10 bg-slate-950/60">
@@ -18,6 +18,7 @@
       <nav class="hidden md:flex items-center gap-6 text-sm text-slate-300">
         <a href="auth.html" class="hover:text-brand-300">Prueba gratis</a>
         <a href="dashboard.html" class="hover:text-brand-300">Dashboard</a>
+        <a href="billing.html" class="hover:text-brand-300">Planes y Recargas</a>
       </nav>
       <div class="flex items-center gap-2">
         <a href="auth.html" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm">Entrar / Registrarme</a>
@@ -28,14 +29,15 @@
   <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 grid md:grid-cols-2 gap-12 items-center">
     <div class="space-y-6">
       <h1 class="text-4xl md:text-5xl font-extrabold leading-tight">Mixtli USB Cloud</h1>
-      <p class="text-slate-300 text-lg">**V5**: Carpetas + compartir con expiración + tags + portada de álbum.</p>
+      <p class="text-slate-300 text-lg">**V6**: Recargas de GB + cuotas con bloqueo de subida.</p>
       <div class="flex flex-wrap gap-3">
-        <a href="auth.html" class="px-5 py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-white font-semibold shadow-lg">Probar gratis</a>
+        <a href="auth.html" class="px-5 py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold shadow-lg">Probar gratis</a>
         <a href="dashboard.html" class="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20">Ir al Dashboard</a>
+        <a href="billing.html" class="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20">Planes y Recargas</a>
       </div>
-      <p class="text-xs text-slate-400">Lista para demos premium</p>
+      <p class="text-xs text-slate-400">Listo para monetizar</p>
     </div>
-    <div class="rounded-2xl border border-white/10 bg-white/5 p-6">Gestión por carpetas + colecciones 🔥</div>
+    <div class="rounded-2xl border border-white/10 bg-white/5 p-6">Barra de uso + compras con Stripe 💳</div>
   </main>
 </body>
 </html>

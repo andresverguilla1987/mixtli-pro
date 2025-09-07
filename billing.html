@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mixtli — Planes y Recargas</title>
+  <link rel="icon" href="assets/logo.svg">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/config.js"></script>
+  <script src="assets/billing.js" defer></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+  <header class="border-b border-white/10 bg-slate-950/60 backdrop-blur">
+    <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-3">
+        <img src="assets/logo.svg" class="h-8 w-8 rounded-xl shadow" alt="logo">
+        <span class="font-bold">Mixtli</span>
+      </a>
+      <nav class="flex items-center gap-5 text-sm">
+        <a href="dashboard.html" class="hover:underline">Dashboard</a>
+        <a href="billing.html" class="hover:underline">Planes y Recargas</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10">
+    <h1 class="text-3xl font-extrabold">Planes y Recargas</h1>
+    <p class="text-slate-300 mt-1">Compra GB extra o suscríbete a un plan.</p>
+
+    <div id="plans" class="mt-6 grid md:grid-cols-4 gap-4"></div>
+
+    <div class="mt-10 rounded-2xl border border-white/10 bg-white/5 p-5">
+      <h2 class="font-semibold">Historial de compras</h2>
+      <ul id="purchaseList" class="mt-3 space-y-2 text-sm"></ul>
+    </div>
+  </main>
+</body>
+</html>
