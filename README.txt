@@ -726,3 +726,59 @@ revoke all on function public.admin_set_kyc_status(uuid, text, text) from public
 grant execute on function public.admin_set_kyc_status(uuid, text, text) to authenticated;
 ```
 > Ajusta `admin_role_limits` según tus políticas internas.
+
+
+---
+# V6.9 — OTP 2FA, XLSX + Gráficas, Alertas Slack
+Generado: 2025-09-07 04:53
+
+## Novedades
+- **OTP 2FA por email** para aprobar/finalizar depósitos por encima del umbral.
+- **Exportación XLSX** y **gráficas** (ingresos por mes, split por proveedor) en Reportes.
+- **Alertas Slack** cuando hay `pending_second`, `approved` o `rejected`.
+
+## SQL extra (OTP)
+```sql
+create extension if not exists pgcrypto;
+create table if not exists public.admin_otps(
+  actor_email text not null,
+  code_hash text not null,
+  expires_at timestamptz not null,
+  used boolean default false,
+  created_at timestamptz default now()
+);
+create index if not exists admin_otps_idx on public.admin_otps(actor_email, expires_at) where used=false;
+
+create or replace function public.admin_check_otp(p_code text) returns boolean
+language plpgsql security definer as $$
+declare v_email text; v_hash text; v_expires timestamptz; v_id timestamptz; ok boolean; begin
+  v_email := auth.jwt()->>'email';
+  if v_email is null then return false; end if;
+  select code_hash, expires_at into v_hash, v_expires
+  from admin_otps
+  where actor_email = v_email and used=false
+  order by created_at desc limit 1;
+  if v_hash is null then return false; end if;
+  ok := encode(digest(p_code, 'sha256'), 'hex') = v_hash and now() < v_expires;
+  if ok then
+    update admin_otps set used=true where actor_email=v_email and code_hash=v_hash;
+  end if;
+  return ok;
+end; $$;
+revoke all on function public.admin_check_otp(text) from public;
+grant execute on function public.admin_check_otp(text) to authenticated;
+```
+> OTP se envía con Edge Function `send-otp` (usa Resend) y guarda sólo **hash** y **expiry** (5 min por defecto).
+
+## Edge Functions nuevas
+- `send-otp` — genera código, guarda hash y lo envía por email (Resend).
+- `slack-notify` — envía un payload a Slack (Incoming Webhook).
+
+### Despliegue
+```bash
+supabase functions deploy send-otp slack-notify
+
+supabase functions secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
+supabase functions secrets set RESEND_API_KEY=re_xxx
+supabase functions secrets set SLACK_WEBHOOK_URL=https://hooks.slack.com/services/XXX/YYY/ZZZ
+```

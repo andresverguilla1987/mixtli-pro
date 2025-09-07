@@ -118,9 +118,24 @@
       tr.querySelector(".approve").addEventListener("click", async ()=>{
         if (!confirm("¿Aprobar este depósito?")) return;
         // Primera aprobación (o final si no requiere dual)
-        if (isSecond){
+                // OTP gate for high amounts
+        const { data: lim } = await sb.rpc('get_deposit_limits');
+        const needOtp = (r.expected_cents||0) >= (lim?.dual_required_above_cents || 0);
+        let okOtp = true;
+        if (needOtp){
+          const { data:u } = await sb.auth.getUser();
+          const email = u?.user?.email;
+          if (!email){ alert('Sesión inválida'); return; }
+          await sendOTP(email);
+          const code = prompt('Se envió un código a tu email. Ingrésalo:');
+          if (!code){ return; }
+          okOtp = await checkOTP(sb, code);
+          if (!okOtp){ alert('OTP incorrecto/expirado'); return; }
+        }
+if (isSecond){
           const { data: res2, error: e2 } = await sb.rpc('admin_finalize_bank_deposit', { p_ref: r.id });
           if (e2){ alert(e2.message); return; }
+          slack(`Depósito ${r.id} aprobado (dual)`);
         } else {
           const { data: res1, error: err1 } = await sb.rpc('admin_approve_bank_deposit_v2', { p_ref: r.id });
           if (err1){ alert(err1.message); return; }
@@ -129,12 +144,16 @@
         if (err1){ alert(err1.message); return; }
         if (res1 === 'pending_second'){
           alert('Primera aprobación registrada. Requiere segunda aprobación.');
+          slack(`Depósito ${r.id} pasó a pending_second • ${(r.expected_cents/100).toFixed(2)} ${(r.currency||'MXN').toUpperCase()}`);
+        } else {
+          slack(`Depósito ${r.id} aprobado (single) • ${(r.expected_cents/100).toFixed(2)} ${(r.currency||'MXN').toUpperCase()}`);
         }
         loadDeposits();
       });
       tr.querySelector('.reject').addEventListener('click', async ()=>{
         const reason = prompt('Motivo del rechazo:'); if (!reason) return;
         const { error: err } = await sb.rpc('admin_reject_bank_deposit', { p_ref: r.id, p_reason: reason });
+        if (!err){ slack(`Depósito ${r.id} rechazado: ${reason}`); }
         if (err){ alert(err.message); return; }
         loadDeposits();
       });
@@ -226,6 +245,11 @@
   const pEnd = document.getElementById("pEnd");
   const pFetch = document.getElementById("pFetch");
   const pCsv = document.getElementById("pCsv");
+  const pXlsxBtn = document.createElement('button');
+  pXlsxBtn.id = 'pXlsx'; pXlsxBtn.className = 'px-3 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white ml-2';
+  pXlsxBtn.textContent = 'Exportar XLSX';
+  pCsv.parentElement?.appendChild(pXlsxBtn);
+
   const pList = document.getElementById("pList");
   const pProvider = document.getElementById('pProvider');
   const pZip = document.getElementById('pZip');
@@ -256,6 +280,8 @@
       pList.appendChild(li);
     });
     if (pData.length===0) pList.innerHTML = '<li class="text-slate-400">Sin resultados</li>';
+    // Charts
+    try{ renderCharts(pData); }catch(e){}
   });
 
   wFetch.addEventListener("click", async ()=>{
@@ -336,3 +362,70 @@
     a.download = 'recibos.zip';
     a.click();
   });
+
+
+// --- OTP helpers & Slack notify ---
+async function sendOTP(email){
+  try{
+    const r = await fetch('/functions/v1/send-otp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ to: email }) });
+    const j = await r.json(); return !!j.ok;
+  }catch(e){ return false; }
+}
+async function checkOTP(sb, code){
+  const { data, error } = await sb.rpc('admin_check_otp', { p_code: String(code||'') });
+  if (error) return false; return !!data;
+}
+async function slack(text){
+  try{ await fetch('/functions/v1/slack-notify', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text }) }); }catch(e){}
+}
+
+  // XLSX export
+  document.getElementById('pXlsx')?.addEventListener('click', ()=>{
+    if (!pData || !pData.length){ alert('Carga primero compras.'); return; }
+    const rows = pData.map(r => ({
+      created_at: r.created_at,
+      user_id: r.user_id,
+      provider: r.provider,
+      gb: r.gb,
+      amount: (r.amount_cents||0)/100,
+      currency: (r.currency||'mxn').toUpperCase(),
+      provider_ref: r.provider_ref
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'purchases');
+    XLSX.writeFile(wb, 'purchases.xlsx');
+  });
+
+function renderCharts(rows){
+  const byMonth = {};
+  const byProv = {};
+  rows.forEach(r => {
+    const m = (r.created_at||'').slice(0,7);
+    const amt = (r.amount_cents||0)/100;
+    byMonth[m] = (byMonth[m]||0) + amt;
+    byProv[r.provider||''] = (byProv[r.provider||'']||0) + amt;
+  });
+  const mLabels = Object.keys(byMonth).sort();
+  const mData = mLabels.map(k => byMonth[k]);
+  const pLabels = Object.keys(byProv);
+  const pData = pLabels.map(k => byProv[k]);
+
+  const ctx1 = document.getElementById('revByMonth')?.getContext('2d');
+  const ctx2 = document.getElementById('revByProvider')?.getContext('2d');
+  if (!ctx1 || !ctx2) return;
+
+  if (window._c1) window._c1.destroy();
+  if (window._c2) window._c2.destroy();
+
+  window._c1 = new Chart(ctx1, {
+    type: 'line',
+    data: { labels: mLabels, datasets: [{ label: 'Ingresos', data: mData }] },
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+  });
+  window._c2 = new Chart(ctx2, {
+    type: 'bar',
+    data: { labels: pLabels, datasets: [{ label: 'Por proveedor', data: pData }] },
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+  });
+}
