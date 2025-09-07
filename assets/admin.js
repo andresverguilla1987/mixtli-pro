@@ -268,6 +268,9 @@ if (isSecond){
   const pProvider = document.getElementById('pProvider');
   const pZip = document.getElementById('pZip');
   const pXlsxAll = document.getElementById('pXlsxAll');
+  const normalizeMxn = document.getElementById('normalizeMxn');
+  const pivotCountry = document.getElementById('pivotCountry');
+  const auditZipBtn = document.getElementById('auditZip');
 
   const wStart = document.getElementById("wStart");
   const wEnd = document.getElementById("wEnd");
@@ -286,6 +289,12 @@ if (isSecond){
     let q = sb.from('purchases').select('*').gte('created_at', pStart.value).lte('created_at', pEnd.value);
     if (pProvider.value) q = q.eq('provider', pProvider.value);
     const { data, error } = await q.order('created_at',{ascending:false}).limit(1000);
+    // FX normalization
+    let rates = {};
+    if (normalizeMxn.checked){ const { data:fx } = await sb.from('fx_rates').select('*'); (fx||[]).forEach(r=>rates[(r.currency||'').toUpperCase()]=Number(r.rate_to_mxn||1)); }
+    // Country map from profiles
+    const uids = Array.from(new Set((data||[]).map(r=>r.user_id))).filter(Boolean);
+    let countryMap = {}; if (pivotCountry.checked && uids.length){ const { data: pf } = await sb.from('profiles').select('user_id,country').in('user_id', uids); (pf||[]).forEach(p=>countryMap[p.user_id]=p.country||''); }
     if (error){ pList.innerHTML = `<li class="text-red-400">${error.message}</li>`; return; }
     pData = data||[];
     pList.innerHTML = "";
@@ -605,3 +614,24 @@ tenantSel?.addEventListener('change', applyBrand);
   });
 
   tenantSel?.addEventListener('change', refreshTeams);
+
+  // Audit ZIP export
+  auditZipBtn?.addEventListener('click', async ()=>{
+    const { data: acts, error } = await sb.from('admin_actions').select('*').gte('created_at', pStart.value).lte('created_at', pEnd.value).limit(5000);
+    if (error){ alert(error.message); return; }
+    function toCSV(rows){
+      const cols = ['id','created_at','actor_email','entity','action','ref_id','amount_cents','currency','details','sig'];
+      const head = cols.join(',');
+      const body = (rows||[]).map(r => cols.map(k => {
+        let v = r[k]; if (typeof v === 'object' && v !== null) v = JSON.stringify(v);
+        if (v === null || v === undefined) v = '';
+        const s = String(v).replace(/"/g,'""');
+        return '"' + s + '"';
+      }).join(',')).join('\n');
+      return head + '\n' + body;
+    }
+    const csv = toCSV(acts||[]);
+    const zip = new JSZip(); zip.file('admin_actions.csv', csv);
+    const blob = await zip.generateAsync({ type:'blob' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'audit_logs.zip'; a.click();
+  });

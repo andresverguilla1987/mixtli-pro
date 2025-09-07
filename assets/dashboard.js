@@ -101,3 +101,5 @@ document.getElementById('dlCohorts')?.addEventListener('click', ()=>{
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'cohorts');
   XLSX.writeFile(wb, 'cohorts.xlsx');
 });
+
+// FX normalization in dashboard (optional minimal: use fx_rates to display in MXN already)

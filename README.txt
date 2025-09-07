@@ -1080,3 +1080,130 @@ grant execute on function public.team_can_spend(uuid, bigint) to authenticated;
 ```bash
 supabase functions deploy slack-notify discord-notify
 ```
+
+
+---
+# V7.3 — Enforced team limits, Embeds pro, FX normalization, Audit export
+Generado: 2025-09-07 05:09
+
+## Novedades
+- **Enforcement server-side** de límites por team (triggers en `wallet_ledger` y `purchases`).
+- **Embeds pro** en Slack/Discord desde la cola de `jobs` (payload rico con colores y campos).
+- **Normalización FX** (MXN) en Reportes/Dashboard con tabla `fx_rates`.
+- **Export Auditoría (ZIP)** de `admin_actions` por rango/tenant con hash de integridad (HMAC).
+
+## SQL — Enforcement y FX
+```sql
+-- FX rates simples (manual o job de actualización)
+create table if not exists public.fx_rates(
+  currency text primary key,
+  rate_to_mxn numeric not null,             -- 1 unidad de currency = X MXN
+  updated_at timestamptz default now()
+);
+
+create or replace function public.fx_to_mxn(p_currency text, p_amount_cents bigint) returns bigint
+language sql stable as $$
+  select ceil( coalesce(p_amount_cents,0) * coalesce((select rate_to_mxn from fx_rates where upper(currency)=upper(p_currency)), 1)::numeric );
+$$;
+revoke all on function public.fx_to_mxn(text, bigint) from public;
+grant execute on function public.fx_to_mxn(text, bigint) to authenticated;
+
+-- Enforce en wallet_ledger: bloquea si team excede límite
+create or replace function public.enforce_team_limit_wallet() returns trigger
+language plpgsql as $$
+begin
+  if NEW.team_id is not null and NEW.type in ('spend','purchase') then
+    if not public.team_can_spend(NEW.team_id, NEW.amount_cents) then
+      raise exception 'team monthly limit exceeded';
+    end if;
+  end if;
+  return NEW;
+end; $$;
+drop trigger if exists trg_enforce_wallet on public.wallet_ledger;
+create trigger trg_enforce_wallet before insert on public.wallet_ledger
+for each row execute function public.enforce_team_limit_wallet();
+
+-- Enforce en purchases: previo a crear compra
+create or replace function public.enforce_team_limit_purchase() returns trigger
+language plpgsql as $$
+begin
+  if NEW.team_id is not null then
+    if not public.team_can_spend(NEW.team_id, NEW.amount_cents) then
+      raise exception 'team monthly limit exceeded';
+    end if;
+  end if;
+  return NEW;
+end; $$;
+drop trigger if exists trg_enforce_purchase on public.purchases;
+create trigger trg_enforce_purchase before insert on public.purchases
+for each row execute function public.enforce_team_limit_purchase();
+```
+
+## SQL — Auditoría firmada (HMAC en DB)
+```sql
+create extension if not exists pgcrypto;
+
+-- Secreto HMAC (guárdalo y restringe acceso)
+create table if not exists public.audit_secret(
+  id boolean primary key default true,
+  secret text not null
+);
+-- Setea tu secreto: insert into audit_secret(secret) values ('cambia_estO_!'); on conflict (id) do update set secret=excluded.secret;
+
+-- Firma HMAC-SHA256 sobre (actor|entity|action|ref|timestamp|details)
+create or replace function public.audit_sign(p_actor text, p_entity text, p_action text, p_ref uuid, p_created timestamptz, p_details jsonb)
+returns text language sql stable as $$
+  select encode(hmac(
+    coalesce(p_actor,'') || '|' || coalesce(p_entity,'') || '|' || coalesce(p_action,'') || '|' ||
+    coalesce(p_ref::text,'') || '|' || coalesce(p_created::text,'') || '|' || coalesce(p_details::text,''),
+    (select secret from audit_secret limit 1),
+    'sha256'
+  ), 'hex');
+$$;
+
+alter table public.admin_actions add column if not exists sig text;
+create or replace function public.audit_backfill_sign() returns void language plpgsql as $$
+declare r record; begin
+  for r in select * from admin_actions loop
+    update admin_actions set sig = public.audit_sign(r.actor_email, r.entity, r.action, r.ref_id, r.created_at, r.details)
+    where id = r.id;
+  end loop;
+end; $$;
+```
+
+## Jobs — Embeds pro
+```sql
+-- Ajusta el trigger de depósitos para meter payloads ricos
+create or replace function public.enqueue_deposit_job() returns trigger language plpgsql as $$
+declare txt text; clr text; begin
+  if TG_OP = 'UPDATE' and NEW.status <> OLD.status then
+    if NEW.status = 'pending_second' then
+      txt := 'Depósito '||NEW.id||' requiere 2da aprobación';
+      clr := '#f59e0b';
+    elsif NEW.status = 'approved' then
+      txt := 'Depósito '||NEW.id||' aprobado';
+      clr := '#10b981';
+    elsif NEW.status = 'rejected' then
+      txt := 'Depósito '||NEW.id||' rechazado';
+      clr := '#ef4444';
+    end if;
+    if txt is not null then
+      insert into jobs(topic, payload) values ('slack', jsonb_build_object(
+        'text', txt,
+        'attachments', jsonb_build_array(jsonb_build_object('color', clr, 'fields', jsonb_build_array(
+          jsonb_build_object('title','User','value', coalesce(NEW.user_id::text,''),'short',true),
+          jsonb_build_object('title','Monto','value', (NEW.expected_cents/100)::text || ' ' || upper(coalesce(NEW.currency,'mxn')),'short',true)
+        )))
+      ));
+      insert into jobs(topic, payload) values ('discord', jsonb_build_object(
+        'content', txt,
+        'embeds', jsonb_build_array(jsonb_build_object('color', 5814783, 'fields', jsonb_build_array(
+          jsonb_build_object('name','User','value', coalesce(NEW.user_id::text,'')),
+          jsonb_build_object('name','Monto','value', (NEW.expected_cents/100)::text || ' ' || upper(coalesce(NEW.currency,'mxn')))
+        )))
+      ));
+    end if;
+  end if;
+  return NEW;
+end; $$;
+```
