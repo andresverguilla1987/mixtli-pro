@@ -1,10 +1,5 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="g" x1="0" x2="1">
-      <stop offset="0%" stop-color="#22D3EE"/>
-      <stop offset="100%" stop-color="#6366F1"/>
-    </linearGradient>
-  </defs>
+  <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0%" stop-color="#22D3EE"/><stop offset="100%" stop-color="#6366F1"/></linearGradient></defs>
   <rect rx="112" ry="112" width="512" height="512" fill="#0F172A"/>
   <g transform="translate(80,80)">
     <circle cx="176" cy="176" r="160" fill="url(#g)" opacity="0.15"/>

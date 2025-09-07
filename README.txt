@@ -1,21 +1,22 @@
-# Mixtli — Landing PRO (Static, drag & drop)
+# Mixtli — Landing con **Prueba Gratis** (Netlify Forms)
+Generado: 2025-09-07 02:50
 
-Generado: 2025-09-07 02:43
+Esta versión viene con:
+- Botón **“Probar gratis”** enlazado a `/trial.html`
+- Formulario **Netlify Forms** que captura leads (nombre, email, uso previsto)
+- Redirección automática a `/gracias.html` tras enviar
+- Protección `honeypot` anti‑spam
+- `netlify.toml` listo (no requiere build)
 
-Listo para arrastrar a **Netlify**, **Vercel (static)**, **Render (static)** o subir a cualquier hosting (Nginx/Apache).
-No requiere build. Solo `index.html` + CDN.
+## Publicar
+1) Entra a app.netlify.com → **Add new site** → **Deploy manually**.
+2) Arrastra **`mixtli-landing-trial-netlify.zip`** (o extrae y arrastra la carpeta).
+3) Ve a **Forms** en Netlify para ver envíos. Activa notificaciones por email/Slack si quieres.
 
-## Cómo publicar (Netlify)
-1. Entra a app.netlify.com → **Sites** → **Add new site** → **Deploy manually**.
-2. Arrastra `mixtli-landing-pro.zip` o extrae y arrastra la carpeta completa.
-3. Listo. (Si te pide build, selecciona **no build** o **Static**).
+## Webhooks / Automatización
+- En Netlify → **Forms** → `trial` → **Notifications** → **Outgoing webhooks**.
+- Ahí pones tu URL (ej. Zapier/Make) para crear cuentas de prueba automáticamente.
 
-## Cómo publicar (Render Static)
-1. Crea **Static Site** → selecciona **drag & drop**.
-2. Sube los archivos (carpeta o ZIP).
-
-## Personaliza
-- Edita enlaces de los botones en `index.html` (`data-links`).
-- Cambia textos en el bloque de idiomas `i18nContent`.
-- Logo: reemplaza `assets/logo.svg` por el tuyo.
-
+## Personalizar
+- Cambia links en `index.html` (objeto `links`).
+- Textos del form en `trial.html`.

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prueba gratis — Mixtli</title>
+  <link rel="icon" href="assets/logo.svg">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
+  <header class="border-b border-white/10 bg-slate-950/60">
+    <div class="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-3">
+        <img src="assets/logo.svg" class="h-8 w-8 rounded-xl shadow" alt="logo">
+        <span class="font-bold">Mixtli</span>
+      </a>
+      <a href="index.html" class="text-sm text-slate-300 hover:text-white">Volver</a>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 py-12">
+    <h1 class="text-3xl font-extrabold">Activa tu prueba gratis</h1>
+    <p class="text-slate-300 mt-2">Déjanos tus datos y te activamos acceso en minutos.</p>
+
+    <!-- Netlify Forms: name='trial' -->
+    <form name="trial" method="POST" data-netlify="true" netlify-honeypot="bot-field" action="/gracias.html" class="mt-8 grid gap-4">
+      <input type="hidden" name="form-name" value="trial">
+      <p class="hidden"><label>No llenar: <input name="bot-field"></label></p>
+
+      <label class="grid gap-2 text-sm">Nombre completo
+        <input name="name" required class="h-11 w-full px-4 rounded-md bg-white/10 border border-white/10 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand-500" placeholder="Tu nombre" />
+      </label>
+      <label class="grid gap-2 text-sm">Correo
+        <input type="email" name="email" required class="h-11 w-full px-4 rounded-md bg-white/10 border border-white/10 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand-500" placeholder="tu@correo.com" />
+      </label>
+      <label class="grid gap-2 text-sm">¿Para qué lo usarás?
+        <select name="usecase" class="h-11 w-full px-4 rounded-md bg-white/10 border border-white/10 outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="personal">Personal</option>
+          <option value="equipo">Equipo</option>
+          <option value="escuela">Escuela</option>
+          <option value="negocio">Negocio</option>
+        </select>
+      </label>
+      <label class="grid gap-2 text-sm">Mensaje (opcional)
+        <textarea name="message" rows="4" class="w-full px-4 py-3 rounded-md bg-white/10 border border-white/10 outline-none focus:ring-2 focus:ring-brand-500" placeholder="Cuéntanos qué necesitas"></textarea>
+      </label>
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input type="checkbox" required class="accent-brand-500"> Acepto los <a href="#" class="underline">Términos</a> y <a href="#" class="underline">Privacidad</a>.
+      </label>
+
+      <button class="h-11 rounded-md bg-brand-500 hover:bg-brand-400 text-white font-semibold">Enviar solicitud</button>
+      <p class="text-xs text-slate-400">Recibirás confirmación por correo. También puedes escribirnos directo a soporte@mixtli.mx</p>
+    </form>
+  </main>
+</body>
+</html>
