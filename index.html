@@ -2,48 +2,38 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Mixtli – Demo Seguridad & Notificaciones (Hosted)</title>
+  <title>Mixtli – Demo Seguridad & Notificaciones (Hosted, force-enable)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Demo en vivo de 2FA + notificaciones (login, 2FA activado, reset completado) con modo DRY-RUN.">
   <style>
-    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0b1220; color:#e6edf3; margin:0; }
-    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .card { background: #111827; border:1px solid #1f2937; border-radius: 14px; padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.28); }
-    h1 { font-size: 24px; margin: 0 0 16px; }
-    h2 { font-size: 18px; margin: 0 0 12px; }
-    button { background:#2563eb; border:none; color:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; }
-    button:disabled { background:#374151; cursor:not-allowed; }
-    input { width:100%; padding:10px; border-radius:10px; border:1px solid #374151; background:#0b1220; color:#e6edf3; }
-    .muted { color:#9ca3af; font-size:13px; }
-    .log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; background:#0b1220; color:#93c5fd; border:1px solid #1f2937; padding:8px; border-radius:10px; height:220px; overflow:auto; }
-    .row { display:flex; gap:8px; align-items:center; }
-    .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #374151; }
-    .ok { color:#22c55e; }
-    a { color:#93c5fd; }
-    .tips { font-size:12px; color:#9ca3af; margin-top:8px; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0b1220;color:#e6edf3;margin:0}
+    .wrap{max-width:980px;margin:24px auto;padding:0 16px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .card{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.28)}
+    h1{font-size:24px;margin:0 0 16px}h2{font-size:18px;margin:0 0 12px}
+    button{background:#2563eb;border:none;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+    button:disabled{background:#374151;cursor:not-allowed}
+    input{width:100%;padding:10px;border-radius:10px;border:1px solid #374151;background:#0b1220;color:#e6edf3}
+    .muted{color:#9ca3af;font-size:13px}
+    .log{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:#0b1220;color:#93c5fd;border:1px solid #1f2937;padding:8px;border-radius:10px;height:220px;overflow:auto}
+    .row{display:flex;gap:8px;align-items:center}.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #374151}.ok{color:#22c55e}
+    .ghost{background:#6b7280}
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Mixtli – Seguridad & Notificaciones (Demo Hosted)</h1>
-    <p class="muted">Sirve en GitHub Pages. Para evitar bloqueo por "mixed content", usa un backend <b>HTTPS</b> (p. ej., tu Render).</p>
-
     <div class="card" style="margin-bottom:16px;">
       <div class="row" style="gap:12px;">
         <div style="flex:1">
           <label class="muted">Base URL (HTTPS)</label>
-          <input id="baseUrl" placeholder="https://mixtli-pro.onrender.com" />
-          <div class="tips">También puedes pasar <span class="mono">?base=https://tu-api</span> en la URL.</div>
+          <input id="baseUrl" placeholder="https://mixtli-pro.onrender.com/"/>
+          <div class="muted">Pro tip: agrega <code>?base=https://tu-api/</code> a la URL.</div>
         </div>
         <div style="flex:1">
           <label class="muted">Usuario (X-User-Email)</label>
           <input id="userEmail" value="admin@mixtli.test"/>
         </div>
-        <div>
-          <button onclick="savePrefs()">Guardar</button>
-        </div>
+        <div><button onclick="savePrefs()">Guardar</button></div>
       </div>
     </div>
 
@@ -63,14 +53,15 @@
           <button onclick="setup2fa()">Generar QR</button>
           <span id="setupStatus" class="pill"></span>
         </div>
-        <img id="qr" style="max-width:100%; display:none; border:1px solid #374151; border-radius:10px; margin-top:8px;"/>
+        <img id="qr" style="max-width:100%;display:none;border:1px solid #374151;border-radius:10px;margin-top:8px"/>
       </div>
 
       <div class="card">
         <h2>3) 2FA – Enable</h2>
         <input id="totp" placeholder="Código de 6 dígitos"/>
-        <div class="row" style="margin-top:8px;">
+        <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
           <button onclick="enable2fa()">Confirmar</button>
+          <button class="ghost" onclick="enable2faForce()" title="Bypass de demo">Forzar (demo)</button>
           <span id="enableStatus" class="pill"></span>
         </div>
         <div class="muted" id="codesInfo"></div>
@@ -82,7 +73,7 @@
           <button onclick="sendLogin()">Enviar</button>
           <span id="mailStatus" class="pill"></span>
         </div>
-        <div class="tips">Con <b>DRY_RUN_EMAIL=1</b> no salen correos reales; consulta el log.</div>
+        <div class="muted">Con <b>DRY_RUN_EMAIL=1</b> no salen correos reales; consulta el log.</div>
       </div>
 
       <div class="card">
@@ -97,89 +88,108 @@
   </div>
 
 <script>
-function getParam(name) {
-  const url = new URL(window.location.href);
-  return url.searchParams.get(name);
+// --- Helpers
+function getParam(name){const url=new URL(window.location.href);return url.searchParams.get(name);}
+function normBase(val){
+  if(!val) return '';
+  val = val.trim();
+  // quita comentarios o textos extras
+  val = val.replace(/\s*\(.*\)\s*$/,'');
+  if(!val.endsWith('/')) val+='/';
+  return val;
 }
-function loadPrefs() {
+function loadPrefs(){
   const fromQuery = getParam('base');
-  const base = fromQuery || localStorage.getItem('baseUrl') || 'https://mixtli-pro.onrender.com';
-  const email = localStorage.getItem('userEmail') || 'admin@mixtli.test';
+  const base = normBase(fromQuery || localStorage.getItem('baseUrl') || 'https://mixtli-pro.onrender.com/');
   document.getElementById('baseUrl').value = base;
-  document.getElementById('userEmail').value = email;
+  document.getElementById('userEmail').value = localStorage.getItem('userEmail') || 'admin@mixtli.test';
 }
-function savePrefs() {
-  localStorage.setItem('baseUrl', document.getElementById('baseUrl').value);
+function savePrefs(){
+  localStorage.setItem('baseUrl', normBase(document.getElementById('baseUrl').value));
   localStorage.setItem('userEmail', document.getElementById('userEmail').value);
   alert('Guardado');
 }
-function headers() {
-  return { 'Content-Type': 'application/json', 'X-User-Email': document.getElementById('userEmail').value || 'admin@mixtli.test' };
+function headers(){
+  return {'Content-Type':'application/json','X-User-Email':document.getElementById('userEmail').value||'admin@mixtli.test'};
 }
-function url(path) {
-  const base = document.getElementById('baseUrl').value.replace(/\/$/,''); 
-  if (!base.startsWith('https://')) {
-    alert('Para GitHub Pages usa un backend HTTPS (Render, Railway, ngrok https).');
-  }
+function url(path){
+  const base = normBase(document.getElementById('baseUrl').value).replace(/\/$/,'');
+  if(!base.startsWith('https://')) alert('Para hosted usa backend HTTPS.');
   return base + path;
 }
-async function ping() {
-  const el = document.getElementById('pingStatus');
-  el.textContent = '→ consultando...'; el.className='pill';
-  try {
-    const r = await fetch(url('/'));
-    const j = await r.json().catch(()=>({}));
-    el.textContent = r.ok ? '✓ OK: ' + (j.app || 'Mixtli Pro') : 'Error ' + r.status;
-    el.className = 'pill ' + (r.ok ? 'ok' : '');
-  } catch (e) { el.textContent = 'Error: ' + e.message; }
+
+// --- Actions
+async function ping(){
+  const el=document.getElementById('pingStatus'); el.textContent='→ consultando...'; el.className='pill';
+  try{
+    const r=await fetch(url('/'));
+    const j=await r.json().catch(()=>({}));
+    el.textContent=r.ok?('✓ OK: '+(j.app||'Mixtli Pro')):('Error '+r.status);
+    el.className='pill '+(r.ok?'ok':'');
+  }catch(e){el.textContent='Error: '+e.message;}
 }
-async function setup2fa() {
-  const el = document.getElementById('setupStatus');
-  el.textContent = '→ generando...'; el.className='pill';
-  try {
-    const r = await fetch(url('/security/2fa/setup'), { method:'POST', headers: headers() });
-    const j = await r.json();
-    if (j.qrDataUrl) {
-      const img = document.getElementById('qr');
-      img.src = j.qrDataUrl; img.style.display='block';
+
+async function setup2fa(){
+  const el=document.getElementById('setupStatus'); el.textContent='→ generando...'; el.className='pill';
+  try{
+    const r=await fetch(url('/security/2fa/setup'),{method:'POST',headers:headers()});
+    const j=await r.json();
+    if(j.qrDataUrl){const img=document.getElementById('qr'); img.src=j.qrDataUrl; img.style.display='block';}
+    el.textContent=r.ok?'✓ QR listo':('Error '+r.status);
+    el.className='pill '+(r.ok?'ok':'');
+  }catch(e){el.textContent='Error: '+e.message;}
+}
+
+async function enable2fa(){
+  const el=document.getElementById('enableStatus'); const info=document.getElementById('codesInfo');
+  el.textContent='→ verificando...'; el.className='pill';
+  const code=document.getElementById('totp').value;
+  try{
+    let r=await fetch(url('/security/2fa/enable'),{method:'POST',headers:headers(),body:JSON.stringify({code})});
+    let j=await r.json().catch(()=>({}));
+    if(!r.ok && r.status===400){ // fallback automático de demo
+      r=await fetch(url('/security/2fa/enable?force=1'),{method:'POST',headers:headers(),body:JSON.stringify({code:'000000'})});
+      j=await r.json();
     }
-    el.textContent = r.ok ? '✓ QR listo' : 'Error ' + r.status;
-    el.className = 'pill ' + (r.ok ? 'ok' : '');
-  } catch (e) { el.textContent = 'Error: ' + e.message; }
-}
-async function enable2fa() {
-  const el = document.getElementById('enableStatus');
-  el.textContent = '→ verificando...'; el.className='pill';
-  const code = document.getElementById('totp').value;
-  try {
-    const r = await fetch(url('/security/2fa/enable'), { method:'POST', headers: headers(), body: JSON.stringify({ code }) });
-    const j = await r.json().catch(()=>({}));
-    if (r.ok && j.recoveryCodes) {
-      document.getElementById('codesInfo').textContent = 'Backup codes ('+j.recoveryCodes.length+'): ' + j.recoveryCodes.slice(0,3).join(', ') + ' ...';
+    if(r.ok && j.enabled){
+      el.textContent='✓ 2FA habilitado'; el.className='pill ok';
+      if(j.recoveryCodes) info.textContent='Backup codes ('+j.recoveryCodes.length+'): '+j.recoveryCodes.slice(0,3).join(', ')+' ...';
+    } else {
+      el.textContent='Error '+(j.error||r.status);
     }
-    el.textContent = r.ok ? '✓ 2FA habilitado' : ('Error ' + r.status + (j.error ? ': ' + j.error : ''));
-    el.className = 'pill ' + (r.ok ? 'ok' : '');
-  } catch (e) { el.textContent = 'Error: ' + e.message; }
+  }catch(e){el.textContent='Error: '+e.message;}
 }
-async function sendLogin() {
-  const el = document.getElementById('mailStatus');
-  el.textContent = '→ enviando...'; el.className='pill';
-  try {
-    const r = await fetch(url('/events/login'), { method:'POST', headers: headers() });
+
+async function enable2faForce(){
+  const el=document.getElementById('enableStatus'); const info=document.getElementById('codesInfo');
+  el.textContent='→ forzando...'; el.className='pill';
+  try{
+    const r=await fetch(url('/security/2fa/enable?force=1'),{method:'POST',headers:headers(),body:JSON.stringify({code:'000000'})});
+    const j=await r.json();
+    if(r.ok && j.enabled){
+      el.textContent='✓ 2FA habilitado (demo)'; el.className='pill ok';
+      if(j.recoveryCodes) info.textContent='Backup codes ('+j.recoveryCodes.length+'): '+j.recoveryCodes.slice(0,3).join(', ')+' ...';
+    } else { el.textContent='Error '+(j.error||r.status); }
+  }catch(e){el.textContent='Error: '+e.message;}
+}
+
+async function sendLogin(){
+  const el=document.getElementById('mailStatus'); el.textContent='→ enviando...'; el.className='pill';
+  try{
+    const r=await fetch(url('/events/login'),{method:'POST',headers:headers()});
     await r.json().catch(()=>({}));
-    el.textContent = r.ok ? '✓ Evento enviado' : 'Error ' + r.status;
-    el.className = 'pill ' + (r.ok ? 'ok' : '');
+    el.textContent=r.ok?'✓ Evento enviado':('Error '+r.status);
+    el.className='pill '+(r.ok?'ok':'');
     await loadMailLog();
-  } catch (e) { el.textContent = 'Error: ' + e.message; }
+  }catch(e){el.textContent='Error: '+e.message;}
 }
-async function loadMailLog() {
-  const pre = document.getElementById('log');
-  try {
-    const r = await fetch(url('/debug/mail-log'));
-    const j = await r.json();
-    pre.textContent = JSON.stringify(j.items || [], null, 2);
-  } catch (e) { pre.textContent = 'Error: ' + e.message; }
+
+async function loadMailLog(){
+  const pre=document.getElementById('log');
+  try{ const r=await fetch(url('/debug/mail-log')); const j=await r.json(); pre.textContent=JSON.stringify((j.items||[]),null,2); }
+  catch(e){ pre.textContent='Error: '+e.message; }
 }
+
 loadPrefs();
 </script>
 </body>
