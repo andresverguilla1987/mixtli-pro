@@ -4,13 +4,42 @@ window.CONFIG = {
   supabaseAnonKey: "",
   storageBucket: "files",
   billing: {
-    stripeLinks: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
-    priceIds: { topup10: "price_123", topup50: "price_456", topup100: "price_789", proMonthly: "price_abc" },
+    currencies: { MX: "MXN", AR: "ARS", BR: "BRL", CL: "CLP", CO: "COP", PE: "PEN", INT: "USD" },
     products: {
       topup10: { gb: 10, label: "Recarga 10 GB" },
       topup50: { gb: 50, label: "Recarga 50 GB" },
       topup100: { gb: 100, label: "Recarga 100 GB" },
       proMonthly: { gb: 200, label: "Plan Pro (200 GB/mes)" }
+    },
+    // Links por país y pasarela (rellena con tus Payment Links / Botones)
+    links: {
+      stripe: {
+        MX: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        AR: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        BR: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        CL: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        CO: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        PE: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        INT:{ topup10: "", topup50: "", topup100: "", proMonthly: "" }
+      },
+      mercadopago: {
+        MX: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        AR: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        BR: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        CL: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        CO: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        PE: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        INT:{ topup10: "", topup50: "", topup100: "", proMonthly: "" }
+      },
+      paypal: {
+        MX: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        AR: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        BR: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        CL: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        CO: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        PE: { topup10: "", topup50: "", topup100: "", proMonthly: "" },
+        INT:{ topup10: "", topup50: "", topup100: "", proMonthly: "" }
+      }
     }
   }
 };

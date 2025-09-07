@@ -28,6 +28,24 @@
     <h1 class="text-3xl font-extrabold">Planes y Recargas</h1>
     <p class="text-slate-300 mt-1">Compra GB extra o suscríbete a un plan.</p>
 
+    <div class="mt-4 flex flex-wrap gap-3 items-center">
+      <select id="countrySel" class="h-10 px-3 rounded-md bg-white/10 border border-white/10">
+        <option value="MX">México (MXN)</option>
+        <option value="AR">Argentina (ARS)</option>
+        <option value="BR">Brasil (BRL)</option>
+        <option value="CL">Chile (CLP)</option>
+        <option value="CO">Colombia (COP)</option>
+        <option value="PE">Perú (PEN)</option>
+        <option value="INT">Internacional (USD)</option>
+      </select>
+      <div class="flex items-center gap-2 text-sm">
+        <label>Método:</label>
+        <button id="methodStripe" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Stripe</button>
+        <button id="methodMP" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Mercado&nbsp;Pago</button>
+        <button id="methodPP" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">PayPal</button>
+      </div>
+    </div>
+
     <div id="plans" class="mt-6 grid md:grid-cols-4 gap-4"></div>
 
     <div class="mt-10 rounded-2xl border border-white/10 bg-white/5 p-5">

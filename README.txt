@@ -175,3 +175,35 @@ window.CONFIG = {
 - Recargas suman a `bonus_gb` y **no expiran** (o puedes poner expiración en `purchases` y un job que reste).
 - Si ofreces plan mensual, resetea `bonus_gb` cada mes o usa `quota_gb` por plan + `bonus_gb` aparte.
 - Muestra un **banner** al 80% de uso y bloquea subida al 100%.
+
+
+---
+# V6.1 — LATAM Payments (Stripe + Mercado Pago + PayPal)
+Generado: 2025-09-07 04:14
+
+## Qué cambia
+- Selector de **país** y **método de pago** (Stripe / Mercado Pago / PayPal) en `billing.html`.
+- Links por país y por producto (10/50/100 GB, plan Pro), configurables en `assets/config.js`.
+- **Moneda local** por país (MXN, ARS, BRL, CLP, COP, PEN, USD).
+- **Webhooks** extra de ejemplo:
+  - `supabase/functions/mercadopago-webhook/index.ts`
+  - `supabase/functions/paypal-webhook/index.ts`
+- Todos acreditan GB en `profiles.bonus_gb` y guardan en `purchases` (provider, ref, currency, amount).
+
+## Configuración rápida
+1) En `assets/config.js` define tus **links por país**:
+   - `billing.links.stripe.MX.topup10 = "https://buy.stripe.com/..."`
+   - `billing.links.mercadopago.AR.topup10 = "https://mpago.la/..."`
+   - `billing.links.paypal.CO.topup10 = "https://www.paypal.com/..."`
+2) Despliega funciones y añade secretos:
+   ```bash
+   supabase functions deploy mercadopago-webhook
+   supabase functions secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... MP_WEBHOOK_SECRET=xxx SKU_MAP_JSON='{"10GB":10,"50GB":50,"100GB":100}'
+   supabase functions deploy paypal-webhook
+   supabase functions secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... PAYPAL_WEBHOOK_ID=xxx SKU_MAP_JSON='{"10GB":10,"50GB":50,"100GB":100}'
+   ```
+3) En Mercado Pago / PayPal configura webhook al endpoint de la función.
+4) (Opcional) Usa **SKU** o **metadata** para enviar `user_id` y `sku` en la preferencia/orden. Los ejemplos aceptan lookup por `sku` y/o `price_id` via `SKU_MAP_JSON`.
+
+## Países soportados en UI (editable):
+- México (MX, MXN), Argentina (AR, ARS), Brasil (BR, BRL), Chile (CL, CLP), Colombia (CO, COP), Perú (PE, PEN), Internacional (INT, USD).
