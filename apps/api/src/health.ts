@@ -1,14 +1,11 @@
-import type { Request, Response } from 'express';
 import { Router } from 'express';
 
 const router = Router();
 
-// Root OK for Render health probe
-router.get('/', (_req: Request, res: Response) => res.status(200).send('ok'));
-router.head('/', (_req: Request, res: Response) => res.status(200).end());
-
-// Explicit health endpoint
-router.get('/health', (_req: Request, res: Response) => {
+// Health & root OK responses so the platform doesn't mark the service as down.
+router.get('/', (_req, res) => res.status(200).send('ok'));
+router.head('/', (_req, res) => res.sendStatus(200));
+router.get(['/health', '/salud', '/status', '/ready', '/live'], (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
