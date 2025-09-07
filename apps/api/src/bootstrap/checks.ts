@@ -1,16 +1,20 @@
-// apps/api/src/bootstrap/checks.ts
-import { tryRedisPing, getRedisUrl } from "../lib/redis";
+import type { Request, Response } from "express";
+import { tryRedisPing, getRedisUrl } from "../lib/redis.js";
 
-export async function bootChecks() {
-  const url = getRedisUrl();
-  if (!url) {
-    console.warn("[BOOT] Redis deshabilitado (no hay REDIS_URL). La app seguirá sin cache/colas.");
-    return;
+export function registerChecks(app: any) {
+  const ok = (res: Response) => res.status(200).json({ status: "ok" });
+  const routes = ["/", "/health", "/salud", "/status", "/ready", "/live"];
+  for (const r of routes) {
+    app.get(r, (_req: Request, res: Response) => ok(res));
+    app.head(r, (_req: Request, res: Response) => ok(res));
   }
-  const res = await tryRedisPing();
-  if (!res.ok) {
-    console.warn("[BOOT] Redis no disponible:", res.reason);
-  } else {
-    console.log("[BOOT] Redis OK.");
-  }
+
+  // /healthz profundo con chequeo de Redis si hay URL
+  app.get("/healthz", async (_req: Request, res: Response) => {
+    const hasRedis = !!getRedisUrl();
+    if (!hasRedis) return res.json({ status: "ok", redis: "skip" });
+    const ping = await tryRedisPing();
+    const healthy = ping === "ok" || ping === "skip";
+    res.status(healthy ? 200 : 503).json({ status: healthy ? "ok" : "error", redis: ping });
+  });
 }

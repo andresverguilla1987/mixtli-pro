@@ -1,52 +1,92 @@
-// Safe Redis wrapper: if no Redis is available, provide a no-op in-memory client.
-// This avoids crashes like ECONNREFUSED 127.0.0.1:6379.
+/**
+ * Redis helper con "stub" cuando no hay REDIS_URL o el paquete no está.
+ * Evita ECONNREFUSED 127.0.0.1:6379 en Render.
+ */
 
-type Value = string;
-class MemoryRedis {
-  private store = new Map<string, Value>();
-  isOpen = true;
+type AnyClient = {
+  isOpen?: boolean;
+  connect?: () => Promise<void>;
+  quit?: () => Promise<void>;
+  disconnect?: () => void;
+  on?: (...a: any[]) => void;
+  get?: (...a: any[]) => Promise<any>;
+  set?: (...a: any[]) => Promise<any>;
+  del?: (...a: any[]) => Promise<any>;
+  publish?: (...a: any[]) => Promise<any>;
+  subscribe?: (...a: any[]) => Promise<any>;
+  unsubscribe?: (...a: any[]) => Promise<any>;
+  multi?: (...a: any[]) => { exec: () => Promise<any[]> };
+  ping?: () => Promise<any>;
+};
 
-  async connect(): Promise<void> {}
-  async quit(): Promise<void> {}
-  disconnect(): void {}
-  on(): void {}
+let _client: AnyClient | null = null;
 
-  async get(key: string): Promise<string | null> {
-    return this.store.has(key) ? (this.store.get(key) as string) : null;
-  }
-  async set(key: string, value: string): Promise<'OK'> {
-    this.store.set(key, value);
-    return 'OK';
-  }
-  async del(key: string): Promise<number> {
-    const had = this.store.delete(key);
-    return had ? 1 : 0;
-  }
-
-  // Pub/Sub no-ops
-  async publish(_channel: string, _message: string): Promise<number> { return 0; }
-  async subscribe(_channel: string, _listener?: (message: string) => void): Promise<void> {}
-  async unsubscribe(_channel?: string): Promise<void> {}
-
-  multi() { return { exec: async () => [] as any[] }; }
+export function getRedisUrl(): string | null {
+  return process.env.REDIS_URL || process.env.REDIS_URL_INTERNAL || null;
 }
 
-export type RedisLike = MemoryRedis;
-
-let singleton: MemoryRedis | null = null;
-
-export function getRedis(): RedisLike {
-  if (!singleton) singleton = new MemoryRedis();
-  return singleton;
+function stubClient(): AnyClient {
+  return {
+    isOpen: true,
+    connect: async () => {},
+    quit: async () => {},
+    disconnect: () => {},
+    on: () => {},
+    get: async () => null,
+    set: async () => "OK",
+    del: async () => 0,
+    publish: async () => 0,
+    subscribe: async () => {},
+    unsubscribe: async () => {},
+    multi: () => ({ exec: async () => [] }),
+    ping: async () => "PONG",
+  };
 }
 
-// Optional helpers some codebases expect:
-export function getRedisUrl(): string | undefined {
-  return process.env.REDIS_URL || process.env.UPSTASH_REDIS_REST_URL || undefined;
+export async function getRedis(): Promise<AnyClient> {
+  if (_client) return _client;
+  const url = getRedisUrl();
+  if (!url) {
+    console.warn("[REDIS] Sin REDIS_URL, usando stub (no-op).");
+    _client = stubClient();
+    return _client;
+  }
+  try {
+    const mod: any = await import("redis").catch(() => null);
+    if (mod && typeof mod.createClient === "function") {
+      const c: AnyClient = mod.createClient({ url });
+      if (typeof c.on === "function") {
+        c.on("error", (e: any) => console.warn("[REDIS] error:", e?.message || e));
+      }
+      if (typeof c.connect === "function") {
+        await c.connect();
+      }
+      _client = c;
+      return c;
+    }
+    console.warn("[REDIS] Paquete 'redis' no disponible, usando stub.");
+    _client = stubClient();
+    return _client;
+  } catch (e: any) {
+    console.warn("[REDIS] Conexión falló, usando stub:", e?.message || e);
+    _client = stubClient();
+    return _client;
+  }
 }
 
-export async function tryRedisPing(timeoutMs: number = 500): Promise<boolean> {
-  // Always resolve true for the stub (to avoid failing health checks).
-  await new Promise(res => setTimeout(res, Math.min(timeoutMs, 50)));
-  return true;
+export async function tryRedisPing(): Promise<"ok" | "skip" | "error"> {
+  const url = getRedisUrl();
+  if (!url) return "skip";
+  try {
+    const c = await getRedis();
+    if (typeof c.ping === "function") {
+      await c.ping();
+    } else if (typeof c.get === "function") {
+      await c.get("health");
+    }
+    return "ok";
+  } catch (e: any) {
+    console.warn("[REDIS] ping failed:", e?.message || e);
+    return "error";
+  }
 }

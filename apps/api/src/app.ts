@@ -1,19 +1,21 @@
-import express from 'express';
-import cors from 'cors';
-import morgan from 'morgan';
+import express from "express";
+import cors from "cors";
+import morgan from "morgan";
+import { registerChecks } from "./bootstrap/checks.js";
 
-// Simple Express app with health endpoints.
-const app = express();
+export const PORT: number = Number(process.env.PORT) || 10000;
+
+// Crea la app de Express y middlewares básicos
+export const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(morgan('dev'));
+app.use(morgan("combined"));
 
-// Health & root routes so Render health checks don't 404.
-app.get('/', (_req, res) => res.status(200).send('ok'));
-app.get(['/health', '/salud', '/status', '/ready', '/live'], (_req, res) => {
-  res.status(200).json({ status: 'ok' });
-});
+// Rutas de salud y raíz
+registerChecks(app);
 
-// Export for server.ts
-export const PORT: number = parseInt(process.env.PORT || '10000', 10);
+// (Opcional) Aqui montarías tus routers reales, por ejemplo:
+// import usersRouter from "./routes/users.js";
+// app.use("/api/users", usersRouter);
+
 export default app;
