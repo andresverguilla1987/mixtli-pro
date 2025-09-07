@@ -1,9 +1,8 @@
-
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Mixtli – Demo (2FA + Notificaciones + Adjuntos)</title>
+  <title>Mixtli – Demo (2FA + Notificaciones + Multi-Adjuntos)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0b1220;color:#e6edf3;margin:0}
@@ -18,22 +17,23 @@
     .log{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:#0b1220;color:#93c5fd;border:1px solid #1f2937;padding:8px;border-radius:10px;height:220px;overflow:auto}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #374151}
-    .ok{color:#22c55e}
-    .ghost{background:#6b7280}
+    .ok{color:#22c55e}.ghost{background:#6b7280}
     .two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .bar{height:10px;background:#1f2937;border-radius:8px;overflow:hidden}
+    .bar>div{height:100%;width:0%}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Mixtli – Seguridad & Notificaciones (Demo completa)</h1>
-    <p class="muted">Backend HTTPS recomendado (Render / ngrok). Esta versión incluye <b>envío de adjuntos</b> en alta calidad.</p>
+    <h1>Mixtli – Seguridad & Notificaciones (Multi‑Adjuntos)</h1>
+    <p class="muted">Para envío real, tu backend debe mostrar <b>mode: LIVE</b> en el Ping.</p>
 
     <div class="card" style="margin-bottom:16px;">
       <div class="row" style="gap:12px;">
         <div style="flex:1">
           <label class="muted">Base URL (HTTPS)</label>
           <input id="baseUrl" placeholder="https://mixtli-pro.onrender.com/"/>
-          <div class="muted">Tip: agrega <code>?base=https://tu-api/</code> a la URL.</div>
+          <div class="muted">Puedes pasar <code>?base=https://tu-api/</code> en la URL.</div>
         </div>
         <div style="flex:1">
           <label class="muted">Usuario (X-User-Email)</label>
@@ -50,7 +50,7 @@
           <button onclick="ping()">Probar</button>
           <span id="pingStatus" class="pill"></span>
         </div>
-        <div class="muted">Comprueba que el backend responde.</div>
+        <div class="muted">Debe mostrar <code>(LIVE sendgrid|ses)</code> si enviará de verdad.</div>
       </div>
 
       <div class="card">
@@ -74,16 +74,7 @@
       </div>
 
       <div class="card">
-        <h2>4) Notificación: Nuevo login</h2>
-        <div class="row">
-          <button onclick="sendLogin()">Enviar</button>
-          <span id="mailStatus" class="pill"></span>
-        </div>
-        <div class="muted">Con <b>DRY_RUN_EMAIL=1</b> no salen correos reales; consulta el log.</div>
-      </div>
-
-      <div class="card">
-        <h2>5) Enviar adjunto (alta calidad)</h2>
+        <h2>4) Enviar multi‑adjuntos</h2>
         <div class="two-col">
           <div>
             <label class="muted">Destinatario</label>
@@ -91,23 +82,24 @@
           </div>
           <div>
             <label class="muted">Asunto</label>
-            <input id="subject" value="Prueba adjunto máxima calidad"/>
+            <input id="subject" value="Prueba multi-adjuntos máxima calidad"/>
           </div>
         </div>
         <div style="margin-top:8px;">
           <label class="muted">Mensaje (opcional)</label>
-          <textarea id="plainText" rows="3" placeholder="Adjunto original sin comprimir."></textarea>
+          <textarea id="plainText" rows="3" placeholder="Adjunto archivos originales sin comprimir."></textarea>
         </div>
         <div class="row" style="margin-top:8px;">
-          <input type="file" id="fileInput" />
-          <button onclick="sendAttachment()">Enviar adjunto</button>
+          <input type="file" id="fileInput" multiple />
+          <button onclick="sendAttachments()">Enviar adjuntos</button>
           <span id="attachStatus" class="pill"></span>
         </div>
+        <div class="bar" style="margin-top:8px;"><div id="progressInner"></div></div>
         <div class="muted" id="attachInfo"></div>
       </div>
 
       <div class="card">
-        <h2>6) Mail Log</h2>
+        <h2>5) Mail Log</h2>
         <div class="row" style="gap:12px;">
           <button onclick="loadMailLog()">Refrescar</button>
           <span class="muted">Endpoint: <code>/debug/mail-log</code></span>
@@ -118,139 +110,36 @@
   </div>
 
 <script>
-// --- Helpers
 function getParam(name){const url=new URL(window.location.href);return url.searchParams.get(name);}
-function normBase(val){
-  if(!val) return '';
-  val = val.trim();
-  val = val.replace(/\s*\(.*\)\s*$/,''); // limpia comentarios
-  if(!val.endsWith('/')) val+='/';
-  return val;
-}
-function loadPrefs(){
-  const fromQuery = getParam('base');
-  const base = normBase(fromQuery || localStorage.getItem('baseUrl') || 'https://mixtli-pro.onrender.com/');
-  document.getElementById('baseUrl').value = base;
-  document.getElementById('userEmail').value = localStorage.getItem('userEmail') || 'admin@mixtli.test';
-  document.getElementById('toEmail').value = localStorage.getItem('toEmail') || '';
-}
-function savePrefs(){
-  localStorage.setItem('baseUrl', normBase(document.getElementById('baseUrl').value));
-  localStorage.setItem('userEmail', document.getElementById('userEmail').value);
-  localStorage.setItem('toEmail', document.getElementById('toEmail').value);
-  alert('Guardado');
-}
-function headers(){
-  return {'Content-Type':'application/json','X-User-Email':document.getElementById('userEmail').value||'admin@mixtli.test'};
-}
-function url(path){
-  const base = normBase(document.getElementById('baseUrl').value).replace(/\/$/,'');
-  if(!base.startsWith('https://')) alert('Para hosted usa backend HTTPS.');
-  return base + path;
-}
+function normBase(val){if(!val) return '';val=val.trim();val=val.replace(/\s*\(.*\)\s*$/,'');if(!val.endsWith('/'))val+='/';return val;}
+function loadPrefs(){const fromQuery=getParam('base');const base=normBase(fromQuery||localStorage.getItem('baseUrl')||'https://mixtli-pro.onrender.com/');document.getElementById('baseUrl').value=base;document.getElementById('userEmail').value=localStorage.getItem('userEmail')||'admin@mixtli.test';document.getElementById('toEmail').value=localStorage.getItem('toEmail')||'';}
+function savePrefs(){localStorage.setItem('baseUrl',normBase(document.getElementById('baseUrl').value));localStorage.setItem('userEmail',document.getElementById('userEmail').value);localStorage.setItem('toEmail',document.getElementById('toEmail').value);alert('Guardado');}
+function headers(){return {'X-User-Email':document.getElementById('userEmail').value||'admin@mixtli.test'};}
+function url(path){const base=normBase(document.getElementById('baseUrl').value).replace(/\/$/,'');if(!base.startsWith('https://')) alert('Para hosted usa backend HTTPS.');return base+path;}
 
-// --- Existing demo actions
-async function ping(){
-  const el=document.getElementById('pingStatus'); el.textContent='→ consultando...'; el.className='pill';
-  try{
-    const r=await fetch(url('/'));
-    const j=await r.json().catch(()=>({}));
-    el.textContent=r.ok?('✓ OK: '+(j.app||'Mixtli Pro')+' ('+(j.mode||'')+' '+(j.provider||'')+')'):('Error '+r.status);
-    el.className='pill '+(r.ok?'ok':'');
-  }catch(e){el.textContent='Error: '+e.message;}
-}
-async function setup2fa(){
-  const el=document.getElementById('setupStatus'); el.textContent='→ generando...'; el.className='pill';
-  try{
-    const r=await fetch(url('/security/2fa/setup'),{method:'POST',headers:headers()});
-    const j=await r.json();
-    if(j.qrDataUrl){const img=document.getElementById('qr'); img.src=j.qrDataUrl; img.style.display='block';}
-    el.textContent=r.ok?'✓ QR listo':('Error '+r.status); el.className='pill '+(r.ok?'ok':'');
-  }catch(e){el.textContent='Error: '+e.message;}
-}
-async function enable2fa(){
-  const el=document.getElementById('enableStatus'); const info=document.getElementById('codesInfo');
-  el.textContent='→ verificando...'; el.className='pill';
-  const code=document.getElementById('totp').value;
-  try{
-    let r=await fetch(url('/security/2fa/enable'),{method:'POST',headers:headers(),body:JSON.stringify({code})});
-    let j=await r.json().catch(()=>({}));
-    if(!r.ok && r.status===400){
-      r=await fetch(url('/security/2fa/enable?force=1'),{method:'POST',headers:headers(),body:JSON.stringify({code:'000000'})});
-      j=await r.json();
-    }
-    if(r.ok && j.enabled){
-      el.textContent='✓ 2FA habilitado'; el.className='pill ok';
-      if(j.recoveryCodes) info.textContent='Backup codes ('+j.recoveryCodes.length+'): '+j.recoveryCodes.slice(0,3).join(', ')+' ...';
-    } else { el.textContent='Error '+(j.error||r.status); }
-  }catch(e){el.textContent='Error: '+e.message;}
-}
-async function enable2faForce(){
-  const el=document.getElementById('enableStatus'); const info=document.getElementById('codesInfo');
-  el.textContent='→ forzando...'; el.className='pill';
-  try{
-    const r=await fetch(url('/security/2fa/enable?force=1'),{method:'POST',headers:headers(),body:JSON.stringify({code:'000000'})});
-    const j=await r.json();
-    if(r.ok && j.enabled){
-      el.textContent='✓ 2FA habilitado (demo)'; el.className='pill ok';
-      if(j.recoveryCodes) info.textContent='Backup codes ('+j.recoveryCodes.length+'): '+j.recoveryCodes.slice(0,3).join(', ')+' ...';
-    } else { el.textContent='Error '+(j.error||r.status); }
-  }catch(e){el.textContent='Error: '+e.message;}
-}
-async function sendLogin(){
-  const el=document.getElementById('mailStatus'); el.textContent='→ enviando...'; el.className='pill';
-  try{
-    const r=await fetch(url('/events/login'),{method:'POST',headers:headers()});
-    await r.json().catch(()=>({}));
-    el.textContent=r.ok?'✓ Evento enviado':('Error '+r.status); el.className='pill '+(r.ok?'ok':'');
-    await loadMailLog();
-  }catch(e){el.textContent='Error: '+e.message;}
-}
-async function loadMailLog(){
-  const pre=document.getElementById('log');
-  try{ const r=await fetch(url('/debug/mail-log')); const j=await r.json(); pre.textContent=JSON.stringify((j.items||[]),null,2); }
-  catch(e){ pre.textContent='Error: '+e.message; }
-}
+async function ping(){const el=document.getElementById('pingStatus');el.textContent='→ consultando...';el.className='pill';try{const r=await fetch(url('/'));const j=await r.json().catch(()=>({}));el.textContent=r.ok?('✓ OK: '+(j.app||'Mixtli Pro')+' ('+(j.mode||'')+' '+(j.provider||'')+')'):('Error '+r.status);el.className='pill '+(r.ok?'ok':'');}catch(e){el.textContent='Error: '+e.message;}}
+async function setup2fa(){const el=document.getElementById('setupStatus');el.textContent='→ generando...';el.className='pill';try{const r=await fetch(url('/security/2fa/setup'),{method:'POST',headers:{...headers(),'Content-Type':'application/json'}});const j=await r.json();if(j.qrDataUrl){const img=document.getElementById('qr');img.src=j.qrDataUrl;img.style.display='block';}el.textContent=r.ok?'✓ QR listo':('Error '+r.status);el.className='pill '+(r.ok?'ok':'');}catch(e){el.textContent='Error: '+e.message;}}
+async function enable2fa(){const el=document.getElementById('enableStatus');const info=document.getElementById('codesInfo');el.textContent='→ verificando...';el.className='pill';const code=document.getElementById('totp').value;try{let r=await fetch(url('/security/2fa/enable'),{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({code})});let j=await r.json().catch(()=>({}));if(!r.ok&&r.status===400){r=await fetch(url('/security/2fa/enable?force=1'),{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({code:'000000'})});j=await r.json();}if(r.ok&&j.enabled){el.textContent='✓ 2FA habilitado';el.className='pill ok';if(j.recoveryCodes) info.textContent='Backup codes ('+j.recoveryCodes.length+'): '+j.recoveryCodes.slice(0,3).join(', ')+' ...';} else {el.textContent='Error '+(j.error||r.status);} }catch(e){el.textContent='Error: '+e.message;}}
+async function enable2faForce(){const el=document.getElementById('enableStatus');const info=document.getElementById('codesInfo');el.textContent='→ forzando...';el.className='pill';try{const r=await fetch(url('/security/2fa/enable?force=1'),{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({code:'000000'})});const j=await r.json();if(r.ok&&j.enabled){el.textContent='✓ 2FA habilitado (demo)';el.className='pill ok';if(j.recoveryCodes) info.textContent='Backup codes ('+j.recoveryCodes.length+'): '+j.recoveryCodes.slice(0,3).join(', ')+' ...';} else {el.textContent='Error '+(j.error||r.status);} }catch(e){el.textContent='Error: '+e.message;}}
 
-// --- New: send attachment
-async function sendAttachment(){
-  const status=document.getElementById('attachStatus');
-  const info=document.getElementById('attachInfo');
-  status.textContent='→ enviando...'; status.className='pill';
-  info.textContent='';
-  const to=document.getElementById('toEmail').value.trim();
-  const subject=document.getElementById('subject').value.trim();
-  const text=document.getElementById('plainText').value;
-  const file=document.getElementById('fileInput').files[0];
-  if(!to || !subject || !file){ status.textContent='Falta to/subject/archivo'; return; }
-  try{
-    const fd=new FormData();
-    fd.append('to', to);
-    fd.append('subject', subject);
-    if(text) fd.append('text', text);
-    fd.append('attachment', file, file.name);
-    const r=await fetch(url('/events/send-multipart'),{ method:'POST', body: fd, headers: { 'X-User-Email': document.getElementById('userEmail').value || 'admin@mixtli.test' } });
-    const j=await r.json().catch(()=>({}));
-    if(r.ok){
-      status.textContent='✓ Enviado'; status.className='pill ok';
-      info.textContent = (j.attached ? ('Adjunto: '+j.attached.name+' ('+j.attached.size+' bytes)') : 'Sin detalle de adjunto') + (j.dryRun ? ' (DRY)' : ' (LIVE)');
-      await loadMailLog();
-    } else {
-      status.textContent='Error '+(j.error||r.status);
-      info.textContent=j.detail?String(j.detail):'';
-    }
-  }catch(e){
-    status.textContent='Error: '+e.message;
+function xhrUpload(urlStr, formData, onProgress){return new Promise((resolve,reject)=>{const xhr=new XMLHttpRequest();xhr.open('POST',urlStr,true);xhr.setRequestHeader('X-User-Email', document.getElementById('userEmail').value || 'admin@mixtli.test');xhr.upload.onprogress=(e)=>{if(e.lengthComputable&&onProgress){onProgress(e.loaded/e.total);} };xhr.onreadystatechange=()=>{if(xhr.readyState===4){try{resolve({ ok: (xhr.status>=200&&xhr.status<300), status:xhr.status, json: JSON.parse(xhr.responseText||'{}') });}catch(_){resolve({ ok:false, status:xhr.status, json:{ error:'parse_error', raw:xhr.responseText } });}}};xhr.onerror=()=>reject(new Error('network error'));xhr.send(formData);});}
+
+async function sendAttachments(){const status=document.getElementById('attachStatus');const info=document.getElementById('attachInfo');const bar=document.getElementById('progressInner');status.textContent='→ preparando...';status.className='pill';info.textContent='';bar.style.width='0%';const to=document.getElementById('toEmail').value.trim();const subject=document.getElementById('subject').value.trim();const text=document.getElementById('plainText').value;const files=[...document.getElementById('fileInput').files];if(!to||!subject||files.length===0){status.textContent='Falta to/subject/archivos';return;}try{const fd=new FormData();fd.append('to',to);fd.append('subject',subject);if(text)fd.append('text',text);files.forEach(f=>fd.append('attachments',f,f.name)); // try multi endpoint first
+  let r = await xhrUpload(url('/events/send-multipart-multi'), fd, (p)=>{bar.style.width=Math.round(p*100)+'%';});
+  if(!r.ok && r.status===404){ // fallback single: send the first file
+    const fd1=new FormData();fd1.append('to',to);fd1.append('subject',subject);if(text)fd1.append('text',text);fd1.append('attachment',files[0],files[0].name);
+    r = await xhrUpload(url('/events/send-multipart'), fd1, (p)=>{bar.style.width=Math.round(p*100)+'%';});
   }
-}
+  if(!r.ok){ status.textContent='Error '+(r.json?.error||r.status); info.textContent = r.json?.detail ? String(r.json.detail) : (r.json?.raw||''); return; }
+  status.textContent='✓ Enviado'; status.className='pill ok';
+  const list = r.json?.attached || [];
+  info.textContent = (r.json?.dryRun ? 'DRY ' : 'LIVE ') + (list.length? (list.map(a=>a.name+' ('+a.size+' bytes)').join(', ')) : '');
+  await loadMailLog();
+} catch(e){ status.textContent='Error: '+e.message; }}
 
-(function init(){ // auto-load prefs
-  const fromQuery = getParam('base');
-  if (fromQuery) {
-    document.getElementById('baseUrl').value = normBase(fromQuery);
-  }
-  loadPrefs();
-})();
+async function loadMailLog(){const pre=document.getElementById('log');try{const r=await fetch(url('/debug/mail-log'));const j=await r.json();pre.textContent=JSON.stringify((j.items||[]),null,2);}catch(e){pre.textContent='Error: '+e.message;}}
+
+(function init(){const fromQuery=getParam('base');if(fromQuery){document.getElementById('baseUrl').value=normBase(fromQuery);}loadPrefs();})();
 </script>
 </body>
 </html>
