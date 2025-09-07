@@ -5,7 +5,7 @@ const RESEND = Deno.env.get("RESEND_API_KEY") || "";
 
 serve(async (req) => {
   try{
-    const { to, subject, text } = await req.json();
+    const { to, subject, text, pdf_base64, filename } = await req.json();
     if (!RESEND) return new Response(JSON.stringify({ ok:false, error:"RESEND_API_KEY missing" }), { status: 200 });
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -14,7 +14,8 @@ serve(async (req) => {
         from: "Mixtli <receipts@mixtli.dev>",
         to: [to],
         subject: subject || "Tu recibo",
-        text: text || "Gracias por tu pago."
+        text: text || "Gracias por tu pago.",
+        attachments: pdf_base64 ? [{ filename: filename || 'comprobante.pdf', content: pdf_base64 }] : undefined
       })
     });
     const j = await res.json();

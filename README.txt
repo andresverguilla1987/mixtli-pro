@@ -392,3 +392,58 @@ supabase functions secrets set COINBASE_API_KEY=xxx COINBASE_API_BASE=https://ap
 supabase functions secrets set NOWPAYMENTS_API_KEY=xxx NOWPAYMENTS_API_BASE=https://api.nowpayments.io/v1
 supabase functions secrets set RESEND_API_KEY=re_xxx  # o SENDGRID_API_KEY
 ```
+
+
+---
+# V6.5 — Depósito cripto con modal, recibo PDF adjunto por email, y SQL admin para aprobar depósitos
+Generado: 2025-09-07 04:32
+
+## Novedades
+- **Modal de Depósito** (fiat/cripto): el usuario elige monto, país, método y **proveedor cripto** (Coinbase/NOWPayments/BTCPay). Para cripto, se crea el checkout con `create-crypto-charge` y se redirige al hosted page con metadata (`user_id`, `intent`, `sku`).
+- **Recibo por email con PDF adjunto**: la función `send-receipt` ahora acepta `pdf_base64` y `filename`.
+- **SQL Admin** (aprobación de transferencias / depósitos bancarios) y **RPC** con `SECURITY DEFINER`:
+  - `admin_approve_bank_deposit(p_ref uuid, p_amount_cents int)` → mueve `bank_deposits.status` a `approved`, acredita wallet y agrega ledger.
+  - `is_admin()` basada en correos de `admin_emails` (tabla sencilla).
+
+## SQL Admin (ejecuta en Supabase)
+```sql
+create table if not exists public.admin_emails(email text primary key);
+insert into public.admin_emails(email) values ('admin@tu-dominio.com') on conflict do nothing;
+
+create or replace function public.is_admin() returns boolean language sql stable as $$
+  select exists(select 1 from admin_emails where email = auth.jwt()->>'email');
+$$;
+
+-- Permite a admins ver depósitos de todos
+alter table public.bank_deposits enable row level security;
+drop policy if exists own_bank_deposits on public.bank_deposits;
+create policy "view_own_or_admin" on public.bank_deposits
+  for select to authenticated using (user_id = auth.uid() or public.is_admin());
+
+-- Función para aprobar (y acreditar wallet)
+create or replace function public.admin_approve_bank_deposit(p_ref uuid, p_amount_cents int)
+returns void language plpgsql security definer as $$
+declare
+  v_user uuid;
+  v_curr text;
+begin
+  if not public.is_admin() then
+    raise exception 'not admin';
+  end if;
+  select user_id, currency into v_user, v_curr from bank_deposits where id = p_ref and status='pending' for update;
+  if v_user is null then
+    raise exception 'deposit not found or already processed';
+  end if;
+
+  update bank_deposits set status='approved', approved_at=now() where id = p_ref;
+
+  insert into wallets(user_id) values (v_user) on conflict (user_id) do nothing;
+  update wallets set balance_cents = coalesce(balance_cents,0) + p_amount_cents, updated_at = now() where user_id = v_user;
+  insert into wallet_ledger(user_id, type, amount_cents, currency, provider, provider_ref, description)
+    values (v_user, 'deposit', p_amount_cents, coalesce(v_curr,'mxn'), 'bank', p_ref::text, 'Depósito bancario aprobado');
+end;
+$$;
+revoke all on function public.admin_approve_bank_deposit(uuid, int) from public;
+grant execute on function public.admin_approve_bank_deposit(uuid, int) to authenticated;
+```
+**Nota:** Cambia `admin@tu-dominio.com` por tus correos admin. Puedes crear una UI interna que llame `rpc('admin_approve_bank_deposit', ...)`.

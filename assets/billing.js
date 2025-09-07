@@ -322,3 +322,102 @@
     alert("Flujo de KYC pendiente: integra tu proveedor (Truora, Veriff, Stripe Identity). Guardamos status en Supabase (profiles.kyc_status).");
   });
 })();
+
+
+// --- Depósito Modal (fiat/cripto/banco) ---
+(() => {
+  const modal = document.getElementById("depositModal");
+  const btnOpen = document.getElementById("walletDeposit");
+  const btnClose = document.getElementById("depClose");
+  const btnCancel = document.getElementById("depCancel");
+  const btnConfirm = document.getElementById("depConfirm");
+  const amountEl = document.getElementById("depAmount");
+  const countryEl = document.getElementById("depCountry");
+  const methodEl = document.getElementById("depMethod");
+  const cryptoBox = document.getElementById("cryptoProvBox");
+  const cryptoProvEl = document.getElementById("depCryptoProv");
+  const fxHint = document.getElementById("fxHint");
+  const msg = document.getElementById("depMsg");
+  const cfg = window.CONFIG || {};
+
+  function showModal(v){ modal.classList.toggle("hidden", !v); modal.classList.toggle("flex", v); }
+  if (btnOpen) btnOpen.addEventListener("click", ()=> showModal(true));
+  [btnClose, btnCancel].forEach(b=> b && b.addEventListener("click", ()=> showModal(false)));
+
+  methodEl.addEventListener("change", async ()=>{
+    cryptoBox.classList.toggle("hidden", methodEl.value!=="crypto");
+    if (methodEl.value === "crypto"){
+      // Estimar cripto según monto
+      await updateFX();
+    }
+  });
+  amountEl.addEventListener("input", ()=>{ if (methodEl.value==='crypto') updateFX(); });
+  countryEl.addEventListener("change", ()=>{ if (methodEl.value==='crypto') updateFX(); });
+
+  async function updateFX(){
+    const amount = Number(amountEl.value||0);
+    const cur = (cfg.billing?.currencies?.[countryEl.value]) || "USD";
+    if (!amount){ fxHint.textContent = "Ingresa un monto para estimar."; return; }
+    try{
+      const res = await fetch("/functions/v1/rates-proxy", { method:"POST", body: JSON.stringify({ amount, currency: cur }) });
+      const j = await res.json();
+      if (!j.ok) throw 0;
+      const out = j.out;
+      fxHint.textContent = `≈ BTC ${out.BTC?.toFixed(8)} • ETH ${out.ETH?.toFixed(6)} • USDC ${out.USDC?.toFixed(2)}`;
+    }catch(e){
+      fxHint.textContent = "Sin cotización en este momento.";
+    }
+  }
+
+  async function getUser(){
+    if (window.supabase && window.CONFIG?.mode==='supabase'){
+      const sb = window.supabase.createClient(window.CONFIG.supabaseUrl, window.CONFIG.supabaseAnonKey);
+      const { data } = await sb.auth.getUser();
+      return data?.user || null;
+    } else {
+      const s = JSON.parse(localStorage.getItem("mx_session")||"null");
+      return s? { id:"demo-user", email:s.email } : null;
+    }
+  }
+
+  btnConfirm.addEventListener("click", async ()=>{
+    msg.textContent = "";
+    const amount = Number(amountEl.value||0);
+    if (!amount || amount<=0){ msg.textContent = "Monto inválido"; return; }
+    const country = countryEl.value;
+    const method = methodEl.value;
+    const currency = (cfg.billing?.currencies?.[country]) || "USD";
+    const user = await getUser();
+    if (!user){ location.href="auth.html"; return; }
+
+    if (method === "crypto"){
+      // Crear charge via Edge Function
+      const provider = cryptoProvEl.value;
+      try{
+        const r = await fetch("/functions/v1/create-crypto-charge", {
+          method: "POST",
+          headers: { "Content-Type":"application/json" },
+          body: JSON.stringify({ provider, amount, currency, user_id: user.id, sku: "wallet_topup", intent: "wallet_topup" })
+        });
+        const j = await r.json();
+        if (!j.ok || !j.url){ msg.textContent = j.error || "No se pudo crear el cobro."; return; }
+        window.location.href = j.url;
+      }catch(e){ msg.textContent = "Error de red"; }
+      return;
+    }
+
+    if (method === "bank"){
+      // Genera referencia local (DEMO) o inserta fila en bank_deposits via Supabase
+      const ref = crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString().slice(2) + "-REF");
+      alert("Referencia de depósito: " + ref + "\nUsa este código en tu transferencia. Subir comprobante en soporte.");
+      showModal(false);
+      return;
+    }
+
+    // Métodos fiat con links preconfigurados — redirigir a algún link de recarga genérica por país si lo tienes.
+    const map = (((cfg.billing || {}).links || {})[method] || {})[country] || {};
+    const any = map.proMonthly || map.topup100 || map.topup50 || map.topup10 || "";
+    if (any){ window.open(any, "_blank"); showModal(false); }
+    else { msg.textContent = "Configura un Payment Link para depósitos en config.js"; }
+  });
+})();

@@ -72,7 +72,11 @@
       const to = prompt("¿A qué correo te enviamos el recibo?"); if(!to) return;
       const body = `Proveedor: ${data.provider}\nReferencia: ${data.ref}\nMonto: ${data.amount} ${data.currency}\nConcepto: ${data.concept}\nFecha: ${data.date}`;
       try{
-        const r = await fetch("/functions/v1/send-receipt", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ to, subject:"Comprobante Mixtli", text: body }) });
+        // Generar PDF base64
+        const { jsPDF } = window.jspdf; const d = new jsPDF(); d.setFontSize(16); d.text("MIXTLI - Comprobante de Pago", 20, 20); d.setFontSize(12);
+        const lines = [ "Proveedor: "+data.provider, "Referencia: "+data.ref, "Monto: "+data.amount+" "+data.currency, "Concepto: "+data.concept, "Fecha: "+data.date ]; let y=40; lines.forEach(t=>{ d.text(t,20,y); y+=10; });
+        const pdfb64 = d.output("datauristring").split(",")[1];
+        const r = await fetch("/functions/v1/send-receipt", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ to, subject:"Comprobante Mixtli", text: body, pdf_base64: pdfb64, filename: "comprobante-mixtli.pdf" }) });
         const j = await r.json();
         document.getElementById("mailMsg").textContent = j.ok? "Enviado ✅" : (j.error||"Error");
       }catch(e){ document.getElementById("mailMsg").textContent = "Error"; }

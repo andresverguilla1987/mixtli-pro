@@ -4,6 +4,8 @@ window.CONFIG = {
   supabaseAnonKey: "",
   storageBucket: "files",
   billing: {
+    adminEmails: ["admin@tu-dominio.com"],
+
     // Precios por país (fiat) — ajusta a tu estrategia
     prices: {
       MX: { topup10: 49, topup50: 199, topup100: 349, proMonthly: 199 },
