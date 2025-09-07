@@ -1,0 +1,52 @@
+{
+  "slot_minutes": 60,
+  "agents": [
+    {
+      "id": "A1",
+      "skills": [
+        "general"
+      ],
+      "cost_per_hour": 60,
+      "max_hours_week": 40,
+      "min_rest_hours": 12
+    },
+    {
+      "id": "A2",
+      "skills": [
+        "general"
+      ],
+      "cost_per_hour": 55,
+      "max_hours_week": 40,
+      "min_rest_hours": 12
+    },
+    {
+      "id": "A3",
+      "skills": [
+        "general"
+      ],
+      "cost_per_hour": 50,
+      "max_hours_week": 30,
+      "min_rest_hours": 12
+    }
+  ],
+  "demand": [
+    {
+      "slot": 9,
+      "skill": "general",
+      "required": 2,
+      "ts": "2025-09-08T09:00:00Z"
+    },
+    {
+      "slot": 10,
+      "skill": "general",
+      "required": 2,
+      "ts": "2025-09-08T10:00:00Z"
+    },
+    {
+      "slot": 11,
+      "skill": "general",
+      "required": 1,
+      "ts": "2025-09-08T11:00:00Z"
+    }
+  ]
+}

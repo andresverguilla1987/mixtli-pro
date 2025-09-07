@@ -1,40 +1,24 @@
 version: "3.9"
 services:
-  db:
-    image: postgres:15
-    restart: always
+  audit:
+    build: ./services/audit-service
+    ports: ["7004:7004"]
+    volumes: ["./services/audit-service/data:/usr/src/app/data"]
+  wfm:
+    build: ./services/wfm-service
+    ports: ["7001:7001"]
+  scoring:
+    build: ./services/scoring-service
+    ports: ["7002:7002"]
+  rules:
+    build: ./services/rules-service
+    ports: ["7003:7003"]
+  gateway:
+    build: ./services/api-gateway
+    ports: ["7000:7000"]
     environment:
-      POSTGRES_USER: mixtli
-      POSTGRES_PASSWORD: mixtli
-      POSTGRES_DB: mixtli
-    ports:
-      - "5432:5432"
-    volumes:
-      - db_data:/var/lib/postgresql/data
-
-  app:
-    build: .
-    command: npm run dev
-    restart: always
-    environment:
-      DATABASE_URL: postgresql://mixtli:mixtli@db:5432/mixtli
-      ADMIN_EMAIL: admin@example.com
-      ADMIN_PASSWORD: S3gura#123
-      ADMIN_NAME: Admin
-    depends_on:
-      - db
-    ports:
-      - "10000:10000"
-
-  swagger:
-    image: swaggerapi/swagger-ui
-    restart: always
-    environment:
-      SWAGGER_JSON: /openapi.yaml
-    volumes:
-      - ./openapi.yaml:/openapi.yaml:ro
-    ports:
-      - "8080:8080"
-
-volumes:
-  db_data:
+      - WFM_URL=http://wfm:7001
+      - SCORING_URL=http://scoring:7002
+      - RULES_URL=http://rules:7003
+      - AUDIT_URL=http://audit:7004
+    depends_on: [audit, wfm, scoring, rules]
