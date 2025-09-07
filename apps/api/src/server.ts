@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
+import { metricsMiddleware, metricsRouter } from "./metrics.js";
 import { PrismaClient } from "@prisma/client";
 import { router as wfmRouter } from "./wfm.js";
 import { router as scoringRouter } from "./scoring.js";
@@ -16,6 +17,7 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 app.use(morgan("tiny"));
+app.use(metricsMiddleware);
 
 app.get("/health", async (_req, res) => {
   try {
@@ -36,6 +38,8 @@ app.get("/openapi.yaml", (_req, res) => {
   const spec = createOpenApi();
   res.type("text/yaml").send(spec);
 });
+
+app.use(metricsRouter);
 
 app.listen(PORT, () => {
   console.log(`🚀 API listening on :${PORT}`);

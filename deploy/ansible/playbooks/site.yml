@@ -6,4 +6,4 @@
     - nginx
     - certbot
     - app
-    - cloudflared
+    - cloudflared    - cloudsql_proxy

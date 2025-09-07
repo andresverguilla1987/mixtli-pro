@@ -1,0 +1,34 @@
+---
+- name: Descargar Cloud SQL Auth Proxy
+  get_url:
+    url: https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.12.0/cloud-sql-proxy.linux.amd64
+    dest: /usr/local/bin/cloud-sql-proxy
+    mode: '0755'
+
+- name: Crear carpeta credenciales
+  file:
+    path: /root/cloudsql
+    state: directory
+    mode: '0700'
+
+- name: Escribir service (requiere vars: gcp_instance, gcp_sa_key_path)
+  copy:
+    dest: /etc/systemd/system/cloud-sql-proxy.service
+    content: |
+      [Unit]
+      Description=Cloud SQL Auth Proxy
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      ExecStart=/usr/local/bin/cloud-sql-proxy --port 5432 {{ gcp_instance }} --credentials-file {{ gcp_sa_key_path }}
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Habilitar y arrancar proxy
+  systemd:
+    name: cloud-sql-proxy
+    enabled: yes
+    state: started

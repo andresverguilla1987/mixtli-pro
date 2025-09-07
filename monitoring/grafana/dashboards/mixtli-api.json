@@ -1,0 +1,41 @@
+{
+  "title": "Mixtli API",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "HTTP RPS",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total[1m]))",
+          "legendFormat": "rps"
+        }
+      ],
+      "id": 1
+    },
+    {
+      "type": "graph",
+      "title": "HTTP 5xx rate",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))",
+          "legendFormat": "5xx ratio"
+        }
+      ],
+      "id": 2
+    },
+    {
+      "type": "graph",
+      "title": "Container CPU (all)",
+      "targets": [
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{image!=\"\"}[5m])) by (container)",
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "id": 3
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

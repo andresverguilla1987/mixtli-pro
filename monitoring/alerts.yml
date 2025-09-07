@@ -1,0 +1,29 @@
+groups:
+- name: mixtli-general
+  rules:
+  - alert: InstanceDown
+    expr: up == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: 'Target {{ $labels.instance }} is down'
+      description: 'Prometheus target {{ $labels.job }} on {{ $labels.instance }} has been down for 5m.'
+
+  - alert: ApiHighErrorRate
+    expr: (sum(rate(http_requests_total{status=~"5.."}[5m])) by () / sum(rate(http_requests_total[5m])) by ()) > 0.05
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: 'High 5xx rate in API'
+      description: '5xx > 5% over 10m.'
+
+  - alert: HighContainerCPU
+    expr: sum(rate(container_cpu_usage_seconds_total{image!=""}[5m])) by (container) > 0.5
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: 'High CPU usage by container'
+      description: 'Container {{ $labels.container }} CPU > 0.5 cores (5m avg).'
