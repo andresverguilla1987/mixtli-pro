@@ -1,0 +1,54 @@
+{
+  "info": {
+    "name": "Mixtli – Envío con Adjunto (LIVE)",
+    "_postman_id": "auto-attach-demo",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Enviar con adjunto (multipart)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-User-Email",
+            "value": "admin@mixtli.test"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "to",
+              "value": "destinatario@example.com",
+              "type": "text"
+            },
+            {
+              "key": "subject",
+              "value": "Prueba adjunto alta calidad",
+              "type": "text"
+            },
+            {
+              "key": "text",
+              "value": "Adjunto imagen/PDF en máxima calidad.",
+              "type": "text"
+            },
+            {
+              "key": "attachment",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "url": {
+          "raw": "https://mixtli-pro.onrender.com/events/send-multipart"
+        }
+      },
+      "response": []
+    }
+  ]
+}
