@@ -163,6 +163,10 @@ if (isSecond){
         }
         loadDeposits();
       });
+      tr.querySelector('.cpy').addEventListener('click', ()=>{
+        const url = `${location.origin}/approve.html?id=${r.id}&stage=${isSecond ? 'final':'first'}`;
+        navigator.clipboard.writeText(url); alert('Link copiado');
+      });
       tr.querySelector('.reject').addEventListener('click', async ()=>{
         const reason = prompt('Motivo del rechazo:'); if (!reason) return;
         const { error: err } = await sb.rpc('admin_reject_bank_deposit', { p_ref: r.id, p_reason: reason });
@@ -700,3 +704,44 @@ function urlBase64ToUint8Array(base64String){
   const rawData = atob(base64); const outputArray = new Uint8Array(rawData.length);
   for (let i=0; i<rawData.length; ++i){ outputArray[i] = rawData.charCodeAt(i); } return outputArray;
 }
+
+// --- Antifraude ---
+const fQuery = document.getElementById('fQuery');
+const fSearch = document.getElementById('fSearch');
+const fTimeline = document.getElementById('fTimeline');
+const fSignals = document.getElementById('fSignals');
+
+fSearch?.addEventListener('click', async ()=>{
+  const q = (fQuery.value||'').trim(); if (!q) return;
+  // Buscar por email → user_id
+  let userId = q;
+  if (q.includes('@')){
+    const { data:p } = await sb.from('profiles').select('user_id').eq('email', q).single();
+    userId = p?.user_id || q;
+  }
+  const { data: deps } = await sb.from('bank_deposits').select('*').eq('user_id', userId).order('created_at',{ascending:false}).limit(200);
+  const { data: buys } = await sb.from('purchases').select('*').eq('user_id', userId).order('created_at',{ascending:false}).limit(200);
+  const { data: anom } = await sb.from('anomalies').select('*').in('ref_id', (deps||[]).map(d=>d.id)).order('created_at',{ascending:false}).limit(200);
+  const { data: acts } = await sb.from('admin_actions').select('*').in('ref_id', (deps||[]).map(d=>d.id)).order('created_at',{ascending:false}).limit(200);
+  const { data: risks } = await sb.from('risk_assessments').select('*').in('ref_id', (deps||[]).map(d=>d.id)).order('created_at',{ascending:false}).limit(200);
+
+  // Timeline
+  const events = [];
+  (deps||[]).forEach(d=> events.push({ t: d.created_at, kind:'deposit', txt:`Depósito ${(d.expected_cents/100).toFixed(2)} ${(d.currency||'MXN').toUpperCase()} • ${d.status}` }));
+  (buys||[]).forEach(p=> events.push({ t: p.created_at, kind:'purchase', txt:`Compra ${(p.amount_cents/100).toFixed(2)} ${(p.currency||'MXN').toUpperCase()}` }));
+  (acts||[]).forEach(a=> events.push({ t: a.created_at, kind:'action', txt:`Admin ${a.action}` }));
+  (anom||[]).forEach(a=> events.push({ t: a.created_at, kind:'anomaly', txt:`Anomalía ${a.reason||''} (score ${a.score||''})` }));
+  (risks||[]).forEach(r=> events.push({ t: r.created_at, kind:'risk', txt:`Riesgo ${r.band} (score ${r.score})` }));
+  events.sort((a,b)=> (a.t<b.t?1:-1));
+
+  fTimeline.innerHTML = events.map(ev => `<li> ${new Date(ev.t).toLocaleString()} • ${ev.txt} </li>`).join('') || '<li class="text-slate-400">Sin eventos</li>';
+
+  // Señales: por mes mostrar peor banda
+  const byMonth = {};
+  (risks||[]).forEach(r=>{ const m = (r.created_at||'').slice(0,7); const order = {low:1,medium:2,high:3}; byMonth[m] = Math.max(byMonth[m]||0, order[r.band]||0); });
+  const months = Object.keys(byMonth).sort();
+  fSignals.innerHTML = months.map(m => {
+    const v = byMonth[m]; const color = v===3 ? 'bg-rose-600' : v===2 ? 'bg-amber-500' : 'bg-emerald-600';
+    return `<div class="p-3 rounded-md ${color} text-white text-xs">${m}</div>`;
+  }).join('') || '<div class="text-slate-400">Sin señales</div>';
+});

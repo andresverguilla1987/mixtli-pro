@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Mixtli — One‑tap</title>
+  <link rel="icon" href="assets/logo.svg">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/config.js"></script>
+  <script defer src="assets/approve.js"></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+  <main class="mx-auto max-w-md p-6 space-y-6">
+    <div class="text-center space-y-2">
+      <img src="assets/logo.svg" class="h-10 w-10 mx-auto" alt="logo">
+      <h1 class="text-xl font-semibold">Aprobación rápida</h1>
+      <p id="status" class="text-sm text-slate-400">Cargando...</p>
+    </div>
+
+    <div id="card" class="hidden rounded-2xl border border-white/10 p-4 space-y-3">
+      <div id="info" class="text-sm"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <button id="btnApprove" class="h-12 rounded-xl bg-emerald-600 text-white font-semibold">Aprobar</button>
+        <button id="btnReject" class="h-12 rounded-xl bg-rose-600 text-white font-semibold">Rechazar</button>
+      </div>
+    </div>
+
+    <div id="authBox" class="hidden rounded-xl border border-white/10 p-4 text-sm">
+      <div>Inicia sesión para continuar.</div>
+      <a href="index.html" class="mt-2 inline-block px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Ir a login</a>
+    </div>
+  </main>
+</body>
+</html>

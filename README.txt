@@ -1495,3 +1495,127 @@ supabase functions deploy push-register push-broadcast
 supabase functions secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
 supabase functions secrets set VAPID_PUBLIC_KEY=BPUBLICKEY... VAPID_PRIVATE_KEY=xxxxxxxx VAPID_SUBJECT=mailto:admin@tu-dominio.com
 ```
+
+
+---
+# V7.6 — One‑tap móvil, Deep links, Risk scoring + Priority, Antifraude
+Generado: 2025-09-07 05:19
+
+## Novedades
+- **Aprobación móvil one‑tap** con **deep link** (`approve.html?id=...&stage=first|final`). Requiere sesión admin; usa **TOTP/OTP** si aplica.
+- **Risk scoring** para depósitos (`risk_assessments`) con bandas **low/medium/high** y factores (z‑score, KYC, historial).
+- **Priority queue** en `jobs` (columna `priority`) para atender antes eventos de **alto riesgo**.
+- **Panel Antifraude** (nueva pestaña en Admin) con **timeline por usuario** y **mapa de señales**.
+
+## SQL — Risk scoring + Priority
+```sql
+-- Tabla de evaluaciones de riesgo
+create table if not exists public.risk_assessments(
+  id uuid primary key default gen_random_uuid(),
+  ref_id uuid not null,          -- bank_deposits.id
+  kind text not null default 'deposit',
+  score numeric not null,
+  band text not null,            -- low | medium | high
+  factors jsonb,
+  created_at timestamptz default now()
+);
+alter table public.risk_assessments enable row level security;
+create policy risk_view on public.risk_assessments
+  for select to authenticated using (public.is_admin() or public.has_role('reports'));
+
+-- Columna de prioridad en jobs (1=alta, 9=baja)
+alter table public.jobs add column if not exists priority smallint default 5;
+create index if not exists jobs_sched_idx on public.jobs(status, run_after, priority);
+
+-- Función de score de riesgo para depósitos
+create or replace function public.risk_score_deposit(p_ref uuid) returns numeric
+language plpgsql as $$
+declare v_user uuid; v_amt bigint; v_curr text; v_tid uuid;
+        mu numeric; sigma numeric; z numeric; kyc text; rej int; anom int;
+        s numeric := 0; dual bigint;
+begin
+  select user_id, expected_cents, currency, tenant_id into v_user, v_amt, v_curr, v_tid from bank_deposits where id=p_ref;
+  if v_user is null then return 0; end if;
+
+  select avg(expected_cents)::numeric, nullif(stddev_pop(expected_cents),0)::numeric
+    into mu, sigma
+  from bank_deposits where user_id=v_user and created_at>=now()-interval '90 days' and id<>p_ref;
+  if mu is null then mu := 0; end if; if sigma is null then sigma := 1; end if;
+  z := greatest(0, (v_amt - mu) / sigma);
+  s := s + least(10, z);                      -- hasta 10 pts por z-score
+
+  select (select dual_required_above_cents from get_deposit_limits() limit 1) into dual;
+  if v_amt >= dual then s := s + 5; end if;   -- umbral dual
+
+  select kyc_status into kyc from profiles where user_id = v_user;
+  if kyc is null or kyc in ('none','rejected') then s := s + 5;
+  elsif kyc in ('pending') then s := s + 2;
+  end if;
+
+  select count(*) into rej from admin_actions where entity='bank_deposits' and action='deposit_reject' and ref_id in (select id from bank_deposits where user_id=v_user);
+  s := s + least(5, rej);                     -- historial rechazos (cap 5)
+
+  select count(*) into anom from anomalies where ref_id=p_ref;
+  s := s + least(2, anom);                    -- señal de anomalía inmediata
+
+  return s;
+end; $$;
+
+-- Guarda evaluación y encola prioridad según banda
+create or replace function public.assess_and_enqueue(p_ref uuid) returns text
+language plpgsql as $$
+declare sc numeric; band text; prio smallint := 5; txt text; begin
+  sc := public.risk_score_deposit(p_ref);
+  if sc >= 12 then band := 'high'; prio := 1;
+  elsif sc >= 7 then band := 'medium'; prio := 3;
+  else band := 'low'; prio := 5;
+  end if;
+  insert into risk_assessments(ref_id, score, band, factors)
+    values (p_ref, sc, band, jsonb_build_object('note','auto score'));
+  txt := 'Riesgo '||band||' ('||sc||') en depósito '||p_ref;
+  insert into jobs(topic, payload, priority) values ('slack', jsonb_build_object('text', txt), prio);
+  return band;
+end; $$;
+revoke all on function public.assess_and_enqueue(uuid) from public;
+grant execute on function public.assess_and_enqueue(uuid) to authenticated;
+
+-- Trigger: cuando depósito esté pendiente, evaluar riesgo
+create or replace function public.trg_score_deposit_fn() returns trigger language plpgsql as $$
+begin
+  if TG_OP='INSERT' or (TG_OP='UPDATE' and NEW.status<>OLD.status) then
+    if NEW.status in ('pending','pending_second') then
+      perform public.assess_and_enqueue(NEW.id);
+    end if;
+  end if;
+  return NEW;
+end; $$;
+drop trigger if exists trg_score_deposit on public.bank_deposits;
+create trigger trg_score_deposit after insert or update on public.bank_deposits
+for each row execute function public.trg_score_deposit_fn();
+```
+
+## One‑tap y Deep links
+- Nueva página `approve.html` para aprobar/rechazar rápido desde móvil. Requiere sesión admin/role `deposits` y respeta **TOTP/OTP**.
+- Botón **Copiar link** en la cola de depósitos genera `approve.html?id=UUID&stage=first|final` según estado.
+- `jobs-runner` incluye `url` al **one‑tap** en notificaciones **push**/**Discord**/**Slack** cuando hay `pending`/`pending_second`.
+
+## Panel Antifraude
+- Nueva pestaña **Fraude** en Admin: busca por **email o user_id**, muestra **timeline** (depósitos, compras, anomalías, acciones admin) y **mapa de señales** (bandas por fecha).
+
+### Despliegue
+1) Ejecuta el bloque SQL de V7.6 (arriba).  
+2) Abre `admin.html` → pestaña **Fraude**.  
+3) Prueba un **push** en un depósito `pending_second` y aprueba desde `approve.html`.
+
+## Nota: Enlace one‑tap en jobs
+Actualiza tu función `enqueue_deposit_job()` para incluir `payload.url = '/approve.html?id=UUID&stage=...'` según el estado.
+Ejemplo (fragmento):
+```sql
+-- dentro de enqueue_deposit_job()
+    insert into jobs(topic, payload, priority)
+    values ('push', jsonb_build_object(
+      'title', 'Depósito pendiente',
+      'text', txt,
+      'url', '/approve.html?id='||NEW.id||'&stage='||(case when NEW.status='pending_second' then 'final' else 'first' end)
+    ), prio);
+```

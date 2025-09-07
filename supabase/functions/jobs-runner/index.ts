@@ -23,7 +23,7 @@ async function handle(job: any){
 
 serve(async (_req) => {
   try{
-    const { data: jobs } = await db.from("jobs").select("*").eq("status","queued").lte("run_after", new Date().toISOString()).limit(20);
+    const { data: jobs } = await db.from("jobs").select("*").eq("status","queued").lte("run_after", new Date().toISOString()).order('priority', { ascending: true }).order('created_at', { ascending: true }).limit(20);
     for (const j of (jobs||[])){
       await db.from("jobs").update({ status: "running", attempts: (j.attempts||0)+1, updated_at: new Date().toISOString() }).eq("id", j.id);
       await handle(j);
