@@ -9,6 +9,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/config.js"></script>
   <script src="assets/admin.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
   <header class="border-b border-white/10 bg-slate-950/60 backdrop-blur">
@@ -117,6 +119,7 @@
             <input id="pEnd" type="date" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
             <button id="pFetch" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Cargar</button>
             <button id="pCsv" class="px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white">Exportar CSV</button>
+            <button id="pZip" class="px-3 py-2 rounded-md bg-pink-600 hover:bg-pink-700 text-white">PDFs (ZIP)</button>
           </div>
           <ul id="pList" class="mt-3 space-y-1 text-xs text-slate-300"></ul>
         </div>

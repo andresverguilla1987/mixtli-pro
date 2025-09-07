@@ -549,3 +549,180 @@ insert into public.admin_roles(email, roles) values
   ('reportes@tu-dominio.com', array['reports'])
 on conflict (email) do update set roles=excluded.roles;
 ```
+
+
+---
+# V6.8 — Límites por rol, Doble aprobación, Auditoría, PDFs masivos
+Generado: 2025-09-07 04:49
+
+## Novedades
+- **Límites por rol** (sección Deposits): define umbrales de aprobación y montos máximos.
+- **Doble aprobación** automática si el monto supera el umbral configurado.
+- **Auditoría** (`admin_actions`) de todo evento sensible (aprobaciones, KYC).
+- **Descarga masiva de recibos PDF** (ZIP) por rango de fechas en Reportes.
+
+## SQL — nuevas tablas y RPC
+```sql
+-- Límites por rol
+create table if not exists public.admin_role_limits(
+  role text primary key,                                 -- 'deposits', etc.
+  single_auto_approve_cents bigint default 200000,       -- hasta aquí 1 aprobación (ej. $2,000.00 MXN)
+  dual_required_above_cents bigint default 500000,       -- desde aquí requiere 2 aprobaciones
+  max_cents bigint default 2000000                       -- tope absoluto por operación
+);
+
+-- Auditoría
+create table if not exists public.admin_actions(
+  id uuid default gen_random_uuid() primary key,
+  actor_email text not null,
+  action text not null,        -- 'deposit_first_approve','deposit_final_approve','kyc_update', etc.
+  entity text not null,        -- 'bank_deposits','profiles', ...
+  ref_id uuid,                 -- id del depósito o null
+  amount_cents bigint,
+  currency text,
+  details jsonb,
+  created_at timestamptz default now()
+);
+alter table public.admin_actions enable row level security;
+create policy "view_admin_actions" on public.admin_actions
+  for select to authenticated using (public.is_admin() or public.has_role('reports'));
+
+-- Extiende bank_deposits para doble aprobación
+alter table public.bank_deposits add column if not exists approved_by1 text;
+alter table public.bank_deposits add column if not exists approved_by2 text;
+-- estados: 'pending' | 'pending_second' | 'approved' | 'rejected'
+
+-- Helper: email actual desde el JWT
+create or replace function public.current_email() returns text language sql stable as $$
+  select auth.jwt()->>'email';
+$$;
+
+-- Obtiene límites para el rol 'deposits' (o default si no hay)
+create or replace function public.get_deposit_limits() returns table(
+  single_auto_approve_cents bigint,
+  dual_required_above_cents bigint,
+  max_cents bigint
+) language sql stable as $$
+  select l.single_auto_approve_cents, l.dual_required_above_cents, l.max_cents
+  from public.admin_role_limits l
+  where l.role = 'deposits'
+  union all
+  select 200000, 500000, 2000000 limit 1
+  where not exists (select 1 from public.admin_role_limits where role='deposits');
+$$;
+
+-- Primera aprobación: puede dejar en pending_second o aprobar directo si no excede umbral
+create or replace function public.admin_approve_bank_deposit_v2(p_ref uuid)
+returns text language plpgsql security definer as $$
+declare
+  v_user uuid; v_curr text; v_amt bigint; v_status text; v_email text;
+  lim record;
+begin
+  if not (public.is_admin() or public.has_role('deposits')) then
+    raise exception 'not allowed';
+  end if;
+  v_email := public.current_email();
+  select user_id, currency, expected_cents, status into v_user, v_curr, v_amt, v_status
+  from bank_deposits where id = p_ref for update;
+  if v_user is null then
+    raise exception 'deposit not found';
+  end if;
+  if v_status <> 'pending' then
+    raise exception 'deposit not pending';
+  end if;
+
+  select * into lim from public.get_deposit_limits() limit 1;
+  if v_amt > lim.max_cents then
+    raise exception 'amount exceeds max allowed';
+  end if;
+
+  if v_amt >= lim.dual_required_above_cents then
+    update bank_deposits set status='pending_second', approved_by1=v_email where id = p_ref;
+    insert into admin_actions(actor_email, action, entity, ref_id, amount_cents, currency, details)
+      values (v_email, 'deposit_first_approve', 'bank_deposits', p_ref, v_amt, v_curr, jsonb_build_object('note','dual required'));
+    return 'pending_second';
+  else
+    -- aprobar definitivo (una sola aprobación)
+    update bank_deposits set status='approved', approved_at=now(), approved_by1=v_email where id = p_ref;
+    insert into wallets(user_id) values (v_user) on conflict (user_id) do nothing;
+    update wallets set balance_cents = coalesce(balance_cents,0) + v_amt, updated_at = now() where user_id = v_user;
+    insert into wallet_ledger(user_id, type, amount_cents, currency, provider, provider_ref, description)
+      values (v_user, 'deposit', v_amt, coalesce(v_curr,'mxn'), 'bank', p_ref::text, 'Depósito bancario aprobado (single)');
+    insert into admin_actions(actor_email, action, entity, ref_id, amount_cents, currency, details)
+      values (v_email, 'deposit_final_approve', 'bank_deposits', p_ref, v_amt, v_curr, jsonb_build_object('mode','single'));
+    return 'approved';
+  end if;
+end;
+$$;
+revoke all on function public.admin_approve_bank_deposit_v2(uuid) from public;
+grant execute on function public.admin_approve_bank_deposit_v2(uuid) to authenticated;
+
+-- Segunda aprobación
+create or replace function public.admin_finalize_bank_deposit(p_ref uuid)
+returns text language plpgsql security definer as $$
+declare
+  v_user uuid; v_curr text; v_amt bigint; v_status text; v_first text; v_email text;
+begin
+  if not (public.is_admin() or public.has_role('deposits')) then
+    raise exception 'not allowed';
+  end if;
+  v_email := public.current_email();
+  select user_id, currency, expected_cents, status, approved_by1
+  into v_user, v_curr, v_amt, v_status, v_first
+  from bank_deposits where id = p_ref for update;
+  if v_user is null then
+    raise exception 'deposit not found';
+  end if;
+  if v_status <> 'pending_second' then
+    raise exception 'deposit not awaiting second approval';
+  end if;
+  if v_first = v_email then
+    raise exception 'second approver must be different';
+  end if;
+
+  update bank_deposits set status='approved', approved_at=now(), approved_by2=v_email where id = p_ref;
+  insert into wallets(user_id) values (v_user) on conflict (user_id) do nothing;
+  update wallets set balance_cents = coalesce(balance_cents,0) + v_amt, updated_at = now() where user_id = v_user;
+  insert into wallet_ledger(user_id, type, amount_cents, currency, provider, provider_ref, description)
+    values (v_user, 'deposit', v_amt, coalesce(v_curr,'mxn'), 'bank', p_ref::text, 'Depósito bancario aprobado (dual)');
+  insert into admin_actions(actor_email, action, entity, ref_id, amount_cents, currency, details)
+    values (v_email, 'deposit_final_approve', 'bank_deposits', p_ref, v_amt, v_curr, jsonb_build_object('mode','dual'));
+  return 'approved';
+end;
+$$;
+revoke all on function public.admin_finalize_bank_deposit(uuid) from public;
+grant execute on function public.admin_finalize_bank_deposit(uuid) to authenticated;
+
+-- Rechazo (con auditoría)
+create or replace function public.admin_reject_bank_deposit(p_ref uuid, p_reason text)
+returns text language plpgsql security definer as $$
+declare v_status text; v_email text;
+begin
+  if not (public.is_admin() or public.has_role('deposits')) then raise exception 'not allowed'; end if;
+  v_email := public.current_email();
+  select status into v_status from bank_deposits where id = p_ref for update;
+  if v_status is null then raise exception 'deposit not found'; end if;
+  if v_status not in ('pending','pending_second') then raise exception 'cannot reject in this state'; end if;
+  update bank_deposits set status='rejected' where id = p_ref;
+  insert into admin_actions(actor_email, action, entity, ref_id, details)
+    values (v_email, 'deposit_reject', 'bank_deposits', p_ref, jsonb_build_object('reason', p_reason));
+  return 'rejected';
+end;
+$$;
+revoke all on function public.admin_reject_bank_deposit(uuid, text) from public;
+grant execute on function public.admin_reject_bank_deposit(uuid, text) to authenticated;
+
+-- KYC con auditoría
+create or replace function public.admin_set_kyc_status(p_user uuid, p_status text, p_note text default null)
+returns void language plpgsql security definer as $$
+declare v_email text; begin
+  if not (public.is_admin() or public.has_role('kyc')) then raise exception 'not allowed'; end if;
+  v_email := public.current_email();
+  update profiles set kyc_status=p_status, updated_at=now() where user_id = p_user;
+  insert into admin_actions(actor_email, action, entity, ref_id, details)
+    values (v_email, 'kyc_update', 'profiles', p_user, jsonb_build_object('status', p_status, 'note', p_note));
+end; $$;
+revoke all on function public.admin_set_kyc_status(uuid, text, text) from public;
+grant execute on function public.admin_set_kyc_status(uuid, text, text) to authenticated;
+```
+> Ajusta `admin_role_limits` según tus políticas internas.

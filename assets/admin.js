@@ -88,7 +88,7 @@
 
   async function loadDeposits(){
     depRows.innerHTML = "";
-    let q = sb.from('bank_deposits').select('*').eq('status','pending');
+    let q = sb.from('bank_deposits').select('*').in('status',['pending','pending_second']);
     if (depStart.value) q = q.gte('created_at', depStart.value);
     if (depEnd.value) q = q.lte('created_at', depEnd.value);
     q = q.order('created_at',{ascending:false}).range(depPage*DEP_SIZE, depPage*DEP_SIZE + DEP_SIZE - 1);
@@ -105,15 +105,36 @@
   kycNext.addEventListener('click', ()=>{ kycPage++; loadKyc(); });
     (data||[]).forEach(r => {
       const tr = document.createElement("tr");
+      const isSecond = r.status === 'pending_second';
       tr.innerHTML = `<td class="p-2">${r.id}</td>
         <td class="p-2">${r.user_id}<br><span class='text-slate-400 text-xs'>${emailMap[r.user_id]||''}</span></td>
         <td class="p-2">${(r.expected_cents/100).toFixed(2)}</td>
         <td class="p-2">${(r.currency||'mxn').toUpperCase()}</td>
         <td class="p-2">${new Date(r.created_at).toLocaleString()}</td>
-        <td class="p-2"><button class="px-3 py-1 rounded-md bg-brand-500 hover:bg-brand-600 text-white">Aprobar</button></td>`;
-      tr.querySelector("button").addEventListener("click", async ()=>{
+        <td class="p-2 flex gap-2">
+          <button class="approve px-3 py-1 rounded-md bg-brand-500 hover:bg-brand-600 text-white">Aprobar</button>
+          <button class="reject px-3 py-1 rounded-md bg-white/10 hover:bg-white/20">Rechazar</button>
+        </td>`;
+      tr.querySelector(".approve").addEventListener("click", async ()=>{
         if (!confirm("¿Aprobar este depósito?")) return;
-        const { error: err } = await sb.rpc("admin_approve_bank_deposit", { p_ref: r.id, p_amount_cents: r.expected_cents });
+        // Primera aprobación (o final si no requiere dual)
+        if (isSecond){
+          const { data: res2, error: e2 } = await sb.rpc('admin_finalize_bank_deposit', { p_ref: r.id });
+          if (e2){ alert(e2.message); return; }
+        } else {
+          const { data: res1, error: err1 } = await sb.rpc('admin_approve_bank_deposit_v2', { p_ref: r.id });
+          if (err1){ alert(err1.message); return; }
+          if (res1 === 'pending_second'){ alert('Primera aprobación registrada. Requiere segunda aprobación.'); }
+        }
+        if (err1){ alert(err1.message); return; }
+        if (res1 === 'pending_second'){
+          alert('Primera aprobación registrada. Requiere segunda aprobación.');
+        }
+        loadDeposits();
+      });
+      tr.querySelector('.reject').addEventListener('click', async ()=>{
+        const reason = prompt('Motivo del rechazo:'); if (!reason) return;
+        const { error: err } = await sb.rpc('admin_reject_bank_deposit', { p_ref: r.id, p_reason: reason });
         if (err){ alert(err.message); return; }
         loadDeposits();
       });
@@ -187,7 +208,8 @@
         </td>`;
       tr.querySelectorAll("button").forEach(b => b.addEventListener("click", async ()=>{
         const status = b.dataset.s;
-        const { error: err } = await sb.from("profiles").update({ kyc_status: status }).eq("user_id", r.user_id);
+        const note = status==='verified' ? 'manual verify' : 'manual reject';
+        const { error: err } = await sb.rpc('admin_set_kyc_status', { p_user: r.user_id, p_status: status, p_note: note });
         if (err){ alert(err.message); return; }
         loadKyc();
       }));
@@ -206,6 +228,7 @@
   const pCsv = document.getElementById("pCsv");
   const pList = document.getElementById("pList");
   const pProvider = document.getElementById('pProvider');
+  const pZip = document.getElementById('pZip');
 
   const wStart = document.getElementById("wStart");
   const wEnd = document.getElementById("wEnd");
@@ -283,3 +306,33 @@
     if (ROLES.kyc) await loadKyc();
   })();
 })();
+
+  // Bulk PDFs ZIP
+  pZip.addEventListener('click', async ()=>{
+    if (!pData || !pData.length){ alert('Carga primero compras.'); return; }
+    const zip = new JSZip();
+    for (const r of pData){
+      const { jsPDF } = window.jspdf;
+      const d = new jsPDF();
+      d.setFontSize(16); d.text('MIXTLI - Recibo', 20, 20);
+      d.setFontSize(12);
+      let y = 40;
+      const lines = [
+        'Fecha: ' + (r.created_at||''),
+        'Usuario: ' + (r.user_id||''),
+        'Proveedor: ' + (r.provider||''),
+        'GB: ' + (r.gb||0),
+        'Monto: ' + ((r.amount_cents||0)/100) + ' ' + String(r.currency||'MXN').toUpperCase(),
+        'Ref: ' + (r.provider_ref||'')
+      ];
+      lines.forEach(t => { d.text(t, 20, y); y += 10; });
+      const pdfb64 = d.output('datauristring').split(',')[1];
+      const fname = 'recibo-' + (r.created_at||'') .replace(/[:\s]/g,'_') + '-' + (r.user_id||'') + '.pdf';
+      zip.file(fname, pdfb64, {base64:true});
+    }
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'recibos.zip';
+    a.click();
+  });
