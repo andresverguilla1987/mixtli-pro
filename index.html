@@ -1,145 +1,350 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <title>Mixtli – Demo (2FA + Notificaciones + Multi-Adjuntos)</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mixtli USB Cloud — Landing PRO</title>
+  <meta name="description" content="Envía y recibe archivos grandes. Seguro, rápido y global.">
+  <link rel="icon" href="assets/logo.svg">
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#6366F1',
+              50: '#EEF2FF',
+              100: '#E0E7FF',
+              200: '#C7D2FE',
+              300: '#A5B4FC',
+              400: '#818CF8',
+              500: '#6366F1',
+              600: '#4F46E5',
+              700: '#4338CA',
+              800: '#3730A3',
+              900: '#312E81'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide icons -->
+  <script type="module">
+    import { createIcons } from "https://cdn.jsdelivr.net/npm/lucide@latest/+esm";
+    window.addEventListener('DOMContentLoaded', () => createIcons());
+  </script>
   <style>
-    body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0b1220;color:#e6edf3;margin:0}
-    .wrap{max-width:980px;margin:24px auto;padding:0 16px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    .card{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.28)}
-    h1{font-size:24px;margin:0 0 16px}h2{font-size:18px;margin:0 0 12px}
-    button{background:#2563eb;border:none;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
-    button:disabled{background:#374151;cursor:not-allowed}
-    input,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #374151;background:#0b1220;color:#e6edf3}
-    .muted{color:#9ca3af;font-size:13px}
-    .log{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:#0b1220;color:#93c5fd;border:1px solid #1f2937;padding:8px;border-radius:10px;height:220px;overflow:auto}
-    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #374151}
-    .ok{color:#22c55e}.ghost{background:#6b7280}
-    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    .bar{height:10px;background:#1f2937;border-radius:8px;overflow:hidden}
-    .bar>div{height:100%;width:0%}
+    .glass { backdrop-filter: blur(10px); background: color-mix(in srgb, white 8%, transparent); }
   </style>
 </head>
-<body>
-  <div class="wrap">
-    <h1>Mixtli – Seguridad & Notificaciones (Multi‑Adjuntos)</h1>
-    <p class="muted">Para envío real, tu backend debe mostrar <b>mode: LIVE</b> en el Ping.</p>
-
-    <div class="card" style="margin-bottom:16px;">
-      <div class="row" style="gap:12px;">
-        <div style="flex:1">
-          <label class="muted">Base URL (HTTPS)</label>
-          <input id="baseUrl" placeholder="https://mixtli-pro.onrender.com/"/>
-          <div class="muted">Puedes pasar <code>?base=https://tu-api/</code> en la URL.</div>
-        </div>
-        <div style="flex:1">
-          <label class="muted">Usuario (X-User-Email)</label>
-          <input id="userEmail" value="admin@mixtli.test"/>
-        </div>
-        <div><button onclick="savePrefs()">Guardar</button></div>
+<body class="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100 selection:bg-brand-400/30">
+  <!-- Header -->
+  <header class="sticky top-0 z-40 border-b border-white/10 bg-slate-950/60 glass">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <img src="assets/logo.svg" class="h-8 w-8 rounded-xl shadow" alt="Mixtli logo">
+        <span class="font-bold tracking-tight">Mixtli</span>
+        <span class="text-xs px-2 py-1 rounded-full bg-brand-500/15 text-brand-300 border border-brand-500/20">USB Cloud</span>
+      </div>
+      <nav class="hidden md:flex items-center gap-6 text-sm text-slate-300">
+        <a href="#features" class="hover:text-brand-300">Características</a>
+        <a href="#security" class="hover:text-brand-300">Seguridad</a>
+        <a href="#pricing" class="hover:text-brand-300">Precios</a>
+        <a href="#contact" class="hover:text-brand-300">Contacto</a>
+      </nav>
+      <div class="flex items-center gap-2">
+        <button id="langToggle" class="text-xs px-3 py-1 rounded-md border border-white/10 hover:bg-white/5">EN</button>
+        <a data-link="download" class="hidden sm:inline-flex px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm">Descargar app</a>
       </div>
     </div>
+  </header>
 
-    <div class="grid">
-      <div class="card">
-        <h2>1) Ping</h2>
-        <div class="row">
-          <button onclick="ping()">Probar</button>
-          <span id="pingStatus" class="pill"></span>
+  <!-- Hero -->
+  <section class="relative overflow-hidden">
+    <div class="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-brand-600/20 via-transparent to-transparent"></div>
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 md:py-24 grid md:grid-cols-2 gap-12 items-center">
+      <div class="space-y-6">
+        <span class="inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full border border-brand-500/30 text-brand-300">New • Multi‑platform</span>
+        <h1 class="text-4xl md:text-5xl font-extrabold leading-tight">Mixtli USB Cloud</h1>
+        <p id="heroLead" class="text-slate-300 text-lg">Envía y recibe archivos grandes al instante — web, Android, iOS y Huawei. Seguro desde el día uno.</p>
+        <div class="flex flex-wrap gap-3">
+          <a data-link="cta" class="px-5 py-3 rounded-xl bg-brand-500 hover:bg-brand-400 text-white font-semibold shadow-lg shadow-brand-900/40">Probar gratis</a>
+          <a data-link="download" class="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20">Descargar app</a>
         </div>
-        <div class="muted">Debe mostrar <code>(LIVE sendgrid|ses)</code> si enviará de verdad.</div>
+        <p class="text-xs text-slate-400 flex items-center gap-2">
+          <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+          <span id="trustText">Confiado por equipos, escuelas y creadores</span>
+        </p>
       </div>
 
-      <div class="card">
-        <h2>2) 2FA – Setup</h2>
-        <div class="row">
-          <button onclick="setup2fa()">Generar QR</button>
-          <span id="setupStatus" class="pill"></span>
+      <!-- Mock card -->
+      <div class="bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl">
+        <div class="flex items-center gap-2 text-sm mb-4">
+          <i data-lucide="cloud" class="w-5 h-5 text-brand-300"></i>
+          <span class="text-slate-300">Live transfers</span>
         </div>
-        <img id="qr" style="max-width:100%;display:none;border:1px solid #374151;border-radius:10px;margin-top:8px"/>
-      </div>
-
-      <div class="card">
-        <h2>3) 2FA – Enable</h2>
-        <input id="totp" placeholder="Código de 6 dígitos"/>
-        <div class="row" style="margin-top:8px;gap:8px">
-          <button onclick="enable2fa()">Confirmar</button>
-          <button class="ghost" onclick="enable2faForce()" title="Bypass de demo">Forzar (demo)</button>
-          <span id="enableStatus" class="pill"></span>
+        <div class="rounded-xl bg-black/30 p-4">
+          <svg id="spark" viewBox="0 0 300 120" class="w-full h-36 md:h-44"></svg>
         </div>
-        <div class="muted" id="codesInfo"></div>
-      </div>
-
-      <div class="card">
-        <h2>4) Enviar multi‑adjuntos</h2>
-        <div class="two-col">
-          <div>
-            <label class="muted">Destinatario</label>
-            <input id="toEmail" placeholder="destinatario@dominio.com"/>
+        <div class="grid grid-cols-3 gap-3 text-center mt-4">
+          <div class="rounded-lg border border-white/10 p-3">
+            <div class="text-xs text-slate-400">Latency</div>
+            <div class="font-semibold">&lt;150ms</div>
           </div>
-          <div>
-            <label class="muted">Asunto</label>
-            <input id="subject" value="Prueba multi-adjuntos máxima calidad"/>
+          <div class="rounded-lg border border-white/10 p-3">
+            <div class="text-xs text-slate-400">Uptime</div>
+            <div class="font-semibold">99.9%</div>
+          </div>
+          <div class="rounded-lg border border-white/10 p-3">
+            <div class="text-xs text-slate-400">Regions</div>
+            <div class="font-semibold">Global</div>
           </div>
         </div>
-        <div style="margin-top:8px;">
-          <label class="muted">Mensaje (opcional)</label>
-          <textarea id="plainText" rows="3" placeholder="Adjunto archivos originales sin comprimir."></textarea>
-        </div>
-        <div class="row" style="margin-top:8px;">
-          <input type="file" id="fileInput" multiple />
-          <button onclick="sendAttachments()">Enviar adjuntos</button>
-          <span id="attachStatus" class="pill"></span>
-        </div>
-        <div class="bar" style="margin-top:8px;"><div id="progressInner"></div></div>
-        <div class="muted" id="attachInfo"></div>
-      </div>
-
-      <div class="card">
-        <h2>5) Mail Log</h2>
-        <div class="row" style="gap:12px;">
-          <button onclick="loadMailLog()">Refrescar</button>
-          <span class="muted">Endpoint: <code>/debug/mail-log</code></span>
-        </div>
-        <pre id="log" class="log"></pre>
       </div>
     </div>
-  </div>
+  </section>
 
-<script>
-function getParam(name){const url=new URL(window.location.href);return url.searchParams.get(name);}
-function normBase(val){if(!val) return '';val=val.trim();val=val.replace(/\s*\(.*\)\s*$/,'');if(!val.endsWith('/'))val+='/';return val;}
-function loadPrefs(){const fromQuery=getParam('base');const base=normBase(fromQuery||localStorage.getItem('baseUrl')||'https://mixtli-pro.onrender.com/');document.getElementById('baseUrl').value=base;document.getElementById('userEmail').value=localStorage.getItem('userEmail')||'admin@mixtli.test';document.getElementById('toEmail').value=localStorage.getItem('toEmail')||'';}
-function savePrefs(){localStorage.setItem('baseUrl',normBase(document.getElementById('baseUrl').value));localStorage.setItem('userEmail',document.getElementById('userEmail').value);localStorage.setItem('toEmail',document.getElementById('toEmail').value);alert('Guardado');}
-function headers(){return {'X-User-Email':document.getElementById('userEmail').value||'admin@mixtli.test'};}
-function url(path){const base=normBase(document.getElementById('baseUrl').value).replace(/\/$/,'');if(!base.startsWith('https://')) alert('Para hosted usa backend HTTPS.');return base+path;}
+  <!-- Features -->
+  <section id="features" class="py-16 md:py-24">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="text-center space-y-3">
+        <span class="text-xs px-3 py-1 rounded-full bg-white/5 border border-white/10">Features</span>
+        <h2 class="text-3xl md:text-4xl font-bold">Rápido. Simple. Global.</h2>
+        <p class="text-slate-300 max-w-2xl mx-auto">Una experiencia de transferencia pensada para crecer a miles de usuarios sin perder la magia.</p>
+      </div>
 
-async function ping(){const el=document.getElementById('pingStatus');el.textContent='→ consultando...';el.className='pill';try{const r=await fetch(url('/'));const j=await r.json().catch(()=>({}));el.textContent=r.ok?('✓ OK: '+(j.app||'Mixtli Pro')+' ('+(j.mode||'')+' '+(j.provider||'')+')'):('Error '+r.status);el.className='pill '+(r.ok?'ok':'');}catch(e){el.textContent='Error: '+e.message;}}
-async function setup2fa(){const el=document.getElementById('setupStatus');el.textContent='→ generando...';el.className='pill';try{const r=await fetch(url('/security/2fa/setup'),{method:'POST',headers:{...headers(),'Content-Type':'application/json'}});const j=await r.json();if(j.qrDataUrl){const img=document.getElementById('qr');img.src=j.qrDataUrl;img.style.display='block';}el.textContent=r.ok?'✓ QR listo':('Error '+r.status);el.className='pill '+(r.ok?'ok':'');}catch(e){el.textContent='Error: '+e.message;}}
-async function enable2fa(){const el=document.getElementById('enableStatus');const info=document.getElementById('codesInfo');el.textContent='→ verificando...';el.className='pill';const code=document.getElementById('totp').value;try{let r=await fetch(url('/security/2fa/enable'),{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({code})});let j=await r.json().catch(()=>({}));if(!r.ok&&r.status===400){r=await fetch(url('/security/2fa/enable?force=1'),{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({code:'000000'})});j=await r.json();}if(r.ok&&j.enabled){el.textContent='✓ 2FA habilitado';el.className='pill ok';if(j.recoveryCodes) info.textContent='Backup codes ('+j.recoveryCodes.length+'): '+j.recoveryCodes.slice(0,3).join(', ')+' ...';} else {el.textContent='Error '+(j.error||r.status);} }catch(e){el.textContent='Error: '+e.message;}}
-async function enable2faForce(){const el=document.getElementById('enableStatus');const info=document.getElementById('codesInfo');el.textContent='→ forzando...';el.className='pill';try{const r=await fetch(url('/security/2fa/enable?force=1'),{method:'POST',headers:{...headers(),'Content-Type':'application/json'},body:JSON.stringify({code:'000000'})});const j=await r.json();if(r.ok&&j.enabled){el.textContent='✓ 2FA habilitado (demo)';el.className='pill ok';if(j.recoveryCodes) info.textContent='Backup codes ('+j.recoveryCodes.length+'): '+j.recoveryCodes.slice(0,3).join(', ')+' ...';} else {el.textContent='Error '+(j.error||r.status);} }catch(e){el.textContent='Error: '+e.message;}}
+      <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="rounded-xl border border-white/10 bg-white/5 p-6 hover:shadow-lg hover:shadow-brand-900/20 transition">
+          <div class="h-10 w-10 grid place-items-center rounded-lg bg-brand-500/15 text-brand-300 mb-3">
+            <i data-lucide="zap" class="w-5 h-5"></i>
+          </div>
+          <div class="font-semibold mb-1">Ultra‑rápido</div>
+          <p class="text-sm text-slate-300">CDN y optimizaciones para transferencias grandes sin fricción.</p>
+        </div>
+        <div class="rounded-xl border border-white/10 bg-white/5 p-6 hover:shadow-lg hover:shadow-brand-900/20 transition">
+          <div class="h-10 w-10 grid place-items-center rounded-lg bg-brand-500/15 text-brand-300 mb-3">
+            <i data-lucide="globe-2" class="w-5 h-5"></i>
+          </div>
+          <div class="font-semibold mb-1">Multiplataforma</div>
+          <p class="text-sm text-slate-300">Web, Android, iOS y Huawei. PWA lista para instalar.</p>
+        </div>
+        <div class="rounded-xl border border-white/10 bg-white/5 p-6 hover:shadow-lg hover:shadow-brand-900/20 transition">
+          <div class="h-10 w-10 grid place-items-center rounded-lg bg-brand-500/15 text-brand-300 mb-3">
+            <i data-lucide="settings-2" class="w-5 h-5"></i>
+          </div>
+          <div class="font-semibold mb-1">Admin simple</div>
+          <p class="text-sm text-slate-300">Panel claro para equipos, roles, cuotas y vencimientos.</p>
+        </div>
+        <div class="rounded-xl border border-white/10 bg-white/5 p-6 hover:shadow-lg hover:shadow-brand-900/20 transition">
+          <div class="h-10 w-10 grid place-items-center rounded-lg bg-brand-500/15 text-brand-300 mb-3">
+            <i data-lucide="bell" class="w-5 h-5"></i>
+          </div>
+          <div class="font-semibold mb-1">Alertas</div>
+          <p class="text-sm text-slate-300">Notifica por correo eventos críticos y límites de uso.</p>
+        </div>
+        <div class="rounded-xl border border-white/10 bg-white/5 p-6 hover:shadow-lg hover:shadow-brand-900/20 transition">
+          <div class="h-10 w-10 grid place-items-center rounded-lg bg-brand-500/15 text-brand-300 mb-3">
+            <i data-lucide="database" class="w-5 h-5"></i>
+          </div>
+          <div class="font-semibold mb-1">Integraciones</div>
+          <p class="text-sm text-slate-300">Conecta almacenamiento, S3 compatibles y webhooks.</p>
+        </div>
+        <div class="rounded-xl border border-white/10 bg-white/5 p-6 hover:shadow-lg hover:shadow-brand-900/20 transition">
+          <div class="h-10 w-10 grid place-items-center rounded-lg bg-brand-500/15 text-brand-300 mb-3">
+            <i data-lucide="network" class="w-5 h-5"></i>
+          </div>
+          <div class="font-semibold mb-1">API abierta</div>
+          <p class="text-sm text-slate-300">OpenAPI listo para automatizar flujos de envío/recepción.</p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-function xhrUpload(urlStr, formData, onProgress){return new Promise((resolve,reject)=>{const xhr=new XMLHttpRequest();xhr.open('POST',urlStr,true);xhr.setRequestHeader('X-User-Email', document.getElementById('userEmail').value || 'admin@mixtli.test');xhr.upload.onprogress=(e)=>{if(e.lengthComputable&&onProgress){onProgress(e.loaded/e.total);} };xhr.onreadystatechange=()=>{if(xhr.readyState===4){try{resolve({ ok: (xhr.status>=200&&xhr.status<300), status:xhr.status, json: JSON.parse(xhr.responseText||'{}') });}catch(_){resolve({ ok:false, status:xhr.status, json:{ error:'parse_error', raw:xhr.responseText } });}}};xhr.onerror=()=>reject(new Error('network error'));xhr.send(formData);});}
+  <!-- Security -->
+  <section id="security" class="py-16 md:py-24 bg-white/5">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="text-center space-y-3">
+        <span class="text-xs px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">MX PRO</span>
+        <h2 class="text-3xl md:text-4xl font-bold">Seguridad de nivel pro (MX PRO)</h2>
+        <p class="text-slate-300 max-w-2xl mx-auto">Hardening, alertas y buenas prácticas listas desde el inicio.</p>
+      </div>
+      <div class="mt-10 grid gap-6 lg:grid-cols-3">
+        <div class="rounded-xl border border-white/10 bg-black/30 p-6">
+          <div class="flex items-center gap-2 mb-2 text-emerald-300">
+            <i data-lucide="shield-check" class="w-5 h-5"></i><span class="font-semibold">Hardening automático</span>
+          </div>
+          <p class="text-sm text-slate-300">SSH (2222), UFW, sysctl, Fail2Ban y auditd listos para producción.</p>
+        </div>
+        <div class="rounded-xl border border-white/10 bg-black/30 p-6">
+          <div class="flex items-center gap-2 mb-2 text-emerald-300">
+            <i data-lucide="lock" class="w-5 h-5"></i><span class="font-semibold">Sin contraseñas</span>
+          </div>
+          <p class="text-sm text-slate-300">Acceso por llaves SSH y bloqueo de root. 2FA opcional.</p>
+        </div>
+        <div class="rounded-xl border border-white/10 bg-black/30 p-6">
+          <div class="flex items-center gap-2 mb-2 text-emerald-300">
+            <i data-lucide="bell" class="w-5 h-5"></i><span class="font-semibold">Alertas por correo</span>
+          </div>
+          <p class="text-sm text-slate-300">Fail2Ban notifica intentos maliciosos en tiempo real.</p>
+        </div>
+      </div>
+      <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
+        <a data-link="mxpro" class="px-4 py-2 rounded-md border border-white/10 hover:bg-white/5">MX PRO Kit</a>
+        <a data-link="checklist" class="px-4 py-2 rounded-md bg-white/10 hover:bg-white/20">Ver checklist</a>
+      </div>
+    </div>
+  </section>
 
-async function sendAttachments(){const status=document.getElementById('attachStatus');const info=document.getElementById('attachInfo');const bar=document.getElementById('progressInner');status.textContent='→ preparando...';status.className='pill';info.textContent='';bar.style.width='0%';const to=document.getElementById('toEmail').value.trim();const subject=document.getElementById('subject').value.trim();const text=document.getElementById('plainText').value;const files=[...document.getElementById('fileInput').files];if(!to||!subject||files.length===0){status.textContent='Falta to/subject/archivos';return;}try{const fd=new FormData();fd.append('to',to);fd.append('subject',subject);if(text)fd.append('text',text);files.forEach(f=>fd.append('attachments',f,f.name)); // try multi endpoint first
-  let r = await xhrUpload(url('/events/send-multipart-multi'), fd, (p)=>{bar.style.width=Math.round(p*100)+'%';});
-  if(!r.ok && r.status===404){ // fallback single: send the first file
-    const fd1=new FormData();fd1.append('to',to);fd1.append('subject',subject);if(text)fd1.append('text',text);fd1.append('attachment',files[0],files[0].name);
-    r = await xhrUpload(url('/events/send-multipart'), fd1, (p)=>{bar.style.width=Math.round(p*100)+'%';});
-  }
-  if(!r.ok){ status.textContent='Error '+(r.json?.error||r.status); info.textContent = r.json?.detail ? String(r.json.detail) : (r.json?.raw||''); return; }
-  status.textContent='✓ Enviado'; status.className='pill ok';
-  const list = r.json?.attached || [];
-  info.textContent = (r.json?.dryRun ? 'DRY ' : 'LIVE ') + (list.length? (list.map(a=>a.name+' ('+a.size+' bytes)').join(', ')) : '');
-  await loadMailLog();
-} catch(e){ status.textContent='Error: '+e.message; }}
+  <!-- Pricing -->
+  <section id="pricing" class="py-16 md:py-24">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="text-center space-y-3">
+        <span class="text-xs px-3 py-1 rounded-full bg-white/5 border border-white/10">Pricing</span>
+        <h2 class="text-3xl md:text-4xl font-bold">Planes claros, sin sorpresas</h2>
+        <p class="text-slate-300 max-w-2xl mx-auto">Empieza gratis. Escala cuando lo necesites.</p>
+      </div>
 
-async function loadMailLog(){const pre=document.getElementById('log');try{const r=await fetch(url('/debug/mail-log'));const j=await r.json();pre.textContent=JSON.stringify((j.items||[]),null,2);}catch(e){pre.textContent='Error: '+e.message;}}
+      <div class="mt-10 grid gap-6 md:grid-cols-3">
+        <div class="rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div class="flex items-center justify-between">
+            <h3 class="font-semibold">Free</h3>
+          </div>
+          <div class="text-4xl font-extrabold mt-2">$0<span class="text-base text-slate-400">/mes</span></div>
+          <ul class="mt-4 space-y-2 text-sm">
+            <li class="flex gap-2 items-start"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 mt-0.5"></i>5 GB transferencia/mes</li>
+            <li class="flex gap-2 items-start"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 mt-0.5"></i>Links expiran en 7 días</li>
+            <li class="flex gap-2 items-start"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 mt-0.5"></i>1 equipo</li>
+          </ul>
+          <a class="mt-6 block text-center px-4 py-2 rounded-md bg-white/10 hover:bg-white/20">Empezar</a>
+        </div>
+        <div class="rounded-2xl border border-brand-500/40 bg-brand-500/10 p-6 shadow-lg shadow-brand-900/30">
+          <div class="flex items-center justify-between">
+            <h3 class="font-semibold">Pro</h3>
+            <span class="text-xs px-2 py-1 rounded-full bg-brand-500/20 border border-brand-500/30">Popular</span>
+          </div>
+          <div class="text-4xl font-extrabold mt-2">$9<span class="text-base text-slate-300">/mes</span></div>
+          <ul class="mt-4 space-y-2 text-sm">
+            <li class="flex gap-2 items-start"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 mt-0.5"></i>100 GB transferencia/mes</li>
+            <li class="flex gap-2 items-start"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 mt-0.5"></i>Dominio personalizado</li>
+            <li class="flex gap-2 items-start"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 mt-0.5"></i>Alertas por correo</li>
+          </ul>
+          <a class="mt-6 block text-center px-4 py-2 rounded-md bg-brand-500 hover:bg-brand-400 text-white">Elegir Pro</a>
+        </div>
+        <div class="rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div class="flex items-center justify-between">
+            <h3 class="font-semibold">Teams</h3>
+          </div>
+          <div class="text-4xl font-extrabold mt-2">$29<span class="text-base text-slate-400">/mes</span></div>
+          <ul class="mt-4 space-y-2 text-sm">
+            <li class="flex gap-2 items-start"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 mt-0.5"></i>1 TB transferencia/mes</li>
+            <li class="flex gap-2 items-start"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 mt-0.5"></i>SSO / RBAC</li>
+            <li class="flex gap-2 items-start"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 mt-0.5"></i>API prioritaria</li>
+          </ul>
+          <a class="mt-6 block text-center px-4 py-2 rounded-md bg-white/10 hover:bg-white/20">Contactar ventas</a>
+        </div>
+      </div>
+    </div>
+  </section>
 
-(function init(){const fromQuery=getParam('base');if(fromQuery){document.getElementById('baseUrl').value=normBase(fromQuery);}loadPrefs();})();
-</script>
+  <!-- Contact -->
+  <section id="contact" class="py-16">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid md:grid-cols-2 gap-8 items-center">
+      <div>
+        <h3 class="text-2xl font-bold">Recibe novedades y acceso anticipado</h3>
+        <p class="text-slate-300 mt-2">Beta privada con cupos limitados. Déjanos tu correo y te avisamos.</p>
+      </div>
+      <form class="flex gap-2" onsubmit="return false;">
+        <input id="email" type="email" required placeholder="tu@correo.com" class="h-11 w-full px-4 rounded-md bg-white/10 border border-white/10 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand-500">
+        <button id="notifyBtn" class="h-11 px-4 rounded-md bg-brand-500 hover:bg-brand-400 text-white">Avisarme</button>
+      </form>
+    </div>
+  </section>
+
+  <footer class="py-10 border-t border-white/10">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-slate-400 text-sm">
+      <div class="flex items-center gap-3">
+        <img src="assets/logo.svg" class="h-6 w-6 rounded-lg" alt="logo">
+        <span class="font-semibold text-slate-200">Mixtli</span>
+        <span>© <span id="year"></span></span>
+      </div>
+      <p>Hecho con ♥ para creadores y negocios de México y el mundo</p>
+    </div>
+  </footer>
+
+  <script>
+    // Simple sparkline
+    const data = [12,20,18,26,32,41,38];
+    const svg = document.getElementById('spark');
+    const w = 300, h = 120, pad = 10;
+    const max = Math.max(...data);
+    const min = Math.min(...data);
+    const x = i => pad + i * ((w - pad*2) / (data.length - 1));
+    const y = v => h - pad - ((v - min) / (max - min)) * (h - pad*2);
+    let d = '';
+    data.forEach((v,i) => { d += (i===0? 'M':'L') + x(i) + ' ' + y(v) + ' '; });
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', d.trim());
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke','url(#grad)');
+    path.setAttribute('stroke-width','3');
+    path.setAttribute('stroke-linecap','round');
+    const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+    const lg = document.createElementNS('http://www.w3.org/2000/svg','linearGradient');
+    lg.setAttribute('id','grad'); lg.setAttribute('x1','0'); lg.setAttribute('x2','1');
+    lg.innerHTML = '<stop offset="0%" stop-color="#A5B4FC"/><stop offset="100%" stop-color="#22D3EE"/>';
+    defs.appendChild(lg); svg.appendChild(defs); svg.appendChild(path);
+
+    // Year
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Links map (edit to your real endpoints)
+    const links = {
+      cta: '#',           // Landing de registro
+      download: '#',      // Página de descarga apps
+      mxpro: '#',         // Docs MX PRO
+      checklist: '#',     // Checklist público
+    };
+    document.querySelectorAll('[data-link]').forEach(a => a.setAttribute('href', links[a.dataset.link]));
+
+    // Simple i18n toggle
+    const i18n = {
+      es: {
+        heroLead: 'Envía y recibe archivos grandes al instante — web, Android, iOS y Huawei. Seguro desde el día uno.',
+        trustText: 'Confiado por equipos, escuelas y creadores',
+        cta: 'Probar gratis',
+        download: 'Descargar app',
+      },
+      en: {
+        heroLead: 'Send & receive large files instantly — web, Android, iOS & Huawei. Secure from day one.',
+        trustText: 'Trusted by teams, schools & creators',
+        cta: 'Try for free',
+        download: 'Get the app',
+      }
+    };
+    let lang = 'es';
+    const langBtn = document.getElementById('langToggle');
+    const heroLead = document.getElementById('heroLead');
+    const trustText = document.getElementById('trustText');
+    const ctas = document.querySelectorAll('[data-link="cta"]');
+    const dls = document.querySelectorAll('[data-link="download"]');
+    langBtn.addEventListener('click', () => {
+      lang = lang === 'es' ? 'en' : 'es';
+      langBtn.textContent = lang === 'es' ? 'EN' : 'ES';
+      heroLead.textContent = i18n[lang].heroLead;
+      trustText.textContent = i18n[lang].trustText;
+      ctas.forEach(a => a.textContent = i18n[lang].cta);
+      dls.forEach(a => a.textContent = i18n[lang].download);
+    });
+
+    // Fake notify
+    document.getElementById('notifyBtn').addEventListener('click', () => {
+      const email = document.getElementById('email').value;
+      if(!email) return;
+      alert('Gracias, te avisamos pronto: ' + email);
+    });
+  </script>
 </body>
 </html>
