@@ -1,0 +1,131 @@
+---
+- name: Update and upgrade packages
+  apt:
+    update_cache: yes
+    upgrade: dist
+
+- name: Ensure sudo is present
+  apt:
+    name: sudo
+    state: present
+
+- name: Ensure "{{ create_user }}" user exists and is in sudo group
+  user:
+    name: "{{ create_user }}"
+    groups: sudo
+    append: yes
+    shell: /bin/bash
+    create_home: yes
+
+- name: Backup existing sshd_config if not already backed up
+  command: cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
+  args:
+    creates: /etc/ssh/sshd_config.backup
+
+- name: Deploy stricter sshd_config
+  copy:
+    src: sshd_config.sample
+    dest: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Reload SSH
+
+- name: Ensure sysctl.d directory exists
+  file:
+    path: /etc/sysctl.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install kernel/network hardening sysctl
+  copy:
+    src: 60-hardening.conf
+    dest: /etc/sysctl.d/60-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Apply sysctl
+
+- name: Allow OpenSSH through UFW
+  command: ufw allow OpenSSH
+  register: ufw_openssh
+  changed_when: "'skipping' not in ufw_openssh.stdout|default('')"
+
+- name: Allow HTTP
+  command: ufw allow 80/tcp
+  register: ufw_http
+  changed_when: "'skipping' not in ufw_http.stdout|default('')"
+
+- name: Allow HTTPS
+  command: ufw allow 443/tcp
+  register: ufw_https
+  changed_when: "'skipping' not in ufw_https.stdout|default('')"
+
+- name: Enable UFW
+  command: ufw --force enable
+  register: ufw_enable
+  changed_when: "'already enabled' not in ufw_enable.stdout|default('')"
+
+- name: Install Fail2Ban
+  apt:
+    name: fail2ban
+    state: present
+  when: enable_fail2ban
+
+- name: Deploy Fail2Ban jail.local
+  copy:
+    src: jail.local.sample
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart Fail2Ban
+  when: enable_fail2ban
+
+- name: Ensure Fail2Ban service enabled
+  systemd:
+    name: fail2ban
+    enabled: yes
+    state: started
+  when: enable_fail2ban
+
+- name: Install auditd (optional)
+  apt:
+    name: [auditd]
+    state: present
+  when: enable_auditd
+
+- name: Deploy audit rules (optional)
+  copy:
+    src: audit.rules.sample
+    dest: /etc/audit/rules.d/hardening.rules
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Restart auditd
+  when: enable_auditd
+
+handlers:
+  - name: Reload SSH
+    service:
+      name: ssh
+      state: reloaded
+    listen: Reload SSH
+
+  - name: Apply sysctl
+    command: sysctl --system
+    listen: Apply sysctl
+
+  - name: Restart Fail2Ban
+    service:
+      name: fail2ban
+      state: restarted
+    listen: Restart Fail2Ban
+
+  - name: Restart auditd
+    service:
+      name: auditd
+      state: restarted
+    listen: Restart auditd
