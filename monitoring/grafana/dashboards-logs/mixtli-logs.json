@@ -1,0 +1,30 @@
+{
+  "title": "Mixtli Logs (Loki)",
+  "panels": [
+    {
+      "type": "logs",
+      "title": "Container logs",
+      "targets": [
+        {
+          "expr": "{compose_project=\"mixtli-monorepo\"}"
+        }
+      ],
+      "id": 10
+    },
+    {
+      "type": "graph",
+      "title": "HTTP 4xx/5xx per second (from logs)",
+      "targets": [
+        {
+          "expr": "sum(rate({compose_service=\"mixtli_api\"} |= \"\\\"status\\\": 4\" [1m]))"
+        },
+        {
+          "expr": "sum(rate({compose_service=\"mixtli_api\"} |= \"\\\"status\\\": 5\" [1m]))"
+        }
+      ],
+      "id": 11
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

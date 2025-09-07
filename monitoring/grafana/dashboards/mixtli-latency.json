@@ -1,0 +1,40 @@
+{
+  "title": "Mixtli API Latency",
+  "panels": [
+    {
+      "type": "graph",
+      "title": "p95 latency (seconds)",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95"
+        }
+      ],
+      "id": 21
+    },
+    {
+      "type": "graph",
+      "title": "p99 latency (seconds)",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p99"
+        }
+      ],
+      "id": 22
+    },
+    {
+      "type": "graph",
+      "title": "p95 por ruta",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, path) (rate(http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{path}}"
+        }
+      ],
+      "id": 23
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

@@ -8,3 +8,12 @@ providers:
     updateIntervalSeconds: 10
     options:
       path: /var/lib/grafana/dashboards
+
+- name: 'mixtli-logs'
+  orgId: 1
+  folder: 'Logs'
+  type: file
+  disableDeletion: false
+  updateIntervalSeconds: 10
+  options:
+    path: /var/lib/grafana/dashboards-logs
