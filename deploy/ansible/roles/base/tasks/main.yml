@@ -1,0 +1,50 @@
+---
+- name: Actualiza apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Instala paquetes base
+  apt:
+    name:
+      - git
+      - ufw
+      - fail2ban
+      - unattended-upgrades
+      - nginx
+      - docker.io
+      - docker-compose
+      - certbot
+      - python3-certbot-nginx
+    state: present
+
+- name: Habilita y arranca docker
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Configura UFW (por si está presente)
+  ufw:
+    state: enabled
+    policy: deny
+  ignore_errors: yes
+
+- name: Permite puertos en UFW
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+  loop: "{{ ufw_allow }}"
+  ignore_errors: yes
+
+- name: Asegurar Fail2ban (config por defecto)
+  service:
+    name: fail2ban
+    state: started
+    enabled: yes
+
+- name: Nginx default off
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx

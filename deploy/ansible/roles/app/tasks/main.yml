@@ -1,0 +1,19 @@
+---
+- name: Crea carpeta repo
+  file:
+    path: "{{ repo_path }}"
+    state: directory
+    mode: '0755'
+    recurse: yes
+
+- name: Clonar/Pullar repo (ejemplo – reemplaza con tu URL)
+  git:
+    repo: "https://github.com/tu-user/tu-repo.git"
+    dest: "{{ repo_path }}"
+    version: "main"
+    update: yes
+
+- name: Levantar stack (compose no-nginx)
+  command: docker compose -f {{ compose_file }} up -d --build
+  args:
+    chdir: "{{ repo_path }}"

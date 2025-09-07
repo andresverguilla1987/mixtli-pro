@@ -1,0 +1,13 @@
+---
+- name: Plantilla Nginx
+  template:
+    src: mixtli.conf.j2
+    dest: /etc/nginx/sites-available/mixtli.conf
+    mode: '0644'
+
+- name: Enable site
+  file:
+    src: /etc/nginx/sites-available/mixtli.conf
+    dest: /etc/nginx/sites-enabled/mixtli.conf
+    state: link
+  notify: reload nginx

@@ -1,0 +1,53 @@
+---
+- name: Cuando Cloudflare, instala plugin
+  apt:
+    name: python3-certbot-dns-cloudflare
+    state: present
+  when: tls_provider == "cloudflare"
+
+- name: Cuando Route53, instala plugin
+  apt:
+    name: python3-certbot-dns-route53
+    state: present
+  when: tls_provider == "route53"
+
+- name: Escribe credenciales Cloudflare
+  copy:
+    dest: "{{ cloudflare_credentials_path }}"
+    content: "dns_cloudflare_api_token = {{ cloudflare_api_token }}
+"
+    mode: '0600'
+  when: tls_provider == "cloudflare"
+
+- name: Emitir certificado (HTTP-01)
+  command: >
+    certbot --nginx -n --agree-tos
+    -m {{ admin_email }}
+    -d {{ domain }}
+  when: tls_provider == "http01"
+  args:
+    creates: "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
+
+- name: Emitir certificado (DNS-01 – Cloudflare)
+  command: >
+    certbot certonly --dns-cloudflare
+    --dns-cloudflare-credentials {{ cloudflare_credentials_path }}
+    -n --agree-tos -m {{ admin_email }}
+    -d {{ domain }} -d *.{{ domain.split('.',1)[1] if domain|regex_search('^[^.]+\.') else domain }}
+  when: tls_provider == "cloudflare"
+  args:
+    creates: "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
+
+- name: Emitir certificado (DNS-01 – Route53)
+  command: >
+    certbot certonly --dns-route53
+    -n --agree-tos -m {{ admin_email }}
+    -d {{ domain }} -d *.{{ domain.split('.',1)[1] if domain|regex_search('^[^.]+\.') else domain }}
+  when: tls_provider == "route53"
+  args:
+    creates: "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
+
+- name: Recargar Nginx tras emitir/renovar
+  service:
+    name: nginx
+    state: reloaded
