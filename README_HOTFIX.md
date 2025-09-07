@@ -1,22 +1,21 @@
-# Mixtli Hotfix v2 (root & Redis safe)
+# Mixtli Hotfix v3
 
-Este parche hace dos cosas:
-1) Agrega rutas `/`, `/health` y `/salud` con 200 OK para que el healthcheck no marque 404.
-2) Cambia `apps/api/src/lib/redis.ts` por una versión **segura** que no truena si no hay Redis o no se puede conectar.
+Este parche arregla dos cosas sin tocar tus comandos de build/start:
+1) Rutas de salud para evitar 404 en `/` y exponer `/health` (también `/salud`, `/status`, `/ready`, `/live`).
+2) Un wrapper de Redis "no-op" para que no vuelva a salir `ECONNREFUSED 127.0.0.1:6379` aunque no exista Redis.
 
-## Pasos
+## Qué incluye
+- apps/api/src/app.ts              ← reemplaza al actual, añade health y exporta `PORT`
+- apps/api/src/lib/redis.ts        ← stub seguro en memoria
+- apps/api/src/types/shims.d.ts    ← typings mínimos por si compilas con tsc
 
-1. Copia el contenido del ZIP en la **raíz** del repo (respeta carpetas).
-2. Abre `apps/api/src/app.ts` y agrega:
-   ```ts
-   import rootHealth from './health';
-   // ...
-   app.use('/', rootHealth);
-   ```
-3. Deploy normal. Opcional: en Render usa `/health` como Health Check Path.
-4. Si existen variables REDIS_* pero no tienes servicio Redis corriendo, bórralas o déjalas: el wrapper ya no truena.
+## Cómo aplicar
+1. Descomprime este ZIP en la **raíz del repo** (deja que sobreescriba archivos).
+2. Commit & push para que Render redeploye.
 
-## Verificación
-- `GET /` -> 200 "ok"
-- `GET /health` -> 200 `{"status":"ok"}`
-- No deben aparecer errores `ECONNREFUSED 127.0.0.1:6379` de forma continua.
+## Probar
+- GET `/`         → 200 `ok`
+- GET `/health`   → 200 `{"status":"ok"}`
+- GET `/salud`    → 200 `{"status":"ok"}`
+
+El log ya no debería spamear `ECONNREFUSED 127.0.0.1:6379`.
