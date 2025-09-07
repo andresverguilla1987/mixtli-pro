@@ -1164,3 +1164,73 @@ async function callExport(what){
 biExportAll?.addEventListener('click', ()=>callExport('all'));
 biExportDep?.addEventListener('click', ()=>callExport('deposits'));
 biExportPur?.addEventListener('click', ()=>callExport('purchases'));
+
+// ===== Skills =====
+const skName = document.getElementById('skName');
+const skDesc = document.getElementById('skDesc');
+const skAdd = document.getElementById('skAdd');
+const skAgentEmail = document.getElementById('skAgentEmail');
+const skLevel = document.getElementById('skLevel');
+const skMap = document.getElementById('skMap');
+const skQueue = document.getElementById('skQueue');
+const skReq = document.getElementById('skReq');
+const skReqLvl = document.getElementById('skReqLvl');
+const skSetReq = document.getElementById('skSetReq');
+const skMsg = document.getElementById('skMsg');
+
+skAdd?.addEventListener('click', async ()=>{
+  const { error } = await sb.from('skills').upsert({ skill: (skName.value||'').trim(), description: (skDesc.value||null) });
+  skMsg.textContent = error ? error.message : 'Skill creada';
+});
+skMap?.addEventListener('click', async ()=>{
+  const email = (skAgentEmail.value||'').trim(); const lvl = parseInt(skLevel.value||'1',10)||1;
+  const { data:p } = await sb.from('profiles').select('user_id').eq('email', email).maybeSingle();
+  if (!p?.user_id){ skMsg.textContent='Usuario no encontrado'; return; }
+  const { error } = await sb.from('agent_skills').upsert({ user_id: p.user_id, skill: (skName.value||'').trim(), level: lvl });
+  skMsg.textContent = error ? error.message : 'Asignado';
+});
+skSetReq?.addEventListener('click', async ()=>{
+  const { error } = await sb.from('queues').update({ required_skill: (skReq.value||null), required_skill_level: parseInt(skReqLvl.value||'1',10)||1 }).eq('id', (skQueue.value||'').trim());
+  skMsg.textContent = error ? error.message : 'Guardado';
+});
+
+// ===== Shifts =====
+const shQueue = document.getElementById('shQueue');
+const shUserEmail = document.getElementById('shUserEmail');
+const shStart = document.getElementById('shStart');
+const shEnd = document.getElementById('shEnd');
+const shAdd = document.getElementById('shAdd');
+const shRun = document.getElementById('shRun');
+const shMsg = document.getElementById('shMsg');
+const rosterList = document.getElementById('rosterList');
+
+shAdd?.addEventListener('click', async ()=>{
+  const email = (shUserEmail.value||'').trim();
+  const { data:p } = await sb.from('profiles').select('user_id').eq('email', email).maybeSingle();
+  if (!p?.user_id){ shMsg.textContent='Usuario no encontrado'; return; }
+  const rec = { queue_id: (shQueue.value||'').trim(), user_id: p.user_id, starts_at: new Date(shStart.value).toISOString(), ends_at: new Date(shEnd.value).toISOString() };
+  const { error } = await sb.from('oncall_shifts').insert(rec);
+  shMsg.textContent = error ? error.message : 'Shift agregado';
+});
+
+shRun?.addEventListener('click', async ()=>{
+  await fetch('/functions/v1/wfm-scheduler', { method:'POST', body: '{}' });
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1); tomorrow.setHours(0,0,0,0);
+  const dayEnd = new Date(tomorrow.getTime()+24*60*60*1000-1);
+  const { data: ros } = await sb.from('wfm_roster').select('*').gte('date_hour', tomorrow.toISOString()).lte('date_hour', dayEnd.toISOString()).order('date_hour',{ascending:true});
+  rosterList.innerHTML = (ros||[]).map(r => `<li>${new Date(r.date_hour).toLocaleString()} — ${r.queue_id} — ${r.user_id}</li>`).join('');
+});
+
+// ===== BI CDC =====
+const biInitCDC = document.getElementById('biInitCDC');
+const biExportInc = document.getElementById('biExportInc');
+biInitCDC?.addEventListener('click', async ()=>{
+  // set watermark = now() to start fresh
+  const nowIso = new Date().toISOString();
+  await sb.from('bi_export_watermarks').upsert([{ entity:'deposits', last_ts: nowIso }, { entity:'purchases', last_ts: nowIso }]);
+  biMsg.textContent = 'CDC inicializado';
+});
+biExportInc?.addEventListener('click', async ()=>{
+  const r = await fetch('/functions/v1/bq-cdc', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ what:'all' }) });
+  const j = await r.json(); biMsg.textContent = j.ok ? 'CDC OK' : ('Error: '+j.error);
+});

@@ -2013,3 +2013,26 @@ BI — Star + BigQuery
 - DIMs: dim_tenant, dim_queue, dim_user.
 - FACTs: fact_deposits, fact_purchases (RPCs bi_fact_deposits(), bi_fact_purchases()).
 - Edge bq-export usa @google-cloud/bigquery con GOOGLE_APPLICATION_CREDENTIALS_JSON.
+
+
+---
+# V8.1 — Skill Matrix (niveles), WFM estacional + Scheduler, CDC BigQuery + dbt
+Generado: 2025-09-07 05:42
+
+## Novedades
+- **Skill matrix por nivel (L1/L2/L3)** con `agent_skills.level` y `queues.required_skill_level` + clasificación `deposit.difficulty`.
+
+- **Forecast estacional (8 semanas) y Scheduler**: edge `wfm-scheduler` genera **roster** por hora (24h) respetando skills, on‑call y límites.
+
+- **CDC a BigQuery**: edge `bq-cdc` export incremental (watermark), y **templates dbt** para modelo estrella.
+
+## Despliegue rápido
+1) Ejecuta **SQL_V8_1.sql** (ALTERs + tablas nuevas + funciones).  
+2) Deploy edges:
+   ```bash
+   supabase functions deploy wfm-scheduler bq-cdc
+   supabase functions secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
+   # BigQuery (si no lo pusiste en V8.0)
+   supabase functions secrets set GCP_PROJECT_ID=tu-proyecto BQ_DATASET=mixtli GOOGLE_APPLICATION_CREDENTIALS_JSON='{"type":"service_account",...}'
+   ```
+3) Admin UI: nuevas pestañas **Skills** y **Shifts**; en **BI** verás **CDC** (inicializar y export incremental).

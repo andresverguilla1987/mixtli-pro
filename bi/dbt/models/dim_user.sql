@@ -1,0 +1,1 @@
+select user_id, email, country from `{{ var('dataset', 'mixtli') }}`.dim_user

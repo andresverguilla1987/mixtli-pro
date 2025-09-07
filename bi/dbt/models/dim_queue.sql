@@ -1,0 +1,1 @@
+select queue_id, name, sla_minutes, region, provider, required_skill from `{{ var('dataset', 'mixtli') }}`.dim_queue

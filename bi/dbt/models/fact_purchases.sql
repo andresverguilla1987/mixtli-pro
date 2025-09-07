@@ -1,0 +1,1 @@
+select * from `{{ var('dataset', 'mixtli') }}`.fact_purchases

@@ -1,0 +1,27 @@
+version: 2
+models:
+  - name: fact_deposits
+    description: Deposits fact table loaded via CDC
+    columns:
+      - name: id
+        tests: [not_null, unique]
+      - name: tenant_id
+      - name: queue_id
+      - name: user_id
+      - name: status
+      - name: currency
+      - name: expected_cents
+      - name: created_at
+      - name: updated_at
+  - name: fact_purchases
+    description: Purchases fact table loaded via CDC
+    columns:
+      - name: id
+        tests: [not_null, unique]
+      - name: tenant_id
+      - name: user_id
+      - name: provider
+      - name: currency
+      - name: amount_cents
+      - name: created_at
+      - name: updated_at
