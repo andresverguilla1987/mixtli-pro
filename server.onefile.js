@@ -1,16 +1,14 @@
-// server.onefile.js (TOTP con tolerancia ±30s)
+// server.onefile.js (demo: TOTP window=1 + force enable)
 import 'dotenv/config';
 import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import { authenticator } from 'otplib';
 import qrcode from 'qrcode';
-import PDFDocument from 'pdfkit';
 
-// ✅ tolerancia de reloj: acepta códigos del paso anterior/siguiente (±30s)
-authenticator.options = { window: 1 };
+authenticator.options = { window: 1 }; // tolera +/-30s
 
-// ---- In‑memory store (demo) ----
+// ---- In‑memory store ----
 const users = new Map();
 const mailLog = [];
 function getUser(email, name='Admin Demo') {
@@ -55,12 +53,21 @@ app.post('/security/2fa/setup', async (req, res) => {
 app.post('/security/2fa/enable', (req, res) => {
   const user = req.user;
   if (!user.twoFactorSecret) return res.status(400).json({ error: 'No hay secreto pendiente' });
+
   const { code } = req.body || {};
-  const ok = authenticator.check(code || '', user.twoFactorSecret);
-  if (!ok) return res.status(400).json({ error: 'Código inválido' });
+  const force = req.query.force === '1' || req.header('X-Demo-Force') === '1' || process.env.ALLOW_DEMO_FORCE === '1';
+
+  let ok = false;
+  if (force) {
+    ok = true; // bypass para demo
+  } else {
+    ok = authenticator.check(code || '', user.twoFactorSecret);
+  }
+
+  if (!ok) return res.status(400).json({ error: 'Código inválido', force });
   user.twoFactorEnabled = true;
   user.recoveryCodes = genCodes(10);
-  res.json({ enabled: true, recoveryCodes: user.recoveryCodes });
+  res.json({ enabled: true, recoveryCodes: user.recoveryCodes, force });
 });
 
 app.post('/events/login', (req, res) => {
@@ -76,4 +83,4 @@ app.get('/debug/mail-log', (_req, res) => {
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`🧪 One‑file demo server (window=1) on ${port}`));
+app.listen(port, () => console.log(`🧪 One‑file demo server (force-enable ready) on ${port}`));
