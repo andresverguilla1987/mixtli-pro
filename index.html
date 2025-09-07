@@ -1,8 +1,9 @@
+
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Mixtli – Demo Seguridad & Notificaciones (Hosted, force-enable)</title>
+  <title>Mixtli – Demo (2FA + Notificaciones + Adjuntos)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0b1220;color:#e6edf3;margin:0}
@@ -12,22 +13,27 @@
     h1{font-size:24px;margin:0 0 16px}h2{font-size:18px;margin:0 0 12px}
     button{background:#2563eb;border:none;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
     button:disabled{background:#374151;cursor:not-allowed}
-    input{width:100%;padding:10px;border-radius:10px;border:1px solid #374151;background:#0b1220;color:#e6edf3}
+    input,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #374151;background:#0b1220;color:#e6edf3}
     .muted{color:#9ca3af;font-size:13px}
     .log{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:#0b1220;color:#93c5fd;border:1px solid #1f2937;padding:8px;border-radius:10px;height:220px;overflow:auto}
-    .row{display:flex;gap:8px;align-items:center}.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #374151}.ok{color:#22c55e}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #374151}
+    .ok{color:#22c55e}
     .ghost{background:#6b7280}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Mixtli – Seguridad & Notificaciones (Demo Hosted)</h1>
+    <h1>Mixtli – Seguridad & Notificaciones (Demo completa)</h1>
+    <p class="muted">Backend HTTPS recomendado (Render / ngrok). Esta versión incluye <b>envío de adjuntos</b> en alta calidad.</p>
+
     <div class="card" style="margin-bottom:16px;">
       <div class="row" style="gap:12px;">
         <div style="flex:1">
           <label class="muted">Base URL (HTTPS)</label>
           <input id="baseUrl" placeholder="https://mixtli-pro.onrender.com/"/>
-          <div class="muted">Pro tip: agrega <code>?base=https://tu-api/</code> a la URL.</div>
+          <div class="muted">Tip: agrega <code>?base=https://tu-api/</code> a la URL.</div>
         </div>
         <div style="flex:1">
           <label class="muted">Usuario (X-User-Email)</label>
@@ -59,7 +65,7 @@
       <div class="card">
         <h2>3) 2FA – Enable</h2>
         <input id="totp" placeholder="Código de 6 dígitos"/>
-        <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+        <div class="row" style="margin-top:8px;gap:8px">
           <button onclick="enable2fa()">Confirmar</button>
           <button class="ghost" onclick="enable2faForce()" title="Bypass de demo">Forzar (demo)</button>
           <span id="enableStatus" class="pill"></span>
@@ -77,7 +83,31 @@
       </div>
 
       <div class="card">
-        <h2>5) Mail Log</h2>
+        <h2>5) Enviar adjunto (alta calidad)</h2>
+        <div class="two-col">
+          <div>
+            <label class="muted">Destinatario</label>
+            <input id="toEmail" placeholder="destinatario@dominio.com"/>
+          </div>
+          <div>
+            <label class="muted">Asunto</label>
+            <input id="subject" value="Prueba adjunto máxima calidad"/>
+          </div>
+        </div>
+        <div style="margin-top:8px;">
+          <label class="muted">Mensaje (opcional)</label>
+          <textarea id="plainText" rows="3" placeholder="Adjunto original sin comprimir."></textarea>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <input type="file" id="fileInput" />
+          <button onclick="sendAttachment()">Enviar adjunto</button>
+          <span id="attachStatus" class="pill"></span>
+        </div>
+        <div class="muted" id="attachInfo"></div>
+      </div>
+
+      <div class="card">
+        <h2>6) Mail Log</h2>
         <div class="row" style="gap:12px;">
           <button onclick="loadMailLog()">Refrescar</button>
           <span class="muted">Endpoint: <code>/debug/mail-log</code></span>
@@ -93,8 +123,7 @@ function getParam(name){const url=new URL(window.location.href);return url.searc
 function normBase(val){
   if(!val) return '';
   val = val.trim();
-  // quita comentarios o textos extras
-  val = val.replace(/\s*\(.*\)\s*$/,'');
+  val = val.replace(/\s*\(.*\)\s*$/,''); // limpia comentarios
   if(!val.endsWith('/')) val+='/';
   return val;
 }
@@ -103,10 +132,12 @@ function loadPrefs(){
   const base = normBase(fromQuery || localStorage.getItem('baseUrl') || 'https://mixtli-pro.onrender.com/');
   document.getElementById('baseUrl').value = base;
   document.getElementById('userEmail').value = localStorage.getItem('userEmail') || 'admin@mixtli.test';
+  document.getElementById('toEmail').value = localStorage.getItem('toEmail') || '';
 }
 function savePrefs(){
   localStorage.setItem('baseUrl', normBase(document.getElementById('baseUrl').value));
   localStorage.setItem('userEmail', document.getElementById('userEmail').value);
+  localStorage.setItem('toEmail', document.getElementById('toEmail').value);
   alert('Guardado');
 }
 function headers(){
@@ -118,28 +149,25 @@ function url(path){
   return base + path;
 }
 
-// --- Actions
+// --- Existing demo actions
 async function ping(){
   const el=document.getElementById('pingStatus'); el.textContent='→ consultando...'; el.className='pill';
   try{
     const r=await fetch(url('/'));
     const j=await r.json().catch(()=>({}));
-    el.textContent=r.ok?('✓ OK: '+(j.app||'Mixtli Pro')):('Error '+r.status);
+    el.textContent=r.ok?('✓ OK: '+(j.app||'Mixtli Pro')+' ('+(j.mode||'')+' '+(j.provider||'')+')'):('Error '+r.status);
     el.className='pill '+(r.ok?'ok':'');
   }catch(e){el.textContent='Error: '+e.message;}
 }
-
 async function setup2fa(){
   const el=document.getElementById('setupStatus'); el.textContent='→ generando...'; el.className='pill';
   try{
     const r=await fetch(url('/security/2fa/setup'),{method:'POST',headers:headers()});
     const j=await r.json();
     if(j.qrDataUrl){const img=document.getElementById('qr'); img.src=j.qrDataUrl; img.style.display='block';}
-    el.textContent=r.ok?'✓ QR listo':('Error '+r.status);
-    el.className='pill '+(r.ok?'ok':'');
+    el.textContent=r.ok?'✓ QR listo':('Error '+r.status); el.className='pill '+(r.ok?'ok':'');
   }catch(e){el.textContent='Error: '+e.message;}
 }
-
 async function enable2fa(){
   const el=document.getElementById('enableStatus'); const info=document.getElementById('codesInfo');
   el.textContent='→ verificando...'; el.className='pill';
@@ -147,19 +175,16 @@ async function enable2fa(){
   try{
     let r=await fetch(url('/security/2fa/enable'),{method:'POST',headers:headers(),body:JSON.stringify({code})});
     let j=await r.json().catch(()=>({}));
-    if(!r.ok && r.status===400){ // fallback automático de demo
+    if(!r.ok && r.status===400){
       r=await fetch(url('/security/2fa/enable?force=1'),{method:'POST',headers:headers(),body:JSON.stringify({code:'000000'})});
       j=await r.json();
     }
     if(r.ok && j.enabled){
       el.textContent='✓ 2FA habilitado'; el.className='pill ok';
       if(j.recoveryCodes) info.textContent='Backup codes ('+j.recoveryCodes.length+'): '+j.recoveryCodes.slice(0,3).join(', ')+' ...';
-    } else {
-      el.textContent='Error '+(j.error||r.status);
-    }
+    } else { el.textContent='Error '+(j.error||r.status); }
   }catch(e){el.textContent='Error: '+e.message;}
 }
-
 async function enable2faForce(){
   const el=document.getElementById('enableStatus'); const info=document.getElementById('codesInfo');
   el.textContent='→ forzando...'; el.className='pill';
@@ -172,25 +197,60 @@ async function enable2faForce(){
     } else { el.textContent='Error '+(j.error||r.status); }
   }catch(e){el.textContent='Error: '+e.message;}
 }
-
 async function sendLogin(){
   const el=document.getElementById('mailStatus'); el.textContent='→ enviando...'; el.className='pill';
   try{
     const r=await fetch(url('/events/login'),{method:'POST',headers:headers()});
     await r.json().catch(()=>({}));
-    el.textContent=r.ok?'✓ Evento enviado':('Error '+r.status);
-    el.className='pill '+(r.ok?'ok':'');
+    el.textContent=r.ok?'✓ Evento enviado':('Error '+r.status); el.className='pill '+(r.ok?'ok':'');
     await loadMailLog();
   }catch(e){el.textContent='Error: '+e.message;}
 }
-
 async function loadMailLog(){
   const pre=document.getElementById('log');
   try{ const r=await fetch(url('/debug/mail-log')); const j=await r.json(); pre.textContent=JSON.stringify((j.items||[]),null,2); }
   catch(e){ pre.textContent='Error: '+e.message; }
 }
 
-loadPrefs();
+// --- New: send attachment
+async function sendAttachment(){
+  const status=document.getElementById('attachStatus');
+  const info=document.getElementById('attachInfo');
+  status.textContent='→ enviando...'; status.className='pill';
+  info.textContent='';
+  const to=document.getElementById('toEmail').value.trim();
+  const subject=document.getElementById('subject').value.trim();
+  const text=document.getElementById('plainText').value;
+  const file=document.getElementById('fileInput').files[0];
+  if(!to || !subject || !file){ status.textContent='Falta to/subject/archivo'; return; }
+  try{
+    const fd=new FormData();
+    fd.append('to', to);
+    fd.append('subject', subject);
+    if(text) fd.append('text', text);
+    fd.append('attachment', file, file.name);
+    const r=await fetch(url('/events/send-multipart'),{ method:'POST', body: fd, headers: { 'X-User-Email': document.getElementById('userEmail').value || 'admin@mixtli.test' } });
+    const j=await r.json().catch(()=>({}));
+    if(r.ok){
+      status.textContent='✓ Enviado'; status.className='pill ok';
+      info.textContent = (j.attached ? ('Adjunto: '+j.attached.name+' ('+j.attached.size+' bytes)') : 'Sin detalle de adjunto') + (j.dryRun ? ' (DRY)' : ' (LIVE)');
+      await loadMailLog();
+    } else {
+      status.textContent='Error '+(j.error||r.status);
+      info.textContent=j.detail?String(j.detail):'';
+    }
+  }catch(e){
+    status.textContent='Error: '+e.message;
+  }
+}
+
+(function init(){ // auto-load prefs
+  const fromQuery = getParam('base');
+  if (fromQuery) {
+    document.getElementById('baseUrl').value = normBase(fromQuery);
+  }
+  loadPrefs();
+})();
 </script>
 </body>
 </html>

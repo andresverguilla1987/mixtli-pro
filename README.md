@@ -1,11 +1,17 @@
-# Demo hosted con fallback de enable (force=1)
 
-- Esta versión del `index.html` intenta habilitar 2FA normal y, si recibe 400 por código inválido, **reintenta con `?force=1`**.
-- Incluye botón manual **Forzar (demo)**.
+# Demo con adjuntos (2FA + notificaciones + envío de archivos)
 
-## Publicar en GitHub Pages
-1) Sube `index.html` a la raíz de un repo.
-2) Settings → Pages → Deploy from a branch (main / root).
-3) Abre `https://<user>.github.io/<repo>/?base=https://mixtli-pro.onrender.com/`
+Este `index.html` añade UI para mandar un **adjunto** en máxima calidad usando el endpoint
+`POST /events/send-multipart` del servidor `server.onefile.attach.js`.
 
-> Requiere que tu backend soporte `POST /security/2fa/enable?force=1` (parche de server “force-enable”).
+## Uso
+1) Publica el HTML en GitHub Pages o ábrelo local.
+2) Base URL: `https://mixtli-pro.onrender.com/` (o tu ngrok HTTPS).
+3) Pica en orden: Ping → QR → Enable → Enviar login → **Enviar adjunto** → Mail Log.
+
+## Requisitos backend
+- Servir CORS.
+- Endpoints activos:
+  - `/events/send-multipart` (multipart/form-data, campo `attachment`).
+  - `/debug/mail-log` para visualizar lo enviado.
+- Para ENVÍO REAL: configura `MAIL_PROVIDER` (sendgrid|ses) y credenciales.
