@@ -904,3 +904,61 @@ supabase functions deploy totp-setup totp-verify jobs-runner
 supabase functions secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
 # (Slack y Resend ya configurados en V6.9)
 ```
+
+
+---
+# V7.1 — XLSX de cohortes/metrics por tenant, Discord, Branding por tenant, Invitaciones
+Generado: 2025-09-07 05:01
+
+## Novedades
+- **Exportar XLSX** de cohortes y métricas (por tenant) en Dashboard.
+- **Webhook Discord** (además de Slack), integrado al `jobs-runner` y trigger de depósitos.
+- **Branding por tenant** (color primario y logo) aplicado en Admin/Dashboard según tenant activo.
+- **Invitaciones por tenant** con **magic-link**: tabla `tenant_invites` + trigger post-signup para asignar rol al ingresar.
+
+## SQL — Invitaciones y roles por tenant
+```sql
+-- Tabla de invitaciones a tenant
+create table if not exists public.tenant_invites(
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  role text not null default 'agent',        -- owner | manager | agent
+  invited_by text,
+  created_at timestamptz default now(),
+  unique (email, tenant_id)
+);
+alter table public.tenant_invites enable row level security;
+create policy tenant_invites_admin on public.tenant_invites
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- Roles por tenant (owner/manager/agent) ya en user_tenants.role
+
+-- Trigger: al crear profile, si su email tiene invitación vigente, liga el tenant/rol
+create or replace function public.link_tenant_on_profile() returns trigger language plpgsql as $$
+declare v_email text; v_tid uuid; v_role text; begin
+  v_email := NEW.email;
+  select tenant_id, role into v_tid, v_role
+  from tenant_invites where email = v_email order by created_at desc limit 1;
+  if v_tid is not null then
+    insert into user_tenants(user_id, tenant_id, role) values (NEW.user_id, v_tid, coalesce(v_role,'agent'))
+    on conflict do nothing;
+  end if;
+  return NEW;
+end; $$;
+
+drop trigger if exists trg_link_tenant_on_profile on public.profiles;
+create trigger trg_link_tenant_on_profile
+after insert on public.profiles
+for each row execute function public.link_tenant_on_profile();
+```
+
+## Webhooks Discord
+- Nueva Edge: `discord-notify` (Incoming Webhook).
+- `jobs-runner` ahora manda a Slack **y** Discord si hay `discord_text` o si `topic='discord'`.
+
+### Despliegue
+```bash
+supabase functions deploy discord-notify
+supabase functions secrets set DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/XXX/YYY
+```

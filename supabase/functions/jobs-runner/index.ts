@@ -8,9 +8,13 @@ const db = createClient(SUPABASE_URL, SERVICE_KEY);
 async function handle(job: any){
   try{
     if (job.topic === 'slack'){
-      const res = await fetch("/functions/v1/slack-notify", { method:"POST", body: JSON.stringify(job.payload) });
-      // ignore response
+      await fetch("/functions/v1/slack-notify", { method:"POST", body: JSON.stringify(job.payload) });
     }
+    if (job.topic === 'discord'){
+      await fetch("/functions/v1/discord-notify", { method:"POST", body: JSON.stringify(job.payload) });
+    }
+    // Allow combined payloads with both fields
+    if (job.payload?.discord_text){ await fetch('/functions/v1/discord-notify', { method:'POST', body: JSON.stringify({ text: job.payload.discord_text }) }); }
   }catch(e){}
 }
 

@@ -6,18 +6,22 @@
   const el = (id)=>document.getElementById(id);
 
   async function load(){
+    _metricsRows = []; _cohortRows = [];
     const now = new Date();
     const d30 = new Date(now.getTime() - 30*86400000).toISOString();
     const { data: pur } = await sb.from('purchases').select('*').gte('created_at', d30).limit(5000);
     const rev = (pur||[]).reduce((a,r)=> a + (r.amount_cents||0)/100, 0);
     const users = new Set((pur||[]).map(r=>r.user_id)).size || 1;
     el('rev30').textContent = money(rev);
+    _metricsRows.push({ metric:'rev30', value: rev });
     el('arpu').textContent = money(rev / users);
+    _metricsRows.push({ metric:'arpu30', value: rev / users });
 
     // MRR estimado = suma proMonthly últimos 30 días (simples)
     const subs = (pur||[]).filter(r => (r.sku||'').toLowerCase().includes('promonthly'));
     const mrr = subs.reduce((a,r)=> a + (r.amount_cents||0)/100, 0);
     el('mrr').textContent = money(mrr);
+    _metricsRows.push({ metric:'mrr', value: mrr });
 
     // churn aprox con recargas: 1 - (#usuarios con compra en últimos 30d / #usuarios con compra en previos 30-60d)
     const d60 = new Date(now.getTime() - 60*86400000).toISOString();
@@ -27,6 +31,7 @@
     const retained = Array.from(prevUsers).filter(u => currentUsers.has(u)).length;
     const churn = prevUsers.size ? (1 - retained / prevUsers.size) : 0;
     el('churn').textContent = (churn*100).toFixed(1) + '%';
+    _metricsRows.push({ metric:'churn_pct', value: Number((churn*100).toFixed(1)) });
 
     // charts
     renderCharts([...(pur||[]), ...(prev||[])]);
@@ -47,6 +52,7 @@
       return `<div class="flex justify-between"><span>${m}</span><span>${pct}%</span></div>`;
     }).join('');
     document.getElementById('cohorts').innerHTML = rows || '<div class="text-slate-400">Cohortes no disponibles</div>';
+    _cohortRows = Object.keys(cohortMap).sort().map(m => ({ month: m, total: cohortMap[m].total, active: cohortMap[m].active, pct: cohortMap[m].total ? Math.round(100*cohortMap[m].active/cohortMap[m].total) : 0 }));
   }
 
   function money(v){ return new Intl.NumberFormat('es-MX',{ style:'currency', currency:'MXN' }).format(v || 0); }
@@ -78,3 +84,20 @@
 
   load();
 })();
+
+// --- XLSX exports ---
+let _metricsRows = []; let _cohortRows = [];
+
+document.getElementById('dlMetrics')?.addEventListener('click', ()=>{
+  if (!_metricsRows.length){ alert('Carga primero datos.'); return; }
+  const ws = XLSX.utils.json_to_sheet(_metricsRows);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'metrics');
+  XLSX.writeFile(wb, 'metrics.xlsx');
+});
+
+document.getElementById('dlCohorts')?.addEventListener('click', ()=>{
+  if (!_cohortRows.length){ alert('Sin cohortes.'); return; }
+  const ws = XLSX.utils.json_to_sheet(_cohortRows);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'cohorts');
+  XLSX.writeFile(wb, 'cohorts.xlsx');
+});

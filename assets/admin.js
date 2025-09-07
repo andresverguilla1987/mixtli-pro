@@ -35,6 +35,9 @@
     document.getElementById('kyc').classList.toggle('hidden', !ROLES.kyc);
     document.querySelector('[data-tab="reports"]').classList.toggle('hidden', !ROLES.reports);
     document.getElementById('reports').classList.toggle('hidden', !ROLES.reports);
+    // Tenants tab solo admin
+    const tbtn = document.querySelector('[data-tab="tenants"]'); const tsec = document.getElementById('tenants');
+    if (tbtn && tsec){ tbtn.classList.toggle('hidden', !ROLES.admin); tsec.classList.toggle('hidden', !ROLES.admin); }
   }
   kycSearch.addEventListener('click', ()=>{ kycPage=0; loadKyc(); });
   kycPrev.addEventListener('click', ()=>{ if (kycPage>0){ kycPage--; loadKyc(); } });
@@ -494,3 +497,50 @@ totpVerifyBtn?.addEventListener('click', async ()=>{
   const j = await r.json();
   totpMsg.textContent = j.ok ? '✅ TOTP verificado' : '❌ Código inválido';
 });
+
+// --- Tenants tab controls ---
+const brandColor = document.getElementById('brandColor');
+const brandLogo = document.getElementById('brandLogo');
+const brandSave = document.getElementById('brandSave');
+const invEmail = document.getElementById('invEmail');
+const invRole = document.getElementById('invRole');
+const invSend = document.getElementById('invSend');
+const invMsg = document.getElementById('invMsg');
+
+async function applyBrand(){
+  if (!CURRENT_TENANT) return;
+  const { data:t } = await sb.from('tenants').select('*').eq('id', CURRENT_TENANT).single();
+  if (!t) return;
+  brandColor.value = t.brand_primary || '#7c3aed';
+  brandLogo.value = t.brand_logo_url || '';
+  document.documentElement.style.setProperty('--brand', brandColor.value);
+  const logos = document.querySelectorAll('img[alt="logo"]');
+  if (t.brand_logo_url){ logos.forEach(el => el.src = t.brand_logo_url); }
+  // brand buttons
+  document.querySelectorAll('.bg-brand-500').forEach(el => el.style.backgroundColor = brandColor.value);
+  document.querySelectorAll('.hover\:bg-brand-600').forEach(el => el.style.backgroundColor = brandColor.value);
+}
+
+brandSave?.addEventListener('click', async ()=>{
+  if (!CURRENT_TENANT){ alert('Selecciona un tenant'); return; }
+  const { error } = await sb.from('tenants').update({ brand_primary: brandColor.value, brand_logo_url: brandLogo.value }).eq('id', CURRENT_TENANT);
+  if (error) { alert(error.message); return; }
+  await applyBrand();
+  alert('Brand actualizado');
+});
+
+invSend?.addEventListener('click', async ()=>{
+  if (!CURRENT_TENANT){ alert('Selecciona un tenant'); return; }
+  const email = (invEmail.value||'').trim(); if (!email) return;
+  const role = invRole.value || 'agent';
+  // Guarda invitación; el trigger la aplicará al crear perfil post-signup
+  const { error } = await sb.from('tenant_invites').insert({ email, tenant_id: CURRENT_TENANT, role, invited_by: (await sb.auth.getUser()).data.user.email });
+  if (error){ invMsg.textContent = error.message; return; }
+  invMsg.textContent = 'Invitación registrada. Envía un magic-link al correo.';
+  try{
+    await fetch('/functions/v1/send-otp', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ to: email }) });
+  }catch(e){}
+});
+
+// Reaplica brand al cambiar tenant
+tenantSel?.addEventListener('change', applyBrand);

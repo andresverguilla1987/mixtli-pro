@@ -43,6 +43,7 @@
       <button data-tab="deposits" class="tab px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Depósitos</button>
       <button data-tab="kyc" class="tab px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">KYC</button>
       <button data-tab="reports" class="tab px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Reportes</button>
+      <button data-tab="tenants" class="tab px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Tenants</button>
     </div>
 
     <section id="deposits" class="tabsec mt-6 hidden">
@@ -144,6 +145,37 @@
         </div>
       </div>
     </section>
+
+    <section id="tenants" class="tabsec mt-6 hidden">
+      <h2 class="font-semibold text-lg">Tenants & Branding</h2>
+      <div class="grid md:grid-cols-2 gap-4 mt-3">
+        <div class="rounded-xl border border-white/10 p-4">
+          <div class="font-semibold">Branding</div>
+          <div class="mt-3 text-sm grid gap-2">
+            <label>Color primario</label>
+            <input id="brandColor" type="text" placeholder="#7c3aed" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
+            <label>Logo URL</label>
+            <input id="brandLogo" type="text" placeholder="https://..." class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
+            <button id="brandSave" class="mt-2 px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white">Guardar</button>
+            <div class="text-xs text-slate-400">Se aplica al tenant seleccionado.</div>
+          </div>
+        </div>
+        <div class="rounded-xl border border-white/10 p-4">
+          <div class="font-semibold">Invitar usuario</div>
+          <div class="mt-3 text-sm grid gap-2">
+            <input id="invEmail" type="email" placeholder="correo@dominio.com" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
+            <select id="invRole" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
+              <option value="agent">Agente</option>
+              <option value="manager">Manager</option>
+              <option value="owner">Owner</option>
+            </select>
+            <button id="invSend" class="mt-2 px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white">Enviar invitación</button>
+            <div id="invMsg" class="text-xs text-slate-400"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <div id="totpModal" class="fixed inset-0 z-50 hidden items-center justify-center">

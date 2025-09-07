@@ -10,6 +10,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
   <script src="assets/config.js"></script>
   <script src="assets/dashboard.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
   <header class="border-b border-white/10 bg-slate-950/60 backdrop-blur">
@@ -32,11 +33,11 @@
     </div>
 
     <div class="mt-6 grid md:grid-cols-2 gap-4">
-      <div class="rounded-xl border border-white/10 p-4"><canvas id="byMonth"></canvas></div>
+      <div class="rounded-xl border border-white/10 p-4"><canvas id="byMonth"></canvas><div class="mt-2"><button id="dlMetrics" class="mt-2 px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white text-sm">Descargar métricas (XLSX)</button></div></div>
       <div class="rounded-xl border border-white/10 p-4"><canvas id="byProvider"></canvas></div>
     </div>
 
-    <div class="mt-6 rounded-xl border border-white/10 p-4">
+    <div class="mt-6 rounded-xl border border-white/10 p-4"><div class="flex items-center justify-between"><div class="font-semibold mb-2">Cohortes (mes de alta → % con compra este mes)</div><button id="dlCohorts" class="px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white text-sm">Cohortes (XLSX)</button></div>
       <div class="font-semibold mb-2">Cohortes (mes de alta → % con compra este mes)</div>
       <div id="cohorts" class="text-sm text-slate-300"></div>
     </div>
