@@ -668,3 +668,35 @@ async function blobToBase64(blob){
     const r = new FileReader(); r.onloadend=()=>resolve(String(r.result).split(',')[1]); r.onerror=reject; r.readAsDataURL(blob);
   });
 }
+
+// --- PWA & Push ---
+let _deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); _deferredPrompt = e; });
+document.getElementById('pwaInstall')?.addEventListener('click', async ()=>{ if (_deferredPrompt){ _deferredPrompt.prompt(); _deferredPrompt=null; }});
+
+async function regSW(){ try{ return await navigator.serviceWorker.register('assets/service-worker.js'); }catch(e){ return null; } }
+async function askPush(){
+  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)){ alert('Push no soportado'); return; }
+  const sw = await regSW(); if (!sw){ alert('SW no disponible'); return; }
+  const perm = await Notification.requestPermission(); if (perm !== 'granted'){ alert('Permiso denegado'); return; }
+  const key = (window.CONFIG && window.CONFIG.vapidPublicKey) || '';
+  if (!key){ alert('Falta VAPID public key en assets/config.js'); return; }
+  const appKey = urlBase64ToUint8Array(key);
+  const sub = await sw.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appKey });
+  const { data:u } = await sb.auth.getUser();
+  await fetch('/functions/v1/push-register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ user_id: u?.user?.id, email: u?.user?.email, subscription: sub, tenant_id: CURRENT_TENANT && CURRENT_TENANT!=='ALL' ? CURRENT_TENANT : null }) });
+  alert('Push habilitado');
+}
+
+document.getElementById('pushEnable')?.addEventListener('click', askPush);
+document.getElementById('pushTest')?.addEventListener('click', async ()=>{
+  await fetch('/functions/v1/push-broadcast', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ title:'Test', text:'Hola 👋', url: location.href, tenant_id: CURRENT_TENANT && CURRENT_TENANT!=='ALL' ? CURRENT_TENANT : null }) });
+  alert('Push enviado');
+});
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64); const outputArray = new Uint8Array(rawData.length);
+  for (let i=0; i<rawData.length; ++i){ outputArray[i] = rawData.charCodeAt(i); } return outputArray;
+}

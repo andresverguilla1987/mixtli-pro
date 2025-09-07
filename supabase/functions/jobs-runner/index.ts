@@ -13,6 +13,9 @@ async function handle(job: any){
     if (job.topic === 'discord'){
       await fetch("/functions/v1/discord-notify", { method:"POST", body: JSON.stringify(job.payload) });
     }
+    if (job.topic === 'push'){
+      await fetch('/functions/v1/push-broadcast', { method:'POST', body: JSON.stringify(job.payload) });
+    }
     // Allow combined payloads with both fields
     if (job.payload?.discord_text){ await fetch('/functions/v1/discord-notify', { method:'POST', body: JSON.stringify({ text: job.payload.discord_text }) }); }
   }catch(e){}

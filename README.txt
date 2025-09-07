@@ -1319,3 +1319,179 @@ supabase functions secrets set FX_API_URL=https://open.er-api.com/v6/latest/USD 
 # Programar cada 12 horas (Supabase Scheduled Triggers)
 supabase functions schedule create fx-update --cron "0 */12 * * *"
 ```
+
+
+---
+# V7.5 — Rate limiter por usuario, Detección de anomalías, PWA + Push
+Generado: 2025-09-07 05:16
+
+## Novedades
+- **Rate limiter por usuario (dinámico)**: tope diario como % del promedio histórico (rolling) o tope fijo por usuario.
+- **Detección de anomalías en depósitos**: z-score + reglas y encolado de alertas (Slack/Discord/Push).
+- **PWA + Push**: manifest y service worker; registro de **Web Push** con VAPID; jobs envían push a aprobadores.
+
+## SQL — Rate limiter por usuario
+```sql
+-- Límite por usuario (opcional además de políticas por tenant)
+create table if not exists public.user_rate_limits(
+  user_id uuid primary key,
+  daily_pct_cap int default 200,            -- 200 = 200% del promedio diario rolling
+  fixed_daily_cents bigint default 0,       -- 0 = sin tope fijo
+  days_window int default 30,
+  updated_at timestamptz default now()
+);
+
+-- Promedio diario rolling (últimos N días) sobre gastos (wallet_ledger.type in spend/purchase)
+create or replace function public.user_daily_avg_cents(p_user uuid, p_days int default 30) returns bigint
+language sql stable as $$
+  with days as (
+    select generate_series(date_trunc('day', now()) - (p_days||' days')::interval, date_trunc('day', now()), '1 day') d
+  ),
+  agg as (
+    select date_trunc('day', created_at) d, sum(amount_cents) cents
+    from public.wallet_ledger
+    where user_id = p_user and type in ('spend','purchase')
+      and created_at >= date_trunc('day', now()) - (p_days||' days')::interval
+    group by 1
+  )
+  select coalesce(avg(agg.cents)::bigint, 0) from days
+  left join agg using (d);
+$$;
+
+-- ¿Cumple el rate limit?
+create or replace function public.user_rate_allow(p_user uuid, p_amount_cents bigint) returns boolean
+language sql stable as $$
+  select case
+    when not exists (select 1 from user_rate_limits where user_id=p_user) then true
+    else (
+      select
+        case
+          when coalesce(fixed_daily_cents,0) > 0 and public.daily_user_spend_cents(p_user) + p_amount_cents > fixed_daily_cents
+            then false
+          else
+            ( public.daily_user_spend_cents(p_user) + p_amount_cents ) <=
+            ( (coalesce(daily_pct_cap,200) / 100.0) * greatest(100::bigint, public.user_daily_avg_cents(p_user, coalesce(days_window,30))) )
+        end
+      from user_rate_limits where user_id=p_user
+    )
+  end;
+$$;
+revoke all on function public.user_rate_allow(uuid, bigint) from public;
+grant execute on function public.user_rate_allow(uuid, bigint) to authenticated;
+
+-- Enforcement adicional en purchases/wallet_ledger
+create or replace function public.enforce_rate_user_purchase() returns trigger
+language plpgsql as $$
+begin
+  if NEW.user_id is not null then
+    if not public.user_rate_allow(NEW.user_id, NEW.amount_cents) then
+      raise exception 'user daily rate limit exceeded';
+    end if;
+  end if;
+  return NEW;
+end; $$;
+drop trigger if exists trg_enforce_rate_purchase on public.purchases;
+create trigger trg_enforce_rate_purchase before insert on public.purchases
+for each row execute function public.enforce_rate_user_purchase();
+
+create or replace function public.enforce_rate_user_wallet() returns trigger
+language plpgsql as $$
+begin
+  if NEW.user_id is not null and NEW.type in ('spend','purchase') then
+    if not public.user_rate_allow(NEW.user_id, NEW.amount_cents) then
+      raise exception 'user daily rate limit exceeded';
+    end if;
+  end if;
+  return NEW;
+end; $$;
+drop trigger if exists trg_enforce_rate_wallet on public.wallet_ledger;
+create trigger trg_enforce_rate_wallet before insert on public.wallet_ledger
+for each row execute function public.enforce_rate_user_wallet();
+```
+
+## SQL — Detección de anomalías en depósitos
+```sql
+create table if not exists public.anomalies(
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid,
+  ref_id uuid,                -- bank_deposits.id
+  kind text not null,         -- 'deposit'
+  score numeric,              -- z-score aproximado
+  reason text,
+  status text default 'open', -- open | closed | ignored
+  created_at timestamptz default now()
+);
+
+-- Calcula z-score y aplica reglas base
+create or replace function public.detect_deposit_anomaly(p_ref uuid) returns boolean
+language plpgsql as $$
+declare v_user uuid; v_amt bigint; v_curr text; v_tid uuid;
+        mu numeric; sigma numeric; z numeric; reason text; is_anom boolean:=false;
+begin
+  select user_id, expected_cents, currency, tenant_id into v_user, v_amt, v_curr, v_tid from bank_deposits where id=p_ref;
+  if v_user is null then return false; end if;
+
+  -- estadísticos user últimos 90d
+  select avg(expected_cents)::numeric, nullif(stddev_pop(expected_cents),0)::numeric
+    into mu, sigma
+  from bank_deposits
+  where user_id = v_user and status in ('pending','pending_second','approved')
+    and created_at >= now() - interval '90 days' and id <> p_ref;
+
+  if mu is null then mu := 0; end if;
+  if sigma is null then sigma := 1; end if;
+
+  z := (v_amt - mu) / sigma;
+
+  if z > 3 then is_anom := true; reason := 'zscore>3'; end if;
+  if v_amt >= (select dual_required_above_cents from get_deposit_limits() limit 1) then
+    is_anom := true; reason := coalesce(reason,'') || ' dual_threshold'; end if;
+
+  insert into anomalies(tenant_id, ref_id, kind, score, reason)
+  values (v_tid, p_ref, 'deposit', z, coalesce(reason,'baseline'));
+
+  return is_anom;
+end; $$;
+
+-- Trigger: al pasar a pending / pending_second evalúa
+create or replace function public.trg_detect_deposit_anomaly_fn() returns trigger language plpgsql as $$
+declare flagged boolean; begin
+  if TG_OP='INSERT' or (TG_OP='UPDATE' and NEW.status<>OLD.status) then
+    if NEW.status in ('pending','pending_second') then
+      perform public.detect_deposit_anomaly(NEW.id);
+      -- Encola push/slack si score o regla dispara
+      insert into jobs(topic, payload) values ('push', jsonb_build_object('title','Depósito sospechoso','text','Ref '||NEW.id));
+    end if;
+  end if;
+  return NEW;
+end; $$;
+drop trigger if exists trg_detect_deposit_anomaly on public.bank_deposits;
+create trigger trg_detect_deposit_anomaly
+after insert or update on public.bank_deposits
+for each row execute function public.trg_detect_deposit_anomaly_fn();
+```
+
+## PWA + Push (Web Push con VAPID)
+```sql
+create table if not exists public.push_subscriptions(
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid,
+  email text,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  tenant_id uuid,
+  created_at timestamptz default now()
+);
+```
+
+**Edge Functions nuevas**
+- `push-register` — guarda la suscripción Web Push para el usuario actual.
+- `push-broadcast` — envía notificaciones (VAPID) a aprobadores (admins/roles deposits) y limpia endpoints inválidos.
+
+### Despliegue
+```bash
+supabase functions deploy push-register push-broadcast
+supabase functions secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
+supabase functions secrets set VAPID_PUBLIC_KEY=BPUBLICKEY... VAPID_PRIVATE_KEY=xxxxxxxx VAPID_SUBJECT=mailto:admin@tu-dominio.com
+```
