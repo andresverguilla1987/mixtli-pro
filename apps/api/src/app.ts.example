@@ -1,0 +1,20 @@
+// apps/api/src/app.ts (EJEMPLO después de migrar a Sentry v8+)
+import "dotenv/config"; // opcional en desarrollo
+import express from "express";
+import * as Sentry from "@sentry/node";
+
+export const app = express();
+
+// Middlewares base
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Rutas de ejemplo (coloca tus rutas reales aquí)
+app.get("/__health", (_req, res) => res.json({ ok: true }));
+
+// ...tus rutas reales aquí...
+
+// En v8+ reemplaza Handlers.* por un solo setup
+Sentry.setupExpressErrorHandler(app);
+
+export default app;

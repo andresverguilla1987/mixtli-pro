@@ -1,60 +1,49 @@
-# Mixtli V8.2 (A–C) – Prod Bundle
+# Mixtli API — Sentry v8+ Fix (ZIP)
 
-Incluye:
-- **A)** Simulador WFM (what‑if) con asignación ligera tipo ILP (`POST /wfm/simulate`)
-- **B)** Reentrenamiento de scoring encolado por worker (`POST /scoring/retrain`)
-- **C)** Auditoría completa de cambios y aprobaciones (`/rules`, `/audit/logs`)
-- OpenAPI en `/openapi.yaml`
-- Prisma + Postgres + Redis
-- Nginx reverse proxy
-- Seed de admin
+**Qué incluye**
+- `apps/api/src/sentry/instrument.ts` (nuevo)
+- `apps/api/src/app.ts.example` (de referencia tras la migración)
+- `patches/app-ts-sentry-v8.diff` (parche opcional)
+- `.env.example.additions` (variables a agregar)
+- `render/README_RENDER.md` (cómo configurarlo en Render)
 
-## Quickstart
-
-1) Copia las variables:
-```bash
-cp .env.prod .env.prod.local # (opcional) o edita .env.prod directamente
-```
-2) Levanta en producción:
-```bash
-docker compose -f docker-compose.prod.yml up -d --build
-```
-
-3) (Opcional) Ejecuta seed del admin si no arrancó automáticamente:
-```bash
-# Dentro del contenedor api
-docker exec -it mixtli_api sh -lc "node -v && npx prisma migrate deploy && pnpm seed"
-```
-
-## Endpoints
-- `GET /health`
-- `POST /wfm/simulate`
-- `POST /scoring/retrain`
-- `POST /rules`
-- `PUT /rules/{id}/approve`
-- `GET /audit/logs`
-- `GET /openapi.yaml`
-
-## Ejemplos rápidos
-
-### A) Simulación WFM
-```bash
-curl -s http://localhost:8080/wfm/simulate -X POST -H 'content-type: application/json' -d '{
-  "agents":[{"id":"a1","availability":[{"startMin":540,"endMin":1020}]},{"id":"a2","availability":[{"startMin":600,"endMin":900}]}],
-  "slots":[{"startMin":600,"endMin":660,"demand":2},{"startMin":660,"endMin":720,"demand":1}]
-}'
-```
-
-### B) Reentrenar
-```bash
-curl -s http://localhost:8080/scoring/retrain -X POST -H 'content-type: application/json' -d '{"reason":"fraud_feedback"}'
-```
-
-### C) Reglas + Auditoría
-```bash
-curl -s http://localhost:8080/rules -X POST -H 'content-type: application/json' -d '{"name":"rule1","content":{"threshold":0.7},"actor":"andres"}'
-```
+## Pasos rápidos
+1) **Copia** `apps/api/src/sentry/instrument.ts` a tu repo en esa ruta exacta.
+2) **Migra tu `app.ts`:**
+   - Elimina en tu código cualquier uso de:
+     ```ts
+     // v7 (quitar)
+     // app.use(Sentry.Handlers.requestHandler());
+     // app.use(Sentry.Handlers.tracingHandler());
+     // app.use(Sentry.Handlers.errorHandler());
+     ```
+   - Asegúrate de **importar** Sentry:
+     ```ts
+     import * as Sentry from "@sentry/node";
+     ```
+   - Inserta **una sola** línea al final de tus rutas (antes de tu middleware de errores custom si lo tienes):
+     ```ts
+     Sentry.setupExpressErrorHandler(app);
+     ```
+   - Si te sirve, **compara** con `apps/api/src/app.ts.example`.
+   - Alternativa: intenta aplicar `patches/app-ts-sentry-v8.diff` con `git apply`.
+3) **Compilación TS**: Tu `instrument.ts` compila a `dist/sentry/instrument.js`. No olvides que TypeScript lo incluya (si tu `tsconfig` tiene `include` muy cerrado, añádelo).
+4) **Render (elige una):**
+   - **A. Start Command**
+     ```bash
+     cd apps/api && npx prisma migrate deploy && node --import ./dist/sentry/instrument.js dist/server.js
+     ```
+   - **B. NODE_OPTIONS**
+     - En Render > Environment:
+       - `NODE_OPTIONS=--import ./dist/sentry/instrument.js`
+     - Mantén tu start command actual.
+5) **Variables de entorno**
+   - `SENTRY_DSN` (DSN de tu proyecto en Sentry)
+   - `SENTRY_TRACES_SAMPLE_RATE` (p.ej. `0.2` en prod)
+   - `SENTRY_PROFILES_SAMPLE_RATE` (opcional, p.ej. `0`)
+6) **Re-deploy**. Listo.
 
 ## Notas
-- Llena `SENDGRID_*` si vas a notificar por correo desde el worker.
-- Edita `SEED_ADMIN_*` antes de correr en producción.
+- En Sentry v8+ desaparecen `Sentry.Handlers.*`. Se sustituye por **`Sentry.setupExpressErrorHandler(app)`**.
+- La instrumentación debe cargarse **antes** de tu app (de ahí `--import`).
+

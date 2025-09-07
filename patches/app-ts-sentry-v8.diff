@@ -1,0 +1,13 @@
+--- a/apps/api/src/app.ts
++++ b/apps/api/src/app.ts
+@@
+-import * as Sentry from "@sentry/node";
++import * as Sentry from "@sentry/node";
+@@
+-// v7 (remover si existen)
+-// app.use(Sentry.Handlers.requestHandler());
+-// app.use(Sentry.Handlers.tracingHandler());
++// v8+: Ya no existen los Handlers.*
+@@
++// Coloca esta línea después de declarar tus rutas (y antes de tu error-handler custom)
++Sentry.setupExpressErrorHandler(app);
