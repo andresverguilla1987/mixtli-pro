@@ -1698,3 +1698,117 @@ end; $$;
 - **Admin → Depósitos**: botón **“Modo Swipe”** (mobile‑first). Cards con gesto izquierda/derecha o botones.
 - **Admin → Rules** (nueva pestaña): textarea JSON con **Validar** y **Guardar**. Reglas activas **ya** influyen en riesgo/hold.
 - **Cola `on_hold`**: los depósitos en estado `on_hold` se muestran junto a pendientes con badge **HOLD**.
+
+
+---
+# V7.8 — Visual Rules, Auto‑triage + Queues con SLA, Batch + Undo 10s
+Generado: 2025-09-07 05:27
+
+## Novedades
+- **Visual Rules Builder** (UI) que compila a JSON y guarda en `risk_rules`. Soporta condiciones: `amount_gte`, `currency_is`, `country_is`, `provider_is`, y acción `raise|hold`.
+- **Auto‑triage por colas** con **SLA**: tabla `queues` y `deposit_queues`; función `autotriage_deposit(ref)` asigna cola según **país**, **proveedor** y **banda de riesgo**. Métricas por cola (pendientes, vencidos SLA, TTR promedio).
+- **Batch actions + Undo (10s)** en Depósitos: selecciona múltiples, **Aprobar/Rechazar** en lote y aparece snackbar con **Deshacer** dentro de 10s antes de confirmar.
+
+## SQL — Queues + Auto‑triage + Métricas
+```sql
+-- Colas
+create table if not exists public.queues(
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid,
+  slug text unique,
+  name text not null,
+  sla_minutes int default 60,
+  region text,         -- filtro opcional por país/region del usuario
+  provider text,       -- filtro opcional por banco/proveedor
+  priority int default 5,
+  created_at timestamptz default now()
+);
+alter table public.queues enable row level security;
+create policy queues_view on public.queues for select to authenticated using (true);
+create policy queues_admin on public.queues for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- Relación depósito-cola
+create table if not exists public.deposit_queues(
+  deposit_id uuid primary key references public.bank_deposits(id) on delete cascade,
+  queue_id uuid references public.queues(id) on delete set null,
+  assigned_at timestamptz default now(),
+  assigned_by text,
+  resolved_at timestamptz
+);
+alter table public.deposit_queues enable row level security;
+create policy dq_view on public.deposit_queues for select to authenticated using (true);
+create policy dq_admin on public.deposit_queues for all to authenticated using (public.is_admin() or public.has_tenant_cap('deposits', (select tenant_id from bank_deposits where id=deposit_id)));
+
+-- Función: elegir cola
+create or replace function public.autotriage_deposit(p_ref uuid) returns uuid
+language plpgsql as $$
+declare dep record; q record; dest uuid; ucountry text; begin
+  select * into dep from bank_deposits where id = p_ref;
+  if dep is null then return null; end if;
+  select country into ucountry from profiles where user_id = dep.user_id;
+
+  -- 1) match por provider
+  select id into dest from queues where (provider is not null and provider = dep.bank_provider) order by priority asc, created_at asc limit 1;
+  -- 2) match por país
+  if dest is null and ucountry is not null then
+    select id into dest from queues where (region is not null and lower(region) = lower(ucountry)) order by priority asc, created_at asc limit 1;
+  end if;
+  -- 3) banda de riesgo: si hay evaluación high → intenta cola 'fraude' (slug)
+  if dest is null then
+    if exists(select 1 from risk_assessments where ref_id = p_ref and band='high') then
+      select id into dest from queues where slug='fraude' limit 1;
+    end if;
+  end if;
+  -- 4) fallback: primera por prioridad
+  if dest is null then
+    select id into dest from queues order by priority asc, created_at asc limit 1;
+  end if;
+
+  if not exists(select 1 from deposit_queues where deposit_id = p_ref) then
+    insert into deposit_queues(deposit_id, queue_id) values (p_ref, dest);
+  else
+    update deposit_queues set queue_id = dest, assigned_at = now() where deposit_id = p_ref;
+  end if;
+  return dest;
+end; $$;
+
+-- Trigger: al poner pendiente/on_hold, asignar cola
+create or replace function public.trg_autotriage_deposit_fn() returns trigger language plpgsql as $$
+begin
+  if TG_OP='INSERT' or (TG_OP='UPDATE' and NEW.status <> OLD.status) then
+    if NEW.status in ('pending','pending_second','on_hold') then
+      perform public.autotriage_deposit(NEW.id);
+    end if;
+    if NEW.status in ('approved','rejected') then
+      update deposit_queues set resolved_at = now() where deposit_id = NEW.id;
+    end if;
+  end if;
+  return NEW;
+end; $$;
+drop trigger if exists trg_autotriage_deposit on public.bank_deposits;
+create trigger trg_autotriage_deposit after insert or update on public.bank_deposits
+for each row execute function public.trg_autotriage_deposit_fn();
+
+-- Métricas por cola (pendientes, vencidos SLA, TTR promedio minutos)
+create or replace function public.queue_metrics() returns table(
+  queue_id uuid, name text, pending int, breached int, avg_ttr_mins numeric
+) language sql stable as $$
+  with pend as (
+    select q.id, q.name, dq.assigned_at, q.sla_minutes, dq.resolved_at
+    from queues q left join deposit_queues dq on dq.queue_id = q.id
+    join bank_deposits d on d.id = dq.deposit_id
+    where d.status in ('pending','pending_second','on_hold')
+  )
+  select p.id, p.name,
+         count(*) filter (where p.resolved_at is null) as pending,
+         count(*) filter (where p.resolved_at is null and now() > p.assigned_at + (p.sla_minutes||' minutes')::interval) as breached,
+         avg( extract(epoch from (coalesce(p.resolved_at, now()) - p.assigned_at))/60.0 ) as avg_ttr_mins
+  from pend p group by 1,2;
+$$;
+```
+
+## UI — Dónde usarlo
+- **Rules**: nuevo **constructor visual**; compila a JSON y pre‑llena el textarea para guardar.
+- **Queues** (nueva pestaña): crea/edita colas, **métricas**, y reasigna depósitos.
+- **Depósitos**: checkbox por fila + botones **Aprobar seleccionados / Rechazar seleccionados** con **Deshacer 10s** (snackbar).
+

@@ -110,7 +110,7 @@
     (data||[]).forEach(r => {
       const tr = document.createElement("tr");
       const isSecond = r.status === 'pending_second';
-      tr.innerHTML = `<td class="p-2">${r.id}</td>
+      tr.innerHTML = `<td><input type=\"checkbox\" class=\"sel\"></td><td class="p-2">${r.id}</td>
         <td class="p-2">${r.user_id}<br><span class='text-slate-400 text-xs'>${emailMap[r.user_id]||''}</span></td>
         <td class="p-2">${(r.expected_cents/100).toFixed(2)}</td>
         <td class="p-2">${(r.currency||'mxn').toUpperCase()}</td>
@@ -857,4 +857,132 @@ ruleSave?.addEventListener('click', async ()=>{
 ruleList?.addEventListener('click', async ()=>{
   const { data } = await sb.from('risk_rules').select('*').eq('active', true).order('updated_at', { ascending:false }).limit(100);
   ruleUl.innerHTML = (data||[]).map(r => `<li><b>${r.name}</b> — <code>${JSON.stringify(r.content)}</code></li>`).join('') || '<li class="text-slate-400">Sin reglas</li>';
+});
+
+// --- Batch + Undo (10s) ---
+const depApproveSel = document.getElementById('depApproveSel');
+const depRejectSel = document.getElementById('depRejectSel');
+const undoBox = document.getElementById('undoBox');
+const undoBtn = document.getElementById('undoBtn');
+
+let _pendingBatch = null; let _undoTimer = null;
+
+function selectedDeposits(){
+  return Array.from(document.querySelectorAll('#depTable tbody tr')).filter(tr => tr.querySelector('.sel')?.checked).map(tr => tr._rowData);
+}
+
+function startBatch(kind){
+  const items = selectedDeposits();
+  if (!items.length){ alert('Selecciona al menos uno'); return; }
+  _pendingBatch = { kind, items };
+  undoBox.classList.remove('hidden');
+  if (_undoTimer) clearTimeout(_undoTimer);
+  _undoTimer = setTimeout(executeBatch, 10000);
+}
+
+async function executeBatch(){
+  if (!_pendingBatch) return;
+  const { kind, items } = _pendingBatch;
+  for (const r of items){
+    try{
+      if (kind === 'approve'){
+        if (r.status==='pending_second'){ const { error } = await sb.rpc('admin_finalize_bank_deposit', { p_ref: r.id }); if (error) throw error; }
+        else { const { error } = await sb.rpc('admin_approve_bank_deposit_v2', { p_ref: r.id }); if (error) throw error; }
+      }else{
+        const reason = 'batch'; const { error } = await sb.rpc('admin_reject_bank_deposit', { p_ref: r.id, p_reason: reason }); if (error) throw error;
+      }
+    }catch(e){ console.warn('batch item fail', r.id, e.message||e); }
+  }
+  _pendingBatch = null; undoBox.classList.add('hidden'); clearTimeout(_undoTimer); _undoTimer = null;
+  // refresca
+  if (typeof loadDeposits === 'function') loadDeposits();
+}
+
+depApproveSel?.addEventListener('click', ()=> startBatch('approve'));
+depRejectSel?.addEventListener('click', ()=> startBatch('reject'));
+undoBtn?.addEventListener('click', ()=>{ if (_undoTimer){ clearTimeout(_undoTimer); _undoTimer=null; } _pendingBatch=null; undoBox.classList.add('hidden'); });
+
+
+// --- Visual Rules Builder ---
+const vrFields = [
+  { id:'amount_gte', label:'Monto ≥ (cents)', type:'number', key:'cents' },
+  { id:'currency_is', label:'Moneda (ISO)', type:'text', key:'code' },
+  { id:'country_is', label:'País (ISO-2)', type:'text', key:'code' },
+  { id:'provider_is', label:'Proveedor', type:'text', key:'code' }
+];
+(function mountVisualRules(){
+  const host = document.getElementById('rules');
+  if (!host) return;
+  const box = document.createElement('div'); box.className='mt-4 rounded-xl border border-white/10 p-4';
+  box.innerHTML = `<div class="font-semibold mb-2">Constructor visual</div>
+  <div class="grid md:grid-cols-4 gap-2">
+    <select id="vrType" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
+      ${vrFields.map(f=>`<option value="${f.id}">${f.label}</option>`).join('')}
+    </select>
+    <input id="vrValue" class="h-9 px-2 rounded-md bg-white/10 border border-white/10" placeholder="valor">
+    <select id="vrEffect" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
+      <option value="raise">raise</option>
+      <option value="hold">hold</option>
+    </select>
+    <button id="vrAdd" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Añadir al JSON</button>
+  </div>`;
+  host.appendChild(box);
+  const vrType = box.querySelector('#vrType'); const vrValue = box.querySelector('#vrValue'); const vrEffect = box.querySelector('#vrEffect'); const vrAdd = box.querySelector('#vrAdd');
+  vrAdd.addEventListener('click', ()=>{
+    const t = vrType.value; const v = vrValue.value; const eff = vrEffect.value;
+    const cfg = vrFields.find(x=>x.id===t); if (!cfg){ alert('Tipo inválido'); return; }
+    let obj = { type: t, effect: eff }; obj[cfg.key] = (cfg.type==='number') ? parseInt(v||'0',10)||0 : v;
+    try{
+      const cur = ruleJson.value?.trim(); let arr = [];
+      if (cur){ const parsed = JSON.parse(cur); arr = Array.isArray(parsed) ? parsed : [parsed]; }
+      arr.push(obj); ruleJson.value = JSON.stringify(arr, null, 2);
+      ruleMsg.textContent = 'Añadido';
+    }catch(e){ ruleMsg.textContent = 'JSON inválido en textarea'; }
+  });
+})();
+
+// --- Queues CRUD & Metrics ---
+const qName = document.getElementById('qName');
+const qSlug = document.getElementById('qSlug');
+const qSla = document.getElementById('qSla');
+const qRegion = document.getElementById('qRegion');
+const qProvider = document.getElementById('qProvider');
+const qPriority = document.getElementById('qPriority');
+const qSave = document.getElementById('qSave');
+const qList = document.getElementById('qList');
+const qMsg = document.getElementById('qMsg');
+const qMetrics = document.getElementById('qMetrics');
+const dqDep = document.getElementById('dqDep');
+const dqQueue = document.getElementById('dqQueue');
+const dqAssign = document.getElementById('dqAssign');
+const dqMsg = document.getElementById('dqMsg');
+
+qSave?.addEventListener('click', async ()=>{
+  const rec = {
+    name: (qName.value||'').trim(),
+    slug: (qSlug.value||'').trim() || null,
+    sla_minutes: parseInt(qSla.value||'0',10)||60,
+    region: (qRegion.value||'').trim() || null,
+    provider: (qProvider.value||'').trim() || null,
+    priority: parseInt(qPriority.value||'5',10)||5,
+    tenant_id: CURRENT_TENANT && CURRENT_TENANT!=='ALL' ? CURRENT_TENANT : null
+  };
+  const { error } = await sb.from('queues').upsert(rec, { onConflict:'slug' });
+  qMsg.textContent = error ? error.message : 'Guardado';
+});
+
+qList?.addEventListener('click', async ()=>{
+  const { data } = await sb.from('queues').select('*').order('priority',{ascending:true}).limit(200);
+  const { data:met } = await sb.rpc('queue_metrics');
+  qMetrics.innerHTML = (met||[]).map(m => {
+    const row = (data||[]).find(q=>q.id===m.queue_id);
+    return `<li><b>${m.name}</b> • pend ${m.pending} • SLA🔔 ${m.breached} • TTR≈ ${m.avg_ttr_mins? m.avg_ttr_mins.toFixed(1):'-'} min ${row?.region? '• '+row.region:''} ${row?.provider? '• '+row.provider:''}</li>`;
+  }).join('') || '<li class="text-slate-400">Sin colas</li>';
+});
+
+dqAssign?.addEventListener('click', async ()=>{
+  const dep = (dqDep.value||'').trim(); const qid = (dqQueue.value||'').trim();
+  if (!dep || !qid){ dqMsg.textContent = 'Faltan datos'; return; }
+  const { error } = await sb.from('deposit_queues').upsert({ deposit_id: dep, queue_id: qid, assigned_at: new Date().toISOString(), assigned_by: (await sb.auth.getUser()).data.user.email });
+  dqMsg.textContent = error ? error.message : 'Asignado';
 });
