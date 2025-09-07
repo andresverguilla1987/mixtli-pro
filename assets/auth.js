@@ -13,7 +13,7 @@
   const tabSignup = document.getElementById("tab-signup");
   const formSignin = document.getElementById("form-signin");
   const formSignup = document.getElementById("form-signup");
-  if (!tabSignin) return; // not on auth.html
+  if (!tabSignin) return;
 
   const show = (el, vis) => { el.classList.toggle("hidden", !vis); }
 

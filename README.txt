@@ -1,11 +1,10 @@
-# Mixtli — Auth + Storage con **Miniaturas**
-Generado: 2025-09-07 03:14
+# Mixtli — Auth + Storage con **Lightbox** (miniaturas + vista previa modal)
+Generado: 2025-09-07 03:25
 
-Este paquete agrega **galería de miniaturas** al dashboard:
-- Imágenes (`jpg,jpeg,png,gif,webp,svg`) se muestran como `<img>`.
-- Videos (`mp4,webm,ogg`) con `<video>` mini.
-- PDFs muestran ícono + botón **Previsualizar** (abre el signed URL).
-- Otros: tarjeta con extensión + **Copiar link**.
+Incluye:
+- Registro/login real (Supabase) o modo demo sin backend.
+- Subida a **Supabase Storage**.
+- **Miniaturas** (lista/galería) y **LIGHTBOX** con: abrir al clic, **siguiente/anterior**, **zoom** (rueda o botones), **arrastrar para panear**, **ESC** para cerrar, **←/→** para navegar.
 
 ## Configurar `assets/config.js`
 ```js
@@ -17,9 +16,6 @@ window.CONFIG = {
 }
 ```
 
-## Bucket y políticas (resumen)
-- Bucket `files` (Private) y políticas por carpeta `<uid>/...` (ver README anterior que te pasé).
-
-## Vista
-- **Lista / Galería**: toggle arriba a la derecha.
-- Cada tarjeta tiene: nombre, acciones (Copiar link / Borrar) y, si aplica, vista previa.
+## Notas
+- Para demo, usa `mode: "demo"` y verás la UI con miniaturas y lightbox sin backend.
+- Para producción, crea bucket `files` (Private) y aplica políticas por carpeta `<uid>/...`.
