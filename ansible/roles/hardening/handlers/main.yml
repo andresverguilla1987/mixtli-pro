@@ -1,0 +1,18 @@
+---
+- name: Reload SSH
+  service:
+    name: ssh
+    state: reloaded
+
+- name: Apply sysctl
+  command: sysctl --system
+
+- name: Restart Fail2Ban
+  service:
+    name: fail2ban
+    state: restarted
+
+- name: Restart auditd
+  service:
+    name: auditd
+    state: restarted

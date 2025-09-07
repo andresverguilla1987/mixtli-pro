@@ -1,0 +1,17 @@
+SSH:
+  sshd -T | egrep 'port|permitrootlogin|passwordauthentication|maxauthtries|maxsessions|logingracetime'
+
+Firewall (UFW):
+  sudo ufw status numbered
+
+Fail2Ban:
+  sudo fail2ban-client status sshd || true
+
+Sysctl:
+  sudo sysctl -a | egrep 'kptr_restrict|randomize_va_space|unprivileged_bpf_disabled|rp_filter'
+
+Timezone:
+  timedatectl
+
+Auditd:
+  systemctl is-active auditd || true

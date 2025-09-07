@@ -1,26 +1,62 @@
-# Server Security Hardening (Templates)
-    
-Generated: 2025-09-07T02:03:42
+# Server Security Hardening — Paquete Refinado (con EXTRAS)
 
-These files are **templates** to help you harden a fresh Linux server (Ubuntu/Debian-like).
-Review and adapt before using in production.
+Generado: 2025-09-07T02:16:44
 
-## Contents
-- `harden.sh` — idempotent shell script with common hardening steps.
-- `ssh/sshd_config.sample` — stricter SSH daemon config.
-- `sysctl/60-hardening.conf` — kernel/network sysctl settings.
-- `ufw/ufw-commands.txt` — UFW rules to allow SSH and HTTP/HTTPS.
-- `fail2ban/jail.local.sample` — basic Fail2Ban jail for SSH.
-- `auditd/audit.rules.sample` — starter audit rules.
+Incluye dos rutas:
 
-## Quick start (run as root, review first)
+1) **Script Bash** (`harden.sh`) con variables para:
+   - Usuario sudo `deploy`
+   - Puerto SSH `2222`
+   - Puertos abiertos `80,443,3000,8080`
+   - Zona horaria `America/Mexico_City`
+   - `unattended-upgrades`, `fail2ban`, `auditd`
+   - Notificación por correo en Fail2Ban (requiere MTA; se incluye ejemplo **msmtp**)
+
+2) **Playbook Ansible** (`ansible/`) idempotente para Ubuntu 22.04/24.04 y Debian 12.
+
+## Uso rápido (Script)
 ```bash
-# dry-run: just print what would run
-bash harden.sh --dry-run
+chmod +x harden.sh
 
-# apply (careful!)
-bash harden.sh
+# Dry-run (no aplica cambios)
+sudo SSH_PORT=2222 OPEN_PORTS="80,443,3000,8080" CREATE_USER=deploy TIMEZONE=America/Mexico_City ENABLE_UPDATES=1 FAIL2BAN=1 AUDITD=1 EMAIL_TO="" ./harden.sh --dry-run
+
+# Aplicar cambios
+sudo ./harden.sh
 ```
 
----
-**DISCLAIMER:** These are generic examples. Test carefully on a non‑production server first.
+Variables opcionales: `CREATE_USER, SSH_PORT, OPEN_PORTS, TIMEZONE, ENABLE_UPDATES, FAIL2BAN, AUDITD, EMAIL_TO`
+
+## Uso rápido (Ansible)
+```bash
+cd ansible
+# Edita inventory.ini con tu IP/usuario
+ansible-playbook -i inventory.ini playbook.yml --ask-become-pass
+```
+
+## Extras
+- Plantilla `extras/msmtprc.sample` para enviar correo con **SendGrid** o SMTP similar (Fail2Ban usa `sendmail` → msmtp lo provee).
+- Apertura de puertos adicionales típicos (`3000`, `8080`).
+- Zona horaria México.
+- Checklist de verificación en este README y en `postinstall_checklist.txt`.
+
+## Checklist de verificación
+```bash
+# SSH endurecido
+sshd -T | egrep 'port|permitrootlogin|passwordauthentication|maxauthtries|maxsessions|logingracetime'
+
+# Firewall
+sudo ufw status numbered
+
+# Fail2Ban (si activaste)
+sudo fail2ban-client status sshd || true
+
+# Sysctl aplicado
+sudo sysctl -a | egrep 'kptr_restrict|randomize_va_space|unprivileged_bpf_disabled|rp_filter'
+
+# Zona horaria
+timedatectl
+
+# auditd (si activaste)
+systemctl is-active auditd || true
+```

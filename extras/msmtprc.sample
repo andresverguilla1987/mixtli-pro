@@ -1,0 +1,23 @@
+# /etc/msmtprc (ejemplo para SendGrid u otro SMTP)
+# Cambia <API_KEY> por tu clave y el remitente.
+# Asegúrate de: chmod 600 /etc/msmtprc
+
+defaults
+auth           on
+tls            on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile        /var/log/msmtp.log
+
+account        sendgrid
+host           smtp.sendgrid.net
+port           587
+user           apikey
+password       <API_KEY>
+from           notificaciones@tudominio.com
+
+# Usar esta cuenta por defecto
+account default : sendgrid
+
+# Proveer interfaz sendmail para Fail2Ban:
+# apt-get install -y msmtp msmtp-mta
+# ln -sf /usr/bin/msmtp /usr/sbin/sendmail

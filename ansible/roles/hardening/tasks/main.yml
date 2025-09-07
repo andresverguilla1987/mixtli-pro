@@ -1,0 +1,136 @@
+---
+- name: Update and upgrade packages
+  apt:
+    update_cache: yes
+    upgrade: dist
+
+- name: Ensure sudo present
+  apt:
+    name: sudo
+    state: present
+
+- name: Ensure user exists and is in sudo
+  user:
+    name: "{{ create_user }}"
+    groups: sudo
+    append: yes
+    shell: /bin/bash
+    create_home: yes
+
+- name: Set timezone
+  command: timedatectl set-timezone {{ timezone_str }}
+  changed_when: false
+
+- name: Backup existing sshd_config if not already
+  command: cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
+  args:
+    creates: /etc/ssh/sshd_config.backup
+
+- name: Ensure key SSH hardening options
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^#?\s*PermitRootLogin', line: 'PermitRootLogin no' }
+    - { regexp: '^#?\s*PasswordAuthentication', line: 'PasswordAuthentication no' }
+    - { regexp: '^#?\s*ChallengeResponseAuthentication', line: 'ChallengeResponseAuthentication no' }
+    - { regexp: '^#?\s*MaxAuthTries', line: 'MaxAuthTries 3' }
+    - { regexp: '^#?\s*MaxSessions', line: 'MaxSessions 2' }
+    - { regexp: '^#?\s*LoginGraceTime', line: 'LoginGraceTime 20' }
+
+- name: Set SSH Port
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?\s*Port\s+'
+    line: "Port {{ allow_ssh_port }}"
+    state: present
+  notify: Reload SSH
+
+- name: Ensure sysctl.d exists
+  file:
+    path: /etc/sysctl.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install sysctl file
+  copy:
+    src: 60-hardening.conf
+    dest: /etc/sysctl.d/60-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Apply sysctl
+
+- name: Ensure UFW present
+  apt:
+    name: ufw
+    state: present
+
+- name: Allow SSH port
+  command: ufw allow {{ allow_ssh_port }}/tcp
+
+- name: Allow extra TCP ports
+  loop: "{{ open_ports }}"
+  loop_control:
+    loop_var: port_item
+  command: ufw allow {{ port_item }}/tcp
+
+- name: Enable UFW
+  command: ufw --force enable
+
+- name: Install Fail2Ban
+  apt:
+    name: fail2ban
+    state: present
+  when: enable_fail2ban
+
+- name: Deploy jail.local (templated)
+  template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart Fail2Ban
+  when: enable_fail2ban
+
+- name: Ensure Fail2Ban enabled
+  systemd:
+    name: fail2ban
+    enabled: yes
+    state: started
+  when: enable_fail2ban
+
+- name: Install unattended-upgrades
+  apt:
+    name: unattended-upgrades
+    state: present
+  when: enable_unattended
+
+- name: Enable unattended upgrades
+  copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+  when: enable_unattended
+
+- name: Install auditd
+  apt:
+    name: auditd
+    state: present
+  when: enable_auditd
+
+- name: Deploy audit rules
+  copy:
+    src: audit.rules
+    dest: /etc/audit/rules.d/hardening.rules
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Restart auditd
+  when: enable_auditd
