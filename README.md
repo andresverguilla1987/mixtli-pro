@@ -1,14 +1,35 @@
-# Mixtli Autopatch v3 — Typings + Redis exports
+# Mixtli – Hotfix ZIP (Root OK + Safe Redis)
 
-Incluye:
-- `apps/api/src/lib/redis.ts` con `getRedisUrl` y `tryRedisPing` exportados.
-- `apps/api/src/types/shims.d.ts` para cubrir `express`, `cors`, `morgan`, `redis` sin instalar @types.
+Este ZIP agrega:
+1. **`apps/api/src/health.ts`** – Rutas `/` (GET/HEAD) y `/health` que devuelven 200.
+2. **`apps/api/src/lib/redis.ts`** – Implementación *safe* que funciona aunque `REDIS_URL` no exista o rechace conexión.
+3. **`apps/api/src/types/shims.d.ts`** – Shims simples de tipos para evitar ruidos en compilación.
 
-## Build Command recomendado (Render)
-Pega esto tal cual en **Settings → Build Command** del servicio API:
+## Cómo integrarlo (sin tocar tus comandos de build/start)
 
+1. **Descomprime** en la raíz del repo (se fusiona con `apps/api/src/...`).  
+   Si el sistema te pregunta, acepta **reemplazar** `apps/api/src/lib/redis.ts`.
+
+2. **Abre** `apps/api/src/app.ts` y agrega estas dos líneas (arriba y luego después de crear `app`):
+   ```ts
+   import rootHealth from './health';
+   // ...luego de `const app = express()` y middlewares:
+   app.use('/', rootHealth);
+   ```
+
+   > No rompe nada de tus rutas existentes; solo devuelve `200 ok` en `/` y `/health`.
+
+3. **Variables en Render:**
+   - Si no usas Redis ahora, **elimina `REDIS_URL`** o déjala vacía. Con este archivo igual **no falla** si existe.
+   - (Opcional) Configura el Health Check Path en Render a **`/health`**.
+
+4. **Deploy** como siempre (no cambies tus comandos).
+
+## Verificación rápida
+```bash
+curl -i https://TU-DOMINIO/       # Debe responder 200 ok
+curl -i https://TU-DOMINIO/health # Debe responder {"status":"ok"}
 ```
-bash -lc "node -e "const fs=require('fs');const p='apps/api/tsconfig.json';let j=JSON.parse(fs.readFileSync(p,'utf8'));j.compilerOptions=j.compilerOptions||{};j.compilerOptions.rootDir='src';j.compilerOptions.skipLibCheck=true;j.compilerOptions.noImplicitAny=false;j.include=['src'];j.exclude=['scripts','**/*.test.ts','**/*.spec.ts'];fs.writeFileSync(p,JSON.stringify(j,null,2));console.log('[tsconfig] normalized');" && cd apps/api && if [ -f package-lock.json ]; then npm ci; else npm i; fi && npx prisma generate && npm run build"
-```
 
-Con eso desaparecen los errores TS7016/TS7006/TS2307 de tus archivos actuales sin necesidad de instalar `@types/*` ahora mismo.
+---
+Si quieres que el ZIP inserte automáticamente `app.use('/', rootHealth)`, dímelo y te preparo una variante con un pequeño script de parcheo que corre en `postinstall`.

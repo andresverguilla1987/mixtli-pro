@@ -1,4 +1,3 @@
-// apps/api/src/types/shims.d.ts
 declare module 'express';
 declare module 'cors';
 declare module 'morgan';
