@@ -447,3 +447,38 @@ revoke all on function public.admin_approve_bank_deposit(uuid, int) from public;
 grant execute on function public.admin_approve_bank_deposit(uuid, int) to authenticated;
 ```
 **Nota:** Cambia `admin@tu-dominio.com` por tus correos admin. Puedes crear una UI interna que llame `rpc('admin_approve_bank_deposit', ...)`.
+
+
+---
+# V6.6 — Panel Admin (aprobaciones, KYC, reportes)
+Generado: 2025-09-07 04:37
+
+## Qué incluye
+- `admin.html` + `assets/admin.js`: panel seguro para **admins** (según `public.is_admin()`).
+- Tabs: **Depósitos** (aprobar transferencias), **KYC** (cambiar `profiles.kyc_status`), **Reportes** (exportar CSV de `purchases` y `wallet_ledger`).
+
+## SQL RLS extra (dar visibilidad a admins)
+```sql
+-- Purchases (ver todos si eres admin)
+create policy if not exists admin_purchases on public.purchases
+  for select to authenticated using (public.is_admin());
+
+-- Wallet ledger (ver todos si eres admin)
+create policy if not exists admin_wallet_ledger on public.wallet_ledger
+  for select to authenticated using (public.is_admin());
+
+-- Profiles (ver y actualizar KYC si eres admin)
+create policy if not exists admin_profiles_select on public.profiles
+  for select to authenticated using (public.is_admin());
+create policy if not exists admin_profiles_update on public.profiles
+  for update to authenticated using (public.is_admin()) with check (public.is_admin());
+```
+
+> Asegúrate de haber creado `admin_emails` e insertado tus correos admin (ver V6.5).
+
+## Uso
+1) Pon `mode: "supabase"` y tus claves en `assets/config.js`.
+2) Abre `admin.html`, inicia sesión con un correo en `admin_emails`.
+3) **Depósitos** → aprobar (`admin_approve_bank_deposit`) con un clic.  
+   **KYC** → marcar `verified/rejected`.  
+   **Reportes** → filtra por fecha y exporta CSV.

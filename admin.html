@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mixtli — Admin</title>
+  <link rel="icon" href="assets/logo.svg">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/config.js"></script>
+  <script src="assets/admin.js" defer></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+  <header class="border-b border-white/10 bg-slate-950/60 backdrop-blur">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-3">
+        <img src="assets/logo.svg" class="h-8 w-8 rounded-xl shadow" alt="logo">
+        <span class="font-bold">Mixtli</span>
+        <span class="text-xs px-2 py-1 rounded-full bg-pink-500/15 text-pink-300 border border-pink-500/20">ADMIN</span>
+      </a>
+      <div class="flex items-center gap-3 text-sm">
+        <a href="dashboard.html" class="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20">Dashboard</a>
+        <span id="adminEmail" class="text-slate-300"></span>
+        <button id="logoutBtn" class="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20">Salir</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+    <div id="modeWarn" class="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm hidden">
+      Cambia a <b>mode: "supabase"</b> en <code>assets/config.js</code> para usar el panel admin.
+    </div>
+
+    <div id="guard" class="rounded-md border border-red-500/30 bg-red-500/10 p-5 text-sm hidden"></div>
+
+    <div id="tabs" class="mt-2 flex items-center gap-2">
+      <button data-tab="deposits" class="tab px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Depósitos</button>
+      <button data-tab="kyc" class="tab px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">KYC</button>
+      <button data-tab="reports" class="tab px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Reportes</button>
+    </div>
+
+    <section id="deposits" class="tabsec mt-6 hidden">
+      <h2 class="font-semibold text-lg">Transferencias pendientes</h2>
+      <div class="mt-3 overflow-x-auto rounded-xl border border-white/10">
+        <table class="w-full text-sm">
+          <thead class="bg-white/5">
+            <tr>
+              <th class="text-left p-2">Ref</th>
+              <th class="text-left p-2">User</th>
+              <th class="text-left p-2">Monto</th>
+              <th class="text-left p-2">Moneda</th>
+              <th class="text-left p-2">Fecha</th>
+              <th class="text-left p-2">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="depRows" class="divide-y divide-white/10"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="kyc" class="tabsec mt-6 hidden">
+      <h2 class="font-semibold text-lg">KYC — usuarios</h2>
+      <div class="mt-3 overflow-x-auto rounded-xl border border-white/10">
+        <table class="w-full text-sm">
+          <thead class="bg-white/5">
+            <tr>
+              <th class="text-left p-2">User</th>
+              <th class="text-left p-2">Email</th>
+              <th class="text-left p-2">Nivel</th>
+              <th class="text-left p-2">Status</th>
+              <th class="text-left p-2">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="kycRows" class="divide-y divide-white/10"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="reports" class="tabsec mt-6 hidden">
+      <h2 class="font-semibold text-lg">Reportes</h2>
+      <div class="mt-3 grid md:grid-cols-2 gap-4">
+        <div class="rounded-xl border border-white/10 p-4">
+          <div class="font-semibold">Compras</div>
+          <div class="mt-3 flex items-center gap-2 text-sm">
+            <input id="pStart" type="date" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
+            <input id="pEnd" type="date" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
+            <button id="pFetch" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Cargar</button>
+            <button id="pCsv" class="px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white">Exportar CSV</button>
+          </div>
+          <ul id="pList" class="mt-3 space-y-1 text-xs text-slate-300"></ul>
+        </div>
+
+        <div class="rounded-xl border border-white/10 p-4">
+          <div class="font-semibold">Movimientos Wallet</div>
+          <div class="mt-3 flex items-center gap-2 text-sm">
+            <input id="wStart" type="date" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
+            <input id="wEnd" type="date" class="h-9 px-2 rounded-md bg-white/10 border border-white/10">
+            <button id="wFetch" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20">Cargar</button>
+            <button id="wCsv" class="px-3 py-2 rounded-md bg-brand-500 hover:bg-brand-600 text-white">Exportar CSV</button>
+          </div>
+          <ul id="wList" class="mt-3 space-y-1 text-xs text-slate-300"></ul>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
