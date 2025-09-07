@@ -53,3 +53,5 @@ window.CONFIG = {
 IMPORTANTE:
 - Abre siempre con http://localhost:5500 (no con file://) para evitar bloqueos del navegador.
 - En DEMO, desde V5.1 guardamos los archivos como data URL para que 'Abrir' funcione tras recargar (archivos muy grandes pueden no caber en localStorage).
+
+- V5.2: Agrega botón **Reparar demos** para convertir archivos viejos (blob) a **dataURL** persistente. Abre Dashboard → Reparar demos y selecciona los archivos originales desde tu disco.
