@@ -1,0 +1,114 @@
+{
+  "info": {
+    "name": "Mixtli Demo",
+    "_postman_id": "b1e2f1a9-aaaa-bbbb-cccc-ddddeeeeffff",
+    "description": "Colecci\u00f3n para demo: salud, users y endpoints de demo (seed/reset).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{API_BASE_URL}}/salud",
+          "host": [
+            "{{API_BASE_URL}}"
+          ],
+          "path": [
+            "salud"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Users - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{API_BASE_URL}}/api/users",
+          "host": [
+            "{{API_BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "users"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Demo - Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{API_BASE_URL}}/demo/status",
+          "host": [
+            "{{API_BASE_URL}}"
+          ],
+          "path": [
+            "demo",
+            "status"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Demo - Seed",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "x-demo-pin",
+            "value": "{{DEMO_PIN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{API_BASE_URL}}/demo/seed",
+          "host": [
+            "{{API_BASE_URL}}"
+          ],
+          "path": [
+            "demo",
+            "seed"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Demo - Reset",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "x-demo-pin",
+            "value": "{{DEMO_PIN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{API_BASE_URL}}/demo/reset",
+          "host": [
+            "{{API_BASE_URL}}"
+          ],
+          "path": [
+            "demo",
+            "reset"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "API_BASE_URL",
+      "value": "https://mixtli-pro.onrender.com"
+    },
+    {
+      "key": "DEMO_PIN",
+      "value": "c0y0t3-mixtli"
+    }
+  ]
+}
