@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Status</title>
+  <link rel="stylesheet" href="../assets/styles.css"/>
+</head>
+<body>
+  <div class="container">
+    <h1>Mixtli Status</h1>
+    <div id="summary" class="card muted">Cargando...</div>
+    <div id="incidents"></div>
+  </div>
+<script>
+(async () => {
+  const res = await fetch('./incidents/incidents.json?_=' + Date.now());
+  const data = await res.json();
+  const sum = document.getElementById('summary');
+  sum.innerHTML = '<b>Estado:</b> ' + (data.overall || 'operacional') + ' — <span class="muted">' + new Date().toLocaleString() + '</span>';
+  const wrap = document.getElementById('incidents');
+  wrap.innerHTML = '';
+  (data.items||[]).forEach(it => {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.innerHTML = '<h3>' + it.title + '</h3>' +
+      '<div class="muted">' + it.severity + ' — ' + it.started_at + '</div>' +
+      '<p>' + it.summary + '</p>';
+    wrap.appendChild(el);
+  });
+})();
+</script>
+</body>
+</html>
