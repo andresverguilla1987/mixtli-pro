@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { nanoid } from 'nanoid';
 import pino from 'pino';
+import cors from 'cors';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import Database from 'better-sqlite3';
@@ -38,7 +39,9 @@ const env = {
   maxFree: Number(process.env.PLAN_FREE_MAX || 50*1024*1024),
   maxPro: Number(process.env.PLAN_PRO_MAX || 2*1024*1024*1024),
   maxEnt: Number(process.env.PLAN_ENTERPRISE_MAX || 10*1024*1024*1024),
-}
+  // CORS
+  corsOrigins: (process.env.CORS_ORIGINS || '*')
+};
 
 const logger = pino({ level: 'info', base: undefined });
 
@@ -73,7 +76,7 @@ const stmtCreateUpload = db.prepare(`INSERT INTO uploads (id,userId,bucket,ukey,
 const stmtUploadById = db.prepare('SELECT * FROM uploads WHERE id = ? AND userId = ?');
 const stmtMarkUploaded = db.prepare("UPDATE uploads SET status='READY', etag=? WHERE id=?");
 const stmtExpired = db.prepare("SELECT id, ukey FROM uploads WHERE datetime(expiresAt) < datetime('now')");
-const stmtDeleteUpload = db.prepare("DELETE FROM uploads WHERE id=?");
+const stmtDeleteUpload = db.prepare("DELETE FROM uploads WHERE id = ?");
 
 function s3Client() {
   if (env.driver === 'S3') {
@@ -110,7 +113,18 @@ function forbiddenExt(filename) {
 
 // --- App ---
 const app = express();
-app.use(express.json({ limit: '1mb' }));
+
+// CORS: permite cualquier origen (o lista separada por coma en CORS_ORIGINS)
+const origins = env.corsOrigins === '*' ? true : env.corsOrigins.split(',').map(s=>s.trim());
+app.use(cors({
+  origin: origins,
+  methods: ['GET','POST','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  maxAge: 600
+}));
+app.options('*', cors());
+
+app.use(express.json({ limit: '5mb' }));
 
 // request-id
 app.use((req,res,next)=>{
@@ -133,12 +147,17 @@ app.get('/api/health', (req,res)=> res.json({status:'ok', driver: env.driver}));
 app.post('/auth/register', (req,res)=>{
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error:'email and password required'});
-  const exists = stmtUserByEmail.get(email);
-  if (exists) return res.status(409).json({ error:'email already registered'});
-  const hash = bcrypt.hashSync(password, 10);
-  const id = nanoid();
-  stmtCreateUser.run(id, email, hash, 'FREE');
-  return res.json({ ok:true, user:{ id, email, plan:'FREE' } });
+  try {
+    const exists = stmtUserByEmail.get(email);
+    if (exists) return res.status(409).json({ error:'email already registered'});
+    const hash = bcrypt.hashSync(password, 10);
+    const id = nanoid();
+    stmtCreateUser.run(id, email, hash, 'FREE');
+    return res.json({ ok:true, user:{ id, email, plan:'FREE' } });
+  } catch (e) {
+    logger.error({ err: String(e) }, 'register error');
+    return res.status(500).json({ error: 'register failed' });
+  }
 });
 
 app.post('/auth/login', (req,res)=>{
@@ -179,7 +198,7 @@ app.post('/upload/presign', auth, async (req,res)=>{
   stmtCreateUpload.run(id, req.user.sub, bucket(), key, size, (mime||'application/octet-stream'), expiresAt.toISOString());
 
   const client = s3Client();
-  const cmd = new PutObjectCommand({ Bucket: bucket(), Key: key, ContentType: mime || 'application/octet-stream', ContentLength: size });
+  const cmd = new PutObjectCommand({ Bucket: bucket(), Key: key, ContentType: mime || 'application/octet-stream' });
   const putUrl = await getSignedUrl(client, cmd, { expiresIn: 15*60 });
   res.json({ uploadId:id, key, putUrl, putExpiresAt: new Date(Date.now()+15*60*1000).toISOString(), ttlExpiresAt: expiresAt.toISOString() });
 });
@@ -237,14 +256,10 @@ app.post('/email/send', auth, async (req,res)=>{
   res.json({ ok:true });
 });
 
-// Static tester
-app.use('/', express.static('public'));
-
 app.listen(env.port, ()=> logger.info({ port: env.port, driver: env.driver }, 'up'));
 
 // --- helpers ---
 function cryptoRandom() {
-  // tiny request-id
   const arr = new Uint8Array(16);
   crypto.getRandomValues(arr);
   return [...arr].map(b=>b.toString(16).padStart(2,'0')).join('');
