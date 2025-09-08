@@ -1,26 +1,35 @@
-# Mixtli — Investor Demo Kit
+# Demo Smoke (Scheduled)
 
-Todo lo necesario para correr una demo controlada desde terminal/Postman y Render.
+Programa un smoke test alrededor de la demo para tu API ya desplegada (Render u otro).
+Ejecuta **tres** corridas diarias a la hora de la demo (MX): **13:50, 14:10, 14:30**.
 
-## Rápido
-```bash
-# 1) Exporta variables (ajusta URL/TOKEN si aplica)
-export PUBLIC_URL="${PUBLIC_URL:-https://mixtli-pro.onrender.com}"
-export DEMO_REFRESH_TOKEN="${DEMO_REFRESH_TOKEN:-changeme}"
+> **Nota:** GitHub Actions usa **UTC**. CDMX es **UTC-6** todo el año. Por eso el cron corre a 19:50, 20:10 y 20:30 **UTC**.
 
-# 2) Smoke + flujo demo
-bash scripts/hit-demo.sh
+## Instalar
+1. Sube `.github/workflows/demo-smoke-scheduled.yml` a tu repo (rama por defecto).
+2. Ve a **Settings → Secrets and variables → Actions** y configura:
+   - **Variables**:
+     - `DEMO_BASE_URL` → tu URL pública (ej. `https://mixtli-pro.onrender.com`)
+   - **Secrets** (opcionales para alertas):
+     - `SLACK_WEBHOOK_URL`
+     - `DISCORD_WEBHOOK_URL`
 
-# 3) Semilla de datos mínima (opcional)
-bash scripts/seed-demo.sh
+## Qué valida
+- `GET /salud` debe responder 2xx/3xx
+- `GET /` debe responder 2xx/3xx
 
-# 4) Reset rápido (opcional)
-bash scripts/reset-demo.sh
-```
+Si todo pasa, manda ✅ a Slack/Discord (si configuraste webhooks). Si falla, manda ❌ y marca el job en rojo.
 
-## Postman
-Importa `postman/mixtli-demo.postman_collection.json` y configura la variable `base_url` = tu URL pública.
-Si usas token, agrega `DEMO_REFRESH_TOKEN` como variable de colección o Authorization header.
+## Ejecutarlo a mano
+Además de `schedule`, puedes abrir la pestaña **Actions → Demo Smoke (Scheduled - MX 13:50/14:10/14:30)** y usar **Run workflow**.
 
-## OpenAPI
-Archivo de referencia en `openapi/openapi.yaml` (minimal, ajusta según tu API real).
+## Ajustar horarios
+Edita los `cron` en el workflow. Recuerda que **son UTC**. Ejemplos comunes (MX → UTC, restando 6h):
+- 13:50 MX → `50 19 * * *`
+- 14:10 MX → `10 20 * * *`
+- 14:30 MX → `30 20 * * *`
+
+## Troubleshooting
+- Si el job falla con `DEMO_BASE_URL is not set`, ve a **Settings → Secrets and variables → Actions → Variables** y agrega `DEMO_BASE_URL`.
+- Si tus endpoints son otros, cambia `HEALTH_PATH` y `HOME_PATH` en `env:` del workflow.
+- Retrasos de minutos son normales en jobs por `schedule` de GitHub.
