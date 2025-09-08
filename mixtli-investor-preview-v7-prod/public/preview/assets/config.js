@@ -1,0 +1,1 @@
+window.MIXTLI_CFG = { apiBase: '', usersApi: '', grafana: '/dash/grafana', prometheus: '/dash/prom', status: './status/', downloadSuite: '', downloadAddons: '', otelEndpoint: 'http://localhost:4318', cacheBust: true, theme: 'green' };

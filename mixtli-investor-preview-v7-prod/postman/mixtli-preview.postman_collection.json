@@ -1,0 +1,64 @@
+{
+  "info": {
+    "name": "Mixtli Preview Smoke",
+    "_postman_id": "mixtli-smoke",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/salud"
+      }
+    },
+    {
+      "name": "Register",
+      "request": {
+        "method": "POST",
+        "url": "{{base}}/auth/register",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"Demo\",\"email\":\"demo+{{ts}}@example.com\",\"password\":\"secret\",\"plan\":\"pro\"}"
+        }
+      }
+    },
+    {
+      "name": "Users Stats",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/users/stats"
+      }
+    },
+    {
+      "name": "Users Recent",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/users/recent"
+      }
+    },
+    {
+      "name": "Metrics",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/metrics"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base",
+      "value": "http://localhost:10000"
+    },
+    {
+      "key": "ts",
+      "value": "{{timestamp}}"
+    }
+  ]
+}
