@@ -1,45 +1,48 @@
-# Mixtli DB Staging Restore Kit
+# DB Restore + Sanitización a STAGING
 
-Esto te permite **restaurar STAGING** desde los backups en S3 con un workflow manual o con un script local.
+Este paquete agrega un workflow manual para **restaurar la base a STAGING desde S3** y (opcionalmente) **sanitizar PII** para que nadie toque datos reales.
 
-## 1) Secrets requeridos en GitHub Actions
+## Archivos
+- `.github/workflows/db-restore-and-sanitize-staging.yml` – Workflow manual
+- `db/sanitize-staging.js` – Script Node.js (pattern-based) que enmascara correos, nombres, teléfonos, direcciones, tokens, IPs, etc.
+- `db/sanitize-staging.sql` – SQL opcional con ejemplos específicos (ajústalo si aplica)
+- `db/sanitize-local.sh` – Wrapper para correr sanitización local
 
-En el repo: **Settings → Secrets and variables → Actions**
-
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_REGION`
+## Secrets requeridos (GitHub → Settings → Secrets and variables → Actions)
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
 - `S3_BUCKET`
-- `S3_PREFIX` (opcional, default `mixtli/backups`)
-- `DATABASE_URL_STAGING` (cadena de conexión a la base de STAGING)
+- `S3_PREFIX` (opcional; default `mixtli/backups`)
+- `DATABASE_URL_STAGING` (cadena de conexión Postgres de STAGING)
 
-## 2) Workflow manual
+## Inputs del workflow
+- `s3_key` – S3 key del backup a restaurar (si lo dejas vacío, usa el **más reciente** del prefijo)
+- `confirm` – Debe ser `RESTAURAR_STAGING`
+- `drop_schema` – `true` por default; limpia schema `public` antes de restaurar
+- `sanitize` – `true` por default; corre enmascarado masivo
+- `safe_email_suffix` – por default `@mixtli.test`, cualquier email con este sufijo NO se toca
+- `dry_run` – si `true`, imprime queries sin aplicar cambios (útil para revisar)
 
-- Archivo: `.github/workflows/db-restore-to-staging.yml`
-- Ve a **Actions → DB Restore to Staging (Manual) → Run workflow**
-- Inputs:
-  - `s3_key` (opcional): key exacta del backup, ej. `mixtli/backups/backup-20250907-091500.sql`.
-  - `confirm`: escribe EXACTO `RESTAURAR_STAGING` para proceder.
-  - `drop_schema`: true/false (por defecto true).
+## Qué sanitiza (pattern-based)
+- Columnas `email*` → `user_<id>@example.invalid` (si hay `id`) o random
+- `first_name`/`last_name`/`name` → `"Test"`, `"User"` o `"Test User"`
+- `phone|mobile|telefono` → `0000000000`
+- `address|street|city|state|zip|postal|postcode` → `SANITIZED`
+- `birth|dob` (date/timestamp) → `1990-01-01`
+- `ssn|curp|rfc|dni|nss|tax|passport|national_id` → `NULL`
+- `token|secret|api_key|apikey|access|refresh` → `NULL`
+- `ip|device|fingerprint` → `0.0.0.0` (o texto `'0.0.0.0'`)
 
-Si `s3_key` va vacío, el workflow toma el **más reciente** del prefijo `S3_PREFIX`.
+> Sólo aplica donde el **tipo de dato** lo permite (text/char/citext para strings, `date/timestamp` para fechas, `inet` para IPs).  
+> Si existe columna `role`, omite filas con `role IN ('system','internal')`.
 
-## 3) Script local (opcional)
-
+## Uso local
 ```bash
-export AWS_ACCESS_KEY_ID=... 
-export AWS_SECRET_ACCESS_KEY=...
-export AWS_REGION=...
-export S3_BUCKET=...
-export S3_PREFIX=mixtli/backups   # opcional
-export DATABASE_URL_STAGING="postgres://..."
-# opcional: export S3_KEY="mixtli/backups/backup-YYYYmmdd-HHMMSS.sql"
-# opcional: export DROP_SCHEMA=true
-
-bash db/restore-to-staging-from-s3.sh
+export DATABASE_URL_STAGING='postgres://...'
+export SAFE_EMAIL_SUFFIX='@mixtli.test'   # opcional
+export DRY_RUN=false                      # o true para simular
+bash db/sanitize-local.sh
 ```
 
-## 4) Notas
-- Se asume que los backups son **SQL plano** (`.sql`) generados con `pg_dump`.
-- Si tienes seeds demo, ponlos en `db/seed.sql` para que el workflow los aplique al final (opcional).
-- NO corre en PROD, sólo usa `DATABASE_URL_STAGING`.
+## Notas
+- Si tienes tablas/columnas particulares, agrega reglas en `db/sanitize-staging.sql`.
+- Si quieres **crear/forzar un usuario test** con contraseña conocida, dímelo y te agrego un paso seguro (sin exponer secretos).
