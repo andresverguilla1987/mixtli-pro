@@ -1,21 +1,15 @@
+# Mixtli Front (API)
 
-# Mixtli Mini — Presigned Uploads (S3/R2)
+UI bonita, mínima, conectada al backend `mixtli-mini` (presigned R2/S3).
 
-Un solo archivo `server.js`, sin ORM. SQLite embebido con `better-sqlite3`.
-Incluye:
-- Registro/Login (JWT)
-- Presign PUT directo al bucket (S3 o R2)
-- Límites por plan antes del presign
-- TTL/limpieza (`node cleanup.js`)
-- Enviar por email con link firmado
-- request-id en headers y logs
-- `public/index.html` para probar
+## Archivos
+- `index.html` — UI.
+- `assets/styles.css` — estilos.
+- `assets/config.js` — API_BASE y toggles (ocultar registro).
+- `assets/adapter.js` — llamadas al backend (login, presign, PUT, complete, link, email).
+- `assets/app.js` — lógica de la interfaz.
 
-## Run
-```bash
-npm i
-cp .env.example .env  # edita credenciales
-node server.js
-# opcional cron diario
-node cleanup.js
-```
+## Uso
+1) Edita `assets/config.js` → `API_BASE` (por defecto `http://localhost:10000`).
+2) Sirve la carpeta estática (Netlify, nginx) o abre `index.html`.
+3) Login → “Subir y generar enlace”. Opcional: introduce correo para enviar link.

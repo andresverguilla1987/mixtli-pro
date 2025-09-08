@@ -3,79 +3,106 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mixtli — Presigned Upload</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Mixtli — Subir y Compartir</title>
+  <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
-  <div class="container">
-    <h1>Mixtli — Direct-to-Bucket (Presign)</h1>
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">E</div>
+    <div class="title">Mixtli</div>
+  </div>
+  <nav class="nav"><span id="driverHint" class="tag"></span></nav>
+</header>
 
-    <section class="card">
-      <h2>Configuración</h2>
-      <label>Base URL (API): <input id="baseUrl" value="http://localhost:10000" /></label>
-      <button id="saveCfg">Guardar</button>
-      <span id="health" class="muted"></span>
-    </section>
-
-    <section class="card">
-      <h2>Registro</h2>
-      <label>Email <input id="regEmail" type="email" placeholder="usuario@correo.com" /></label>
-      <label>Password <input id="regPass" type="password" /></label>
-      <button id="btnRegister">Crear usuario</button>
-      <pre id="regOut" class="out"></pre>
-    </section>
-
-    <section class="card">
-      <h2>Login</h2>
-      <label>Email <input id="logEmail" type="email" /></label>
-      <label>Password <input id="logPass" type="password" /></label>
-      <button id="btnLogin">Entrar</button>
-      <div class="row">
-        <label>Token (JWT)</label>
-        <textarea id="token" rows="3" readonly></textarea>
-      </div>
+<main class="container">
+  <section class="card" id="authCard">
+    <h1>Bienvenido</h1>
+    <p class="muted">Inicia sesión para subir y compartir archivos.</p>
+    <div class="grid2">
+      <button id="btnTabLogin" class="tab active">Entrar</button>
+      <button id="btnTabReg" class="tab">Registrarme</button>
+    </div>
+    <div id="loginBox" class="box">
+      <label>Email
+        <input id="logEmail" type="email" placeholder="tu@correo.com" autocomplete="username" />
+      </label>
+      <label>Contraseña
+        <input id="logPass" type="password" placeholder="········" autocomplete="current-password" />
+      </label>
+      <button id="btnLogin" class="primary">Entrar</button>
       <pre id="logOut" class="out"></pre>
-    </section>
+    </div>
+    <div id="regBox" class="box hidden">
+      <label>Email
+        <input id="regEmail" type="email" placeholder="tu@correo.com" autocomplete="username" />
+      </label>
+      <label>Contraseña
+        <input id="regPass" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password" />
+      </label>
+      <button id="btnRegister">Crear cuenta</button>
+      <pre id="regOut" class="out"></pre>
+    </div>
+    <div class="row cfg">
+      <label>API Base
+        <input id="apiBase" placeholder="http://localhost:10000" />
+      </label>
+      <button id="btnSaveCfg">Guardar</button>
+      <span id="health" class="dot">•</span>
+      <span id="healthText" class="muted"></span>
+    </div>
+  </section>
 
-    <section class="card">
-      <h2>Subir archivo (Presign → PUT)</h2>
-      <label>Archivo <input id="file" type="file" /></label>
-      <label>Días de expiración (TTL) 
+  <section class="card hidden" id="appCard">
+    <div class="row between">
+      <h2>Enviar archivos</h2>
+      <button id="btnLogout" class="ghost">Salir</button>
+    </div>
+
+    <div id="drop" class="drop">
+      <input id="file" type="file" />
+      <p><strong>Arrastra y suelta</strong> o haz clic para elegir.</p>
+      <p class="muted">Se sube directo al bucket, sin pasar por el servidor.</p>
+    </div>
+
+    <div class="row grid3">
+      <label>TTL (días)
         <input id="ttlDays" type="number" min="1" max="30" value="14" />
       </label>
-      <button id="btnPresign">Generar URL de subida</button>
-      <pre id="presignOut" class="out"></pre>
-      <div class="row">
-        <button id="btnDoPut" disabled>Hacer PUT al bucket</button>
-      </div>
-      <pre id="putOut" class="out"></pre>
-      <div class="row">
-        <button id="btnComplete" disabled>Marcar como completo</button>
-      </div>
-      <pre id="completeOut" class="out"></pre>
-      <div class="row">
-        <button id="btnGetLink" disabled>Obtener link de descarga</button>
-      </div>
-      <pre id="linkOut" class="out"></pre>
-    </section>
-
-    <section class="card">
-      <h2>Enviar por email</h2>
-      <label>Upload ID <input id="emailUploadId" /></label>
-      <label>Para (email) <input id="emailTo" type="email" placeholder="destinatario@correo.com" /></label>
-      <label>Mensaje
-        <textarea id="emailMsg" rows="3" placeholder="Hola, te comparto un archivo..."></textarea>
+      <label>Correo destino (opcional)
+        <input id="emailTo" type="email" placeholder="destinatario@correo.com" />
       </label>
-      <button id="btnSendMail">Enviar</button>
-      <pre id="mailOut" class="out"></pre>
-    </section>
+      <label>Mensaje (opcional)
+        <input id="emailMsg" placeholder="Te comparto este archivo" />
+      </label>
+    </div>
 
-    <section class="card">
-      <h2>Logs</h2>
-      <pre id="log" class="out"></pre>
-    </section>
-  </div>
+    <div class="row">
+      <button id="btnUpload" class="primary">Subir y generar enlace</button>
+    </div>
 
-  <script src="script.js"></script>
+    <div id="progressWrap" class="hidden">
+      <div class="progress"><div id="bar" class="bar" style="width:0%"></div></div>
+      <div class="row between">
+        <span id="statusText" class="muted">Esperando…</span>
+        <span id="sizeText" class="muted"></span>
+      </div>
+    </div>
+
+    <div id="result" class="hidden">
+      <div class="row between">
+        <input id="shareUrl" class="mono" readonly />
+        <button id="btnCopy" class="ghost">Copiar</button>
+      </div>
+      <pre id="debug" class="out"></pre>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span class="muted">Mixtli · Presigned direct-to-bucket</span>
+</footer>
+
+<script type="module" src="assets/app.js"></script>
 </body>
 </html>
