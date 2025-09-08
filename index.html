@@ -1,43 +1,81 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mixtli — Inicio</title>
-  <link rel="icon" href="assets/logo.svg">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config={theme:{extend:{colors:{brand:{500:'#6366F1',600:'#5558ee'},ok:'#22c55e',warn:'#f59e0b',danger:'#ef4444'}}}}}</script>
+  <title>Mixtli — Presigned Upload</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
-<body class="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
-  <header class="border-b border-white/10 bg-slate-950/60">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <img src="assets/logo.svg" class="h-8 w-8 rounded-xl shadow" alt="logo">
-        <span class="font-bold">Mixtli</span>
-      </div>
-      <nav class="hidden md:flex items-center gap-6 text-sm text-slate-300">
-        <a href="auth.html" class="hover:text-brand-300">Prueba gratis</a>
-        <a href="dashboard.html" class="hover:text-brand-300">Dashboard</a>
-        <a href="billing.html" class="hover:text-brand-300">Planes y Recargas</a>
-      </nav>
-      <div class="flex items-center gap-2">
-        <a href="auth.html" class="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-sm">Entrar / Registrarme</a>
-      </div>
-    </div>
-  </header>
+<body>
+  <div class="container">
+    <h1>Mixtli — Direct-to-Bucket (Presign)</h1>
 
-  <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 grid md:grid-cols-2 gap-12 items-center">
-    <div class="space-y-6">
-      <h1 class="text-4xl md:text-5xl font-extrabold leading-tight">Mixtli USB Cloud</h1>
-      <p class="text-slate-300 text-lg">**V6**: Recargas de GB + cuotas con bloqueo de subida.</p>
-      <div class="flex flex-wrap gap-3">
-        <a href="auth.html" class="px-5 py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold shadow-lg">Probar gratis</a>
-        <a href="dashboard.html" class="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20">Ir al Dashboard</a>
-        <a href="billing.html" class="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20">Planes y Recargas</a>
+    <section class="card">
+      <h2>Configuración</h2>
+      <label>Base URL (API): <input id="baseUrl" value="http://localhost:10000" /></label>
+      <button id="saveCfg">Guardar</button>
+      <span id="health" class="muted"></span>
+    </section>
+
+    <section class="card">
+      <h2>Registro</h2>
+      <label>Email <input id="regEmail" type="email" placeholder="usuario@correo.com" /></label>
+      <label>Password <input id="regPass" type="password" /></label>
+      <button id="btnRegister">Crear usuario</button>
+      <pre id="regOut" class="out"></pre>
+    </section>
+
+    <section class="card">
+      <h2>Login</h2>
+      <label>Email <input id="logEmail" type="email" /></label>
+      <label>Password <input id="logPass" type="password" /></label>
+      <button id="btnLogin">Entrar</button>
+      <div class="row">
+        <label>Token (JWT)</label>
+        <textarea id="token" rows="3" readonly></textarea>
       </div>
-      <p class="text-xs text-slate-400">Listo para monetizar</p>
-    </div>
-    <div class="rounded-2xl border border-white/10 bg-white/5 p-6">Barra de uso + compras con Stripe 💳</div>
-  </main>
+      <pre id="logOut" class="out"></pre>
+    </section>
+
+    <section class="card">
+      <h2>Subir archivo (Presign → PUT)</h2>
+      <label>Archivo <input id="file" type="file" /></label>
+      <label>Días de expiración (TTL) 
+        <input id="ttlDays" type="number" min="1" max="30" value="14" />
+      </label>
+      <button id="btnPresign">Generar URL de subida</button>
+      <pre id="presignOut" class="out"></pre>
+      <div class="row">
+        <button id="btnDoPut" disabled>Hacer PUT al bucket</button>
+      </div>
+      <pre id="putOut" class="out"></pre>
+      <div class="row">
+        <button id="btnComplete" disabled>Marcar como completo</button>
+      </div>
+      <pre id="completeOut" class="out"></pre>
+      <div class="row">
+        <button id="btnGetLink" disabled>Obtener link de descarga</button>
+      </div>
+      <pre id="linkOut" class="out"></pre>
+    </section>
+
+    <section class="card">
+      <h2>Enviar por email</h2>
+      <label>Upload ID <input id="emailUploadId" /></label>
+      <label>Para (email) <input id="emailTo" type="email" placeholder="destinatario@correo.com" /></label>
+      <label>Mensaje
+        <textarea id="emailMsg" rows="3" placeholder="Hola, te comparto un archivo..."></textarea>
+      </label>
+      <button id="btnSendMail">Enviar</button>
+      <pre id="mailOut" class="out"></pre>
+    </section>
+
+    <section class="card">
+      <h2>Logs</h2>
+      <pre id="log" class="out"></pre>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>

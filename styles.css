@@ -1,0 +1,12 @@
+*{box-sizing:border-box} body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans',sans-serif;background:#0b0b10;color:#e7e7ec;margin:0;padding:24px}
+.container{max-width:980px;margin:0 auto}
+h1{font-weight:700;margin:0 0 16px;font-size:28px}
+h2{font-size:18px;margin:0 0 12px}
+.card{background:#12121a;border:1px solid #1f2130;border-radius:16px;padding:16px;margin:16px 0;box-shadow:0 1px 8px rgba(0,0,0,.25)}
+label{display:block;margin:8px 0;font-size:14px}
+input,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #282a3a;background:#0f0f16;color:#e7e7ec}
+button{padding:10px 14px;border-radius:10px;border:1px solid #2f3350;background:#1b1f3a;color:#e7e7ec;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+.row{margin:12px 0}
+.out{background:#0d0d14;border:1px dashed #292c45;border-radius:10px;padding:10px;white-space:pre-wrap;max-height:260px;overflow:auto}
+.muted{opacity:.7;margin-left:8px}
