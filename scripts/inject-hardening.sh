@@ -1,52 +1,40 @@
-#!/usr/bin/env bash
-set -euo pipefail
+\
+  #!/usr/bin/env bash
+  set -euo pipefail
 
-APP_TS="apps/api/src/app.ts"
-if [[ ! -f "$APP_TS" ]]; then
-  echo "❌ $APP_TS not found. Edit your app entry manually to import & call applyHardening()."
-  exit 0
-fi
+  APP_FILE="apps/api/src/app.ts"
+  if [[ ! -f "$APP_FILE" ]]; then
+    echo "ERROR: $APP_FILE no existe. Asegúrate de correr desde la raíz del repo."
+    exit 1
+  fi
 
-# Ensure bootstrap & middleware files exist suggestion (they will after unzip)
-if [[ ! -f "apps/api/src/bootstrap/hardening.ts" ]]; then
-  echo "❌ apps/api/src/bootstrap/hardening.ts not found. Make sure you unzipped correctly."
-  exit 1
-fi
-
-# Idempotent import insertion (only if missing)
-if ! grep -q "applyHardening" "$APP_TS"; then
-  # Insert import after last import line
-  awk '
-    BEGIN{inserted=0}
-    /^import /{last=NR}
-    {lines[NR]=$0}
-    END{
-      for(i=1;i<=NR;i++){
-        print lines[i]
-        if(i==last && inserted==0){
-          print "import { applyHardening } from \x27./bootstrap/hardening\x27;"
-          inserted=1
-        }
+  # 1) Inyectar imports si no existen
+  if ! grep -q "middleware/security" "$APP_FILE"; then
+    # Inserta imports después de los imports existentes
+    tmp="$(mktemp)"
+    awk '
+      BEGIN { inserted=0 }
+      /^import / { print; next }
+      inserted==0 { 
+        print "import { security } from \\"./middleware/security\\";";
+        print "import { applyRateLimit } from \\"./middleware/rateLimit\\";";
+        print "import { applyLogging } from \\"./middleware/logging\\";";
+        print "import { notFound, errorHandler } from \\"./middleware/errors\\";";
+        inserted=1
       }
-    }
-  ' "$APP_TS" > "$APP_TS.tmp" && mv "$APP_TS.tmp" "$APP_TS"
-  echo "✅ Import added to $APP_TS"
-else
-  echo "ℹ️ Import already present in $APP_TS"
-fi
+      { print }
+    ' "$APP_FILE" > "$tmp"
+    mv "$tmp" "$APP_FILE"
+  fi
 
-# Insert call applyHardening(app) after the line where app = express()
-if ! grep -q "applyHardening(app)" "$APP_TS"; then
-  awk '
-    {print $0}
-    $0 ~ /const[[:space:]]+app[[:space:]]*=[[:space:]]*express[[:space:]]*\(/ && !added {
-      print "applyHardening(app);"
-      added=1
-    }
-  ' "$APP_TS" > "$APP_TS.tmp" && mv "$APP_TS.tmp" "$APP_TS"
-  echo "✅ applyHardening(app) inserted in $APP_TS"
-else
-  echo "ℹ️ applyHardening(app) already present in $APP_TS"
-fi
+  # 2) Insertar llamadas tras la creación de app
+  if ! grep -q "applyLogging(app);" "$APP_FILE"; then
+    perl -0777 -pe 's|(const\s+app\s*=\s*express\(\)\s*;)|$1\napplyLogging(app);\nsecurity(app);\napplyRateLimit(app);\n|s' -i "$APP_FILE"
+  fi
 
-echo "Done. Commit your changes and deploy when ready."
+  # 3) Agregar notFound y errorHandler al final si no están
+  if ! grep -q "notFound" "$APP_FILE"; then
+    echo -e "\napp.use(notFound as any);\napp.use(errorHandler as any);\n" >> "$APP_FILE"
+  fi
+
+  echo "[inject] Hardening middleware aplicado a $APP_FILE"
