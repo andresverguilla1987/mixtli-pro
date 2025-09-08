@@ -1,35 +1,26 @@
-# Mixtli – Hotfix ZIP (Root OK + Safe Redis)
+# Mixtli — Investor Demo Kit
 
-Este ZIP agrega:
-1. **`apps/api/src/health.ts`** – Rutas `/` (GET/HEAD) y `/health` que devuelven 200.
-2. **`apps/api/src/lib/redis.ts`** – Implementación *safe* que funciona aunque `REDIS_URL` no exista o rechace conexión.
-3. **`apps/api/src/types/shims.d.ts`** – Shims simples de tipos para evitar ruidos en compilación.
+Todo lo necesario para correr una demo controlada desde terminal/Postman y Render.
 
-## Cómo integrarlo (sin tocar tus comandos de build/start)
-
-1. **Descomprime** en la raíz del repo (se fusiona con `apps/api/src/...`).  
-   Si el sistema te pregunta, acepta **reemplazar** `apps/api/src/lib/redis.ts`.
-
-2. **Abre** `apps/api/src/app.ts` y agrega estas dos líneas (arriba y luego después de crear `app`):
-   ```ts
-   import rootHealth from './health';
-   // ...luego de `const app = express()` y middlewares:
-   app.use('/', rootHealth);
-   ```
-
-   > No rompe nada de tus rutas existentes; solo devuelve `200 ok` en `/` y `/health`.
-
-3. **Variables en Render:**
-   - Si no usas Redis ahora, **elimina `REDIS_URL`** o déjala vacía. Con este archivo igual **no falla** si existe.
-   - (Opcional) Configura el Health Check Path en Render a **`/health`**.
-
-4. **Deploy** como siempre (no cambies tus comandos).
-
-## Verificación rápida
+## Rápido
 ```bash
-curl -i https://TU-DOMINIO/       # Debe responder 200 ok
-curl -i https://TU-DOMINIO/health # Debe responder {"status":"ok"}
+# 1) Exporta variables (ajusta URL/TOKEN si aplica)
+export PUBLIC_URL="${PUBLIC_URL:-https://mixtli-pro.onrender.com}"
+export DEMO_REFRESH_TOKEN="${DEMO_REFRESH_TOKEN:-changeme}"
+
+# 2) Smoke + flujo demo
+bash scripts/hit-demo.sh
+
+# 3) Semilla de datos mínima (opcional)
+bash scripts/seed-demo.sh
+
+# 4) Reset rápido (opcional)
+bash scripts/reset-demo.sh
 ```
 
----
-Si quieres que el ZIP inserte automáticamente `app.use('/', rootHealth)`, dímelo y te preparo una variante con un pequeño script de parcheo que corre en `postinstall`.
+## Postman
+Importa `postman/mixtli-demo.postman_collection.json` y configura la variable `base_url` = tu URL pública.
+Si usas token, agrega `DEMO_REFRESH_TOKEN` como variable de colección o Authorization header.
+
+## OpenAPI
+Archivo de referencia en `openapi/openapi.yaml` (minimal, ajusta según tu API real).

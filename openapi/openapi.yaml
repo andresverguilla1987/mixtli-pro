@@ -1,0 +1,59 @@
+openapi: 3.0.1
+info:
+  title: Mixtli API (Demo)
+  version: 0.1.0
+servers:
+  - url: https://mixtli-pro.onrender.com
+paths:
+  /:
+    head:
+      summary: Health (HEAD)
+      responses:
+        '200':
+          description: OK
+  /salud:
+    get:
+      summary: Ping de salud
+      responses:
+        '200':
+          description: OK
+  /api/users:
+    get:
+      summary: Listar usuarios (demo)
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Crear usuario (demo)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201': { description: Creado }
+  /api/users/:
+    put:
+      summary: Actualizar genérico (demo)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: OK }
+    delete:
+      summary: Borrar genérico (demo)
+      responses:
+        '200': { description: OK }
+  /api/refresh:
+    post:
+      summary: Refresh de datos demo
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: OK }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
