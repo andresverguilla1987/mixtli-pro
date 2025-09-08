@@ -1,0 +1,16 @@
+groups:
+- name: http.records
+  rules:
+  - record: job:http_requests_total:rate5m
+    expr: sum by (job, route, method, status_code) (rate(http_requests_total[5m]))
+
+  - record: job:http_request_duration_seconds_bucket:rate5m
+    expr: sum by (job, route, le) (rate(http_request_duration_seconds_bucket[5m]))
+
+- name: slo.records
+  rules:
+  # Define "error" como status_code 5xx (ajusta si quieres incluir 429/4xx)
+  - record: job:slo_error_ratio:5m
+    expr: |
+      (sum by (job) (rate(http_requests_total{status_code=~"5.."}[5m])))
+      / clamp_min(sum by (job) (rate(http_requests_total[5m])), 1)
