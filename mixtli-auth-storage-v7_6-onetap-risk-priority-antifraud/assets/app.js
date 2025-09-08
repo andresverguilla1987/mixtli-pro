@@ -1,0 +1,11 @@
+(() => {
+  // Dashboard demo
+  const user = JSON.parse(localStorage.getItem('mixtli_user')||'{}');
+  document.getElementById('k-storage').textContent = (120 + Math.floor(Math.random()*30)) + ' GB';
+  document.getElementById('k-objects').textContent = (12000 + Math.floor(Math.random()*2000)).toLocaleString();
+  document.getElementById('k-egress').textContent = (12 + Math.floor(Math.random()*6)) + ' GB';
+  document.getElementById('k-plan').textContent = 'free';
+  const tb = document.querySelector('#tbl-activity tbody');
+  tb.innerHTML = `<tr><td>Hoy</td><td>Login</td><td>${user.email||'demo'}</td></tr>
+                  <tr><td>Ayer</td><td>Subió archivo</td><td>video.mp4 (1.2GB)</td></tr>`;
+})();

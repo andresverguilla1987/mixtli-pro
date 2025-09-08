@@ -1,0 +1,39 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mixtli — Planes y Recargas</title><link rel="stylesheet" href="./assets/styles.css"/>
+</head><body>
+<nav class="container">
+  <div class="brand"><img src="./assets/logo.png" alt="Mixtli"/><b>Mixtli</b></div>
+  <div class="actions">
+    <a class="btn secondary" href="./dashboard.html">Dashboard</a>
+    <a class="btn ghost" href="./billing.html">Planes y Recargas</a>
+  </div>
+</nav>
+<section class="container page">
+<h1>Planes y Recargas</h1>
+
+<p class="meta">Compra GB extra o suscríbete a un plan.</p>
+<div class="row">
+  <div><label>País</label><br/><select id="country"><option value="MXN">México (MXN)</option><option value="USD">Estados Unidos (USD)</option><option value="COP">Colombia (COP)</option></select></div>
+  <div><label>Método</label><br/>
+    <div class="row">
+      <button class="btn ghost" data-method="stripe">Stripe</button>
+      <button class="btn ghost" data-method="mp">Mercado Pago</button>
+      <button class="btn ghost" data-method="paypal">PayPal</button>
+      <button class="btn ghost" data-method="crypto">Crypto</button>
+    </div>
+  </div>
+</div>
+
+<div class="grid plan-cards" id="plans"></div>
+
+<div class="card">
+  <div class="title">Estimación en cripto (BTC/ETH/USDC) para el producto seleccionado.</div>
+  <div id="crypto-quote" class="meta">Selecciona un plan para ver la estimación…</div>
+</div>
+
+</section>
+<footer class="footer">Modo: <span id="modeLabel"></span>. Configura en <code>assets/config.js</code>.</footer>
+<script src="./assets/config.js"></script>
+<script src="./assets/billing.js"></script>
+</body></html>

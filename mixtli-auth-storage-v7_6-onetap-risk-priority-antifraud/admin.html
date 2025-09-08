@@ -1,0 +1,47 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mixtli — Admin</title><link rel="stylesheet" href="./assets/styles.css"/></head><body>
+<nav class="container">
+  <div class="brand"><img src="./assets/logo.png" alt="Mixtli"/><b>Mixtli</b><span class="badge">ADMIN</span></div>
+  <div class="actions">
+    <a class="btn secondary" href="./dashboard.html">Dashboard</a>
+    <a class="btn ghost" href="./billing.html">Planes y Recargas</a>
+  </div>
+</nav>
+<section class="container page">
+<h1>Admin</h1>
+
+<div class="container">
+  <div class="notice">Cambia a <b>mode: "supabase"</b> en <code>assets/config.js</code> para usar el panel admin.</div>
+  <div class="row" style="margin:14px 0">
+    <a class="btn ghost" href="#deposits">Depósitos</a>
+    <a class="btn ghost" href="#kyc">KYC</a>
+    <a class="btn ghost" href="#reports">Reportes</a>
+    <a class="btn ghost" href="#tenants">Tenants</a>
+    <a class="btn ghost" href="#fraud">Fraude</a>
+  </div>
+  <div class="card" id="deposits"><div class="title">Depósitos</div>
+    <table class="table" id="tbl-dep"><thead><tr><th>ID</th><th>Usuario</th><th>Método</th><th>Monto</th><th>Estado</th></tr></thead><tbody></tbody></table>
+  </div>
+  <div class="card" id="kyc"><div class="title">KYC</div>
+    <table class="table" id="tbl-kyc"><thead><tr><th>Usuario</th><th>Documento</th><th>Estatus</th><th>Fecha</th></tr></thead><tbody></tbody></table>
+  </div>
+  <div class="card" id="reports"><div class="title">Reportes</div>
+    <div class="kpi">
+      <div class="box"><div>Ingresos hoy</div><h2 id="rev-today">$—</h2></div>
+      <div class="box"><div>MRR</div><h2 id="mrr">$—</h2></div>
+      <div class="box"><div>Churn 30d</div><h2 id="churn">—%</h2></div>
+      <div class="box"><div>Fraude (7d)</div><h2 id="fraud7">—</h2></div>
+    </div>
+  </div>
+  <div class="card" id="tenants"><div class="title">Tenants</div>
+    <table class="table" id="tbl-tenants"><thead><tr><th>Tenant</th><th>Plan</th><th>Uso (GB)</th><th>Usuarios</th></tr></thead><tbody></tbody></table>
+  </div>
+  <div class="card" id="fraud"><div class="title">Fraude</div>
+    <table class="table" id="tbl-fraud"><thead><tr><th>Transacción</th><th>Motivo</th><th>Riesgo</th><th>Acción</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+<footer class="footer">Admin DEMO. Cambia a <code>mode: "supabase"</code> para backend real.</footer>
+<script src="./assets/config.js"></script>
+<script src="./assets/admin.js"></script>
+</body></html>

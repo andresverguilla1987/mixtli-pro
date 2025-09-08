@@ -1,0 +1,28 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mixtli — Dashboard</title><link rel="stylesheet" href="./assets/styles.css"/></head><body>
+<nav class="container">
+  <div class="brand"><img src="./assets/logo.png" alt="Mixtli"/><b>Mixtli</b></div>
+  <div class="actions">
+    <a class="btn secondary" href="./dashboard.html">Dashboard</a>
+    <a class="btn ghost" href="./billing.html">Planes y Recargas</a>
+  </div>
+</nav>
+<section class="container page">
+<h1>Dashboard</h1>
+
+<div class="container">
+  <div class="kpi">
+    <div class="box"><div>Almacenamiento</div><h2 id="k-storage">— GB</h2></div>
+    <div class="box"><div>Objetos</div><h2 id="k-objects">—</h2></div>
+    <div class="box"><div>Transferencia</div><h2 id="k-egress">— GB</h2></div>
+    <div class="box"><div>Plan</div><h2 id="k-plan">—</h2></div>
+  </div>
+  <div class="card"><div class="title">Tu actividad</div>
+    <table class="table" id="tbl-activity"><thead><tr><th>Fecha</th><th>Acción</th><th>Detalle</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+<footer class="footer">Ir a <a href="./billing.html">Planes y Recargas</a></footer>
+<script src="./assets/config.js"></script>
+<script src="./assets/app.js"></script>
+</body></html>
