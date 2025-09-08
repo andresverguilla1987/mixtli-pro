@@ -1,0 +1,147 @@
+<!doctype html><html lang="es">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mixtli — Transferencias</title>
+<link rel="icon" href="./assets/logo.png"/>
+<style>
+/* Landing critical CSS */
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+:root{--fg:#eef6ff;--muted:#c8d4e4;--bg:#020814;--card:rgba(15,23,42,.65);--border:rgba(148,163,184,.2);--accent:#22d3ee;--accent2:#7c3aed}
+body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--fg);overflow-x:hidden}
+.cover{position:relative;height:100vh;width:100vw;display:grid;place-items:center;overflow:hidden}
+.slide{position:absolute;inset:0;opacity:0;transition:opacity .6s ease;will-change:opacity}
+.slide.active{opacity:1}
+.slide .bg{position:absolute;inset:0;background:#09172b;background-size:cover;background-position:center;transform:scale(1.02)}
+.slide video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.9}
+.brand{position:absolute;top:16px;left:16px;display:flex;align-items:center;gap:10px;z-index:3}
+.brand img{height:32px;width:auto;filter:drop-shadow(0 6px 16px rgba(0,0,0,.35))}
+.brand b{font-size:1.05rem}
+.controls{position:absolute;bottom:16px;left:16px;display:flex;gap:8px;z-index:4}
+.btn{background:rgba(2,6,23,.55);color:var(--fg);border:1px solid var(--border);padding:10px 12px;border-radius:12px;cursor:pointer}
+.btn.primary{background:linear-gradient(180deg,var(--accent),#0284c7);color:#03121a;border-color:#0ea5e9}
+.disclosure{position:absolute;top:16px;right:16px;background:rgba(2,6,23,.55);backdrop-filter:blur(8px);border:1px solid var(--border);padding:6px 10px;border-radius:999px;font-size:.85rem;z-index:4}
+/* transfer card */
+.card{position:relative;z-index:3;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;backdrop-filter:blur(8px);box-shadow:0 20px 60px rgba(0,0,0,.45);width:min(480px,90vw)}
+.card h1{margin:0 0 6px}
+.card .meta{color:var(--muted);font-size:.92rem}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+input{flex:1;background:rgba(2,6,23,.55);border:1px solid var(--border);color:var(--fg);padding:10px 12px;border-radius:12px;outline:none}
+input:focus{border-color:var(--accent)}
+.badge{display:inline-block;padding:3px 8px;border-radius:999px;border:1px solid var(--border)}
+.progress{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.25);overflow:hidden}
+.progress span{position:absolute;inset:0 100% 0 0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:right .1s linear}
+/* dot nav */
+.dots{position:absolute;bottom:16px;right:16px;display:flex;gap:8px;z-index:4}
+.dots button{width:10px;height:10px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.35);cursor:pointer}
+.dots button.active{background:linear-gradient(90deg,var(--accent),var(--accent2));border-color:#0ea5e9}
+/* link area */
+a.linkout{position:absolute;inset:0;z-index:2}
+</style>
+</head>
+<body>
+<section class="cover" id="cover">
+  <div class="brand"><img src="./assets/logo.png" alt="Mixtli"/><b>Mixtli</b></div>
+  <div class="disclosure">Publicidad</div>
+  <div id="slides"></div>
+  <div class="card" role="dialog" aria-label="Enviar archivos">
+    <h1>Enviar archivos</h1>
+    <div class="meta">Comparte enlaces o sube un archivo. (Demo UI)</div>
+    <div class="row">
+      <input id="to" placeholder="Correo del destinatario"/>
+      <input id="msg" placeholder="Mensaje (opcional)"/>
+    </div>
+    <div class="row">
+      <button class="btn" id="btnUpload">Subir archivo</button>
+      <button class="btn primary" id="btnGetLink">Obtener enlace</button>
+      <span class="badge" id="info">Hasta 2 GB (demo)</span>
+    </div>
+    <div class="meta" id="out" style="margin-top:8px"></div>
+    <div class="progress" aria-hidden="true"><span id="bar"></span></div>
+  </div>
+  <div class="controls">
+    <button class="btn" id="prev">◀</button>
+    <button class="btn" id="pause">Pausar</button>
+    <button class="btn" id="next">▶</button>
+  </div>
+  <div class="dots" id="dots"></div>
+</section>
+<script type="application/json" id="campaigns">
+{
+  "rotationSec": 8,
+  "items": [
+    {
+      "id": "spot_mixtli",
+      "title": "Mixtli Cloud \u2014 Simple, r\u00e1pido y seguro",
+      "bg": {
+        "gradient": [
+          "#0ea5e9",
+          "#34d399"
+        ]
+      },
+      "href": "./billing.html"
+    },
+    {
+      "id": "spot_imagen",
+      "title": "Creator Week \u2014 Subes, compartes, ganas",
+      "image": "./assets/logo.png",
+      "href": "./dashboard.html"
+    },
+    {
+      "id": "spot_video",
+      "title": "Campa\u00f1a Video (pon tu .mp4)",
+      "video": "./assets/sample.mp4",
+      "poster": "./assets/logo.png",
+      "href": "./admin.html"
+    }
+  ]
+}
+</script>
+<script>
+const cfg = JSON.parse(document.getElementById('campaigns').textContent);
+const slidesEl = document.getElementById('slides');
+const dotsEl = document.getElementById('dots');
+let idx = 0, timer = null, paused=false;
+
+function makeSlide(item, i){
+  const el = document.createElement('div'); el.className='slide'; el.dataset.idx = i;
+  const bg = document.createElement('div'); bg.className='bg';
+  if(item.bg && item.bg.gradient){ const a=item.bg.gradient[0]; const b=item.bg.gradient[1]; bg.style.background = 'linear-gradient(135deg,'+a+','+b+')'; }
+  if(item.image){ bg.style.backgroundImage = 'url('+item.image+')'; }
+  el.appendChild(bg);
+  if(item.video){ const v = document.createElement('video'); v.src = item.video; if(item.poster) v.poster=item.poster; v.autoplay=true; v.loop=true; v.muted=true; v.playsInline=true; el.appendChild(v); }
+  const a = document.createElement('a'); a.className='linkout'; a.href=item.href||'#'; a.target = (item.href||'').startsWith('http') ? '_blank' : '_self'; el.appendChild(a);
+  const h = document.createElement('div'); h.style.position='absolute'; h.style.bottom='64px'; h.style.left='16px'; h.style.fontWeight='800'; h.style.textShadow='0 3px 18px rgba(0,0,0,.45)'; h.textContent = item.title || ''; el.appendChild(h);
+  return el;
+}
+
+function render(){
+  slidesEl.innerHTML=''; dotsEl.innerHTML='';
+  cfg.items.forEach((it,i)=>{
+     slidesEl.appendChild(makeSlide(it,i));
+     const d = document.createElement('button'); d.onclick=function(){go(i)}; dotsEl.appendChild(d);
+  });
+  activate(0);
+}
+function activate(i){
+  idx = i % cfg.items.length;
+  Array.from(slidesEl.children).forEach((s,k)=> s.classList.toggle('active', k===idx));
+  Array.from(dotsEl.children).forEach((d,k)=> d.classList.toggle('active', k===idx));
+}
+function next(){ activate((idx+1)%cfg.items.length); }
+function prev(){ activate((idx-1+cfg.items.length)%cfg.items.length); }
+function play(){ paused=false; loop(); document.getElementById('pause').textContent='Pausar'; }
+function pause(){ paused=true; clearTimeout(timer); document.getElementById('pause').textContent='Reanudar'; }
+function go(i){ activate(i); if(!paused) play(); }
+function loop(){ clearTimeout(timer); timer = setTimeout(function(){ next(); loop(); }, (cfg.rotationSec||8)*1000); }
+document.getElementById('next').onclick=function(){ next(); if(!paused) play(); };
+document.getElementById('prev').onclick=function(){ prev(); if(!paused) play(); };
+document.getElementById('pause').onclick=function(){ paused ? play() : pause(); };
+
+render(); play();
+
+// Transfer card demo
+const out = document.getElementById('out'); const bar = document.getElementById('bar');
+document.getElementById('btnGetLink').onclick=function(){ out.textContent='Generando enlace…'; var p=0; var iv=setInterval(function(){ p+=5; bar.style.right=(100-p)+'%'; if(p>=100){ clearInterval(iv); out.innerHTML='Link listo: <a href="#">https://mix.tl/t/abc123</a>'; setTimeout(function(){bar.style.right='100%';},500);} },80);};
+document.getElementById('btnUpload').onclick=function(){ out.textContent='Subida simulada (demo).'; };
+</script>
+</body></html>
