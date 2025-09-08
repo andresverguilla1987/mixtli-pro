@@ -1,31 +1,54 @@
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = env("DATABASE_PROVIDER")
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id                     String   @id @default(cuid())
-  email                  String   @unique
-  name                   String?
-  emailVerifiedAt        DateTime?
-  twoFactorEnabled       Boolean  @default(false)
-  twoFactorSecretEnc     String?
-  lastLoginAt            DateTime?
-  notificationPrefs      Json?
-  twoFactorRecoveryCodes RecoveryCode[]
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  plan          Plan     @default(FREE)
+  createdAt     DateTime @default(now())
+  uploads       Upload[]
 }
 
-model RecoveryCode {
-  id        String   @id @default(cuid())
-  userId    String
-  hash      String
-  usedAt    DateTime?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
+model Upload {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  bucket      String
+  key         String
+  size        Int
+  mime        String
+  etag        String?   // set after client reports it
+  status      UploadStatus @default(PENDING) // PENDING -> UPLOADED -> READY | BLOCKED
+  scanStatus  ScanStatus   @default(PENDING) // PENDING | PASSED | FAILED | SKIPPED
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum UploadStatus {
+  PENDING
+  UPLOADED
+  READY
+  BLOCKED
+}
+
+enum ScanStatus {
+  PENDING
+  PASSED
+  FAILED
+  SKIPPED
+}
+
+enum Plan {
+  FREE
+  PRO
+  ENTERPRISE
 }

@@ -106,10 +106,17 @@ input:focus,select:focus{border-color:var(--accent)}
   <p class="meta">Usa <span class="badge">⌘K</span> para navegar.</p>
 </section>
 <script>
-document.getElementById('submit').onclick=()=>{
+document.getElementById('submit').onclick=async()=>{
   const email=document.getElementById('email').value.trim();
   if(!email){ document.getElementById('msg').textContent='Completa los campos'; return; }
-  localStorage.setItem('mixtli_user', JSON.stringify({ email }));
+  try{
+  const res = await fetch('/auth/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password:'demo' }) });
+  const data = await res.json();
+  if (data && data.ok && data.user){ localStorage.setItem('mixtli_user', JSON.stringify({ email:data.user.email, id:data.user.id })); document.getElementById('msg').textContent='Registrado: '+data.user.email; return; }
+  document.getElementById('msg').textContent='Demo local: sin backend ('+(data && data.error ? data.error : 'n/a')+')'; localStorage.setItem('mixtli_user', JSON.stringify({ email }));
+} catch(e){
+  document.getElementById('msg').textContent='Demo local (sin API)'; localStorage.setItem('mixtli_user', JSON.stringify({ email }));
+}
   document.getElementById('msg').textContent='Sesión demo: '+email;
 };
 </script>

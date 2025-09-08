@@ -10,6 +10,7 @@ const imports=`
 const path = require('path');
 const { securityHeaders, makeLimiter, auditLogger } = require('./apps/api/middleware/security-bundle');
 const usersPrisma = require('./apps/api/routes/users-prisma');
+const uploadLocal = require('./apps/api/routes/upload-local');
 const dashProxy = require('./apps/api/proxy/dash-proxy');
 `;
 const mounts=`
@@ -19,6 +20,8 @@ app.use(auditLogger());
 app.use('/preview', require('express').static(path.join(__dirname, 'public/preview'), { maxAge: '60s' }));
 app.use(usersPrisma({ basePath: '' }));
 dashProxy(app);
+app.use('/preview/uploads', require('express').static(path.join(__dirname, 'public/uploads'), { maxAge: '7d' }));
+app.use(uploadLocal({ basePath: '' }));
 `;
 if(!code.includes('MIXTLI FUSION PREVIEW')){
   code = code.replace(/(const app\s*=\s*express\(\);)/m, (m)=> m + imports + "\n") + "\n" + mounts + "\n";

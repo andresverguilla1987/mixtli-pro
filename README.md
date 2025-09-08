@@ -1,35 +1,92 @@
-# Demo Smoke (Scheduled)
 
-Programa un smoke test alrededor de la demo para tu API ya desplegada (Render u otro).
-Ejecuta **tres** corridas diarias a la hora de la demo (MX): **13:50, 14:10, 14:30**.
+# Mixtli Presigned Uploads (LOCAL | S3 | R2)
 
-> **Nota:** GitHub Actions usa **UTC**. CDMX es **UTC-6** todo el año. Por eso el cron corre a 19:50, 20:10 y 20:30 **UTC**.
+Backend Express listo para:
+- Presign de **PUT** directo al bucket (S3/R2).
+- TTL y auto‑limpieza (cron + lifecycle).
+- Antivirus *post‑upload* (opcional, ClamAV/clamd).
+- Límites por plan **antes** de emitir el presign.
+- “Enviar por email” con link firmado + expiración.
+- `request-id` en todos los logs.
+- Auth mínima (registro/login JWT) y tabla de uploads.
 
-## Instalar
-1. Sube `.github/workflows/demo-smoke-scheduled.yml` a tu repo (rama por defecto).
-2. Ve a **Settings → Secrets and variables → Actions** y configura:
-   - **Variables**:
-     - `DEMO_BASE_URL` → tu URL pública (ej. `https://mixtli-pro.onrender.com`)
-   - **Secrets** (opcionales para alertas):
-     - `SLACK_WEBHOOK_URL`
-     - `DISCORD_WEBHOOK_URL`
+> **Nota sobre Antivirus “antes del upload”**: con presigned direct‑to‑bucket no es posible inspeccionar el binario **antes** de que suba. La práctica correcta es: validas *metadata* (size/mime/ext) **antes**, emites presign, y **después** del upload escaneas en servidor/worker; sólo cuando pasa el escaneo generas el link de descarga y envíos por email.
 
-## Qué valida
-- `GET /salud` debe responder 2xx/3xx
-- `GET /` debe responder 2xx/3xx
+## Variables de entorno
 
-Si todo pasa, manda ✅ a Slack/Discord (si configuraste webhooks). Si falla, manda ❌ y marca el job en rojo.
+Crea `.env` basado en `.env.example`:
 
-## Ejecutarlo a mano
-Además de `schedule`, puedes abrir la pestaña **Actions → Demo Smoke (Scheduled - MX 13:50/14:10/14:30)** y usar **Run workflow**.
+```
+NODE_ENV=development
+PORT=10000
 
-## Ajustar horarios
-Edita los `cron` en el workflow. Recuerda que **son UTC**. Ejemplos comunes (MX → UTC, restando 6h):
-- 13:50 MX → `50 19 * * *`
-- 14:10 MX → `10 20 * * *`
-- 14:30 MX → `30 20 * * *`
+# Auth
+JWT_SECRET=supersecret
 
-## Troubleshooting
-- Si el job falla con `DEMO_BASE_URL is not set`, ve a **Settings → Secrets and variables → Actions → Variables** y agrega `DEMO_BASE_URL`.
-- Si tus endpoints son otros, cambia `HEALTH_PATH` y `HOME_PATH` en `env:` del workflow.
-- Retrasos de minutos son normales en jobs por `schedule` de GitHub.
+# Storage
+STORAGE_DRIVER=R2  # LOCAL | S3 | R2
+
+# S3 (AWS)
+S3_REGION=us-east-1
+S3_BUCKET=your-bucket
+S3_ACCESS_KEY_ID=AKIA...
+S3_SECRET_ACCESS_KEY=...
+
+# R2 (Cloudflare)
+R2_ACCOUNT_ID=xxxxxxxxxxxxxxxxxxxx
+R2_BUCKET=mixtli-bucket
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+# opcional (si sirves público con dominio propio)
+R2_PUBLIC_BASE_URL=https://cdn.tu-dominio.com
+
+# SendGrid
+SENDGRID_API_KEY=SG.xxxxx
+MAIL_FROM="Mixtli <noreply@tu-dominio.com>"
+
+# DB (usa PostgreSQL en producción)
+DATABASE_URL="file:./dev.db?connection_limit=1&pool_timeout=5&socket_timeout=5"
+
+# Antivirus (opcional)
+CLAMAV_HOST=127.0.0.1
+CLAMAV_PORT=3310
+
+# Límites por plan (bytes)
+PLAN_FREE_MAX_SIZE=52428800       # 50 MB
+PLAN_PRO_MAX_SIZE=2147483648      # 2 GB
+PLAN_ENTERPRISE_MAX_SIZE=10737418240 # 10 GB
+
+# TTL en días
+DEFAULT_TTL_DAYS=14
+```
+
+## Rutas rápidas
+
+- `POST /auth/register { email, password }`
+- `POST /auth/login { email, password }` → `{ token }`
+- `POST /upload/presign { filename, size, mime, ttlDays? }` *(auth)*
+- `POST /upload/complete { uploadId, etag }` *(auth)*
+- `POST /email/send { uploadId, to, message }` *(auth)*
+- `GET /upload/:id/link` *(auth)* → URL firmada de descarga (sólo si antivirus=passed o antivirus desactivado)
+
+## Cron de limpieza
+
+1) Configura *lifecycle rules* en el bucket (S3/R2) para expirar objetos a los 7–14 días.
+2) Además corre `npm run cleanup` 1 vez al día (Render Cron, etc.). Este job elimina en bucket y en DB los uploads vencidos.
+
+## Prisma
+
+```bash
+npm i
+npx prisma generate
+npm run prisma:push
+npm run dev
+```
+
+Listo para probar con Postman:
+1. `POST /auth/register`
+2. `POST /auth/login` → copia el token como `Authorization: Bearer <token>`
+3. `POST /upload/presign` → usa `putUrl` devuelto para subir **PUT** desde el cliente.
+4. `POST /upload/complete` para marcar el ETag (dispara escaneo si CLAMAV está activo).
+5. `POST /email/send` para enviar el link firmado (sólo si antivirus pasó).
+

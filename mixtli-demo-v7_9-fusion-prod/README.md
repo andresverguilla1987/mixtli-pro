@@ -33,3 +33,13 @@ Un solo ZIP con:
 - Usa ⌘/Ctrl+K para navegar (command palette).
 - Pricing: alterna **Mensual/Anual (-15%)** y método (Stripe/MP/PayPal/Crypto).
 - Admin/Dashboard: filtros, sort, skeletons y toasts.
+
+### Nuevo: Registro real y subida real
+- `POST /auth/register` (Prisma)
+- `POST /upload` (local disk, 200MB por archivo en demo)
+
+**Instala deps nuevas:**
+```
+npm i multer nanoid mime-types
+```
+**Sirve los archivos subidos en:** `/preview/uploads/*`

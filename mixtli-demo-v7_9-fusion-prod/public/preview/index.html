@@ -51,8 +51,9 @@ a.linkout{position:absolute;inset:0;z-index:2}
       <input id="msg" placeholder="Mensaje (opcional)"/>
     </div>
     <div class="row">
+      <input type="file" id="fileInput" style="display:none"/>
       <button class="btn" id="btnUpload">Subir archivo</button>
-      <button class="btn primary" id="btnGetLink">Obtener enlace</button>
+      <button class="btn primary" id="btnGetLink">Obtener enlace"
       <span class="badge" id="info">Hasta 2 GB (demo)</span>
     </div>
     <div class="meta" id="out" style="margin-top:8px"></div>
@@ -146,9 +147,24 @@ document.getElementById('pause').onclick=function(){ paused ? play() : pause(); 
 
 render(); play();
 
-// Transfer card demo
-const out = document.getElementById('out'); const bar = document.getElementById('bar');
+// Transfer card — real upload
+const out = document.getElementById('out'); const bar = document.getElementById('bar'); const fileInput = document.getElementById('fileInput');
+document.getElementById('btnUpload').onclick=function(){ fileInput.click(); };
+fileInput.onchange = async function(){
+  if(!fileInput.files || !fileInput.files[0]) return;
+  const f = fileInput.files[0];
+  out.textContent='Subiendo '+f.name+'…';
+  try{
+    const fd = new FormData(); fd.append('file', f);
+    const res = await fetch('/upload', { method:'POST', body: fd });
+    const data = await res.json();
+    if(data && data.ok){
+      out.innerHTML = 'Listo: <a href="'+data.file.url+'" target="_blank">'+data.file.url+'</a>';
+    }else{
+      out.textContent = 'Error: '+(data && data.error || 'desconocido');
+    }
+  }catch(e){ out.textContent='Error al subir'; }
+};
+
+// Keep the fake link generator for demos sin archivo
 document.getElementById('btnGetLink').onclick=function(){ out.textContent='Generando enlace…'; var p=0; var iv=setInterval(function(){ p+=5; bar.style.right=(100-p)+'%'; if(p>=100){ clearInterval(iv); out.innerHTML='Link listo: <a href="#">https://mix.tl/t/abc123</a>'; setTimeout(function(){bar.style.right='100%';},500);} },80);};
-document.getElementById('btnUpload').onclick=function(){ out.textContent='Subida simulada (demo).'; };
-</script>
-</body></html>

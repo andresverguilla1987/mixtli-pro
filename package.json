@@ -1,16 +1,30 @@
 {
-  "name": "mixtli-monorepo",
-  "private": true,
-  "version": "0.0.0",
-  "packageManager": "pnpm@9.6.0",
-  "workspaces": [
-    "apps/*"
-  ],
+  "name": "mixtli-presigned",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/server.js",
   "scripts": {
-    "build": "pnpm -r build",
-    "dev": "pnpm --filter @mixtli/api dev",
-    "prisma:generate": "pnpm --filter @mixtli/api prisma:generate",
-    "prisma:migrate:dev": "pnpm --filter @mixtli/api prisma:migrate:dev",
-    "seed": "pnpm --filter @mixtli/api seed"
+    "dev": "node src/server.js",
+    "start": "node src/server.js",
+    "cleanup": "node scripts/cleanup.js",
+    "prisma:push": "npx prisma db push",
+    "prisma:studio": "npx prisma studio"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.645.0",
+    "@aws-sdk/s3-request-presigner": "^3.645.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "nanoid": "^5.0.7",
+    "pino": "^9.4.0",
+    "pino-http": "^10.3.0",
+    "@sendgrid/mail": "^8.1.4",
+    "@prisma/client": "^5.18.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.18.0"
   }
 }

@@ -1,75 +1,40 @@
-const express = require("express");
-const { PrismaClient } = require("@prisma/client");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
 
-const app = express();
+import express from 'express';
+import cors from 'cors';
+import { requestId } from './middleware/requestId.js';
+import { register, login } from './auth.js';
+import { authRequired } from './middleware/auth.js';
+import { registerUploadRoutes } from './routes/upload.js';
+import { registerEmailRoutes } from './routes/email.js';
+import { env } from './env.js';
+import { logger } from './logger.js';
+import { PrismaClient } from '@prisma/client';
+
 const prisma = new PrismaClient();
-app.use(express.json());
+const app = express();
 
-const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
+app.use(cors());
+app.use(express.json({ limit: '2mb' }));
+app.use(requestId());
 
-// Endpoint de salud
-app.get("/salud", (req, res) => {
-  res.json({ status: "ok", mensaje: "Servidor funcionando 🟢" });
-});
-
-// Listar usuarios
-app.get("/api/users", async (req, res) => {
-  try {
-    const users = await prisma.usuario.findMany();
-    res.json({ ok: true, data: users });
-  } catch (err) {
-    res.status(500).json({ error: "Error listando usuarios" });
-  }
-});
-
-// Crear usuario
-app.post("/api/users", async (req, res) => {
-  try {
-    const { nombre, email, password } = req.body;
-    const hashed = await bcrypt.hash(password, 10);
-    const user = await prisma.usuario.create({
-      data: { nombre, email, password: hashed }
-    });
-    res.status(201).json({ ok: true, data: user });
-  } catch (err) {
-    res.status(500).json({ error: "Error creando usuario" });
-  }
-});
-
-// Login con JWT
-app.post("/api/login", async (req, res) => {
-  const { email, password } = req.body;
-  const user = await prisma.usuario.findUnique({ where: { email } });
-
-  if (!user) return res.status(401).json({ error: "Credenciales inválidas" });
-
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.status(401).json({ error: "Credenciales inválidas" });
-
-  const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "1h" });
-  res.json({ ok: true, token });
-});
-
-// Middleware para proteger rutas
-function authMiddleware(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "Token requerido" });
-
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(403).json({ error: "Token inválido" });
-    req.userId = decoded.userId;
-    next();
+// basic logs per request
+app.use((req,res,next)=>{
+  logger.info({ rid: req.id, method: req.method, url: req.url, ua: req.headers['user-agent'] }, 'req');
+  res.on('finish', ()=> {
+    logger.info({ rid: req.id, status: res.statusCode }, 'res');
   });
-}
-
-// Ruta protegida
-app.get("/api/profile", authMiddleware, async (req, res) => {
-  const user = await prisma.usuario.findUnique({ where: { id: req.userId } });
-  res.json({ ok: true, data: user });
+  next();
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+app.get('/api/health', (req,res)=> res.json({ status: 'ok', driver: env.storageDriver }));
+
+// auth
+app.post('/auth/register', register);
+app.post('/auth/login', login);
+
+// protected
+app.use(authRequired);
+registerUploadRoutes(app);
+registerEmailRoutes(app);
+
+app.listen(env.port, ()=> logger.info({ port: env.port }, 'server up') );
