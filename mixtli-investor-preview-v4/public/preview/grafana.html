@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Grafana</title><link rel="stylesheet" href="./assets/styles.css"/><script src="./assets/config.js"></script>
+</head>
+<body class="center theme-green">
+  <h1>Grafana</h1><p id="msg" class="muted">Buscando URL de Grafana...</p>
+  <script>
+    const cfg = window.MIXTLI_CFG || {}; const qp = new URLSearchParams(location.search);
+    const url = qp.get('url') || cfg.grafana; const msg = document.getElementById('msg');
+    if (url) { msg.innerHTML = 'Redirigiendo a <code>' + url + '</code>...'; location.href = url; }
+    else { msg.innerHTML = 'No se configuró URL. Edita <code>assets/config.js</code> o usa <code>grafana.html?url=...</code>'; }
+  </script>
+</body>
+</html>

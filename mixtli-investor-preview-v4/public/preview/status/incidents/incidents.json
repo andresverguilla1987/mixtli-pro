@@ -1,0 +1,12 @@
+{
+  "overall": "operacional",
+  "items": [
+    {
+      "id": "demo-1",
+      "title": "Latencias elevadas p95",
+      "severity": "warning",
+      "started_at": "2025-09-07T20:00:00Z",
+      "summary": "Investigando p95 > 600ms en us-west."
+    }
+  ]
+}

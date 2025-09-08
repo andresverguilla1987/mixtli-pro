@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Mixtli — Investor Preview</title>
+  <link rel="stylesheet" href="./assets/styles.css"/>
+  <meta name="color-scheme" content="dark light">
+  <link rel="icon" href="./assets/logo.png">
+</head>
+<body class="theme-green">
+  <header class="container">
+    <div class="brand">
+      <img src="./assets/logo.png" alt="Mixtli"/>
+      <h1>Mixtli — Investor Preview</h1>
+    </div>
+    <button id="mode" title="Cambiar tema">🌓</button>
+  </header>
+
+  <main class="container">
+    <section class="card hero">
+      <h2>Avances clave</h2>
+      <p>Stack de observabilidad, healthcheck, despliegue en Render y tablero de métricas listos para demo.</p>
+      <div class="grid stats">
+        <div class="stat"><span id="api-status" class="dot gray"></span> API /salud <small id="api-latency"></small></div>
+        <div class="stat">Request-ID: <code id="reqid">—</code></div>
+        <div class="stat">SLO objetivo: <b>99.9%</b></div>
+        <div class="stat">p95 objetivo: <b>&lt; 500ms</b></div>
+      </div>
+      <div class="actions">
+        <a class="btn" id="open-grafana" href="./grafana.html">Grafana</a>
+        <a class="btn" id="open-prom" href="./prom.html">Prometheus</a>
+        <a class="btn outline" id="open-status" href="./status/">Status Page</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Roadmap & Estado</h3>
+      <ul class="timeline">
+        <li class="done"><b>Request-ID + Pino</b> (logs correlacionados)</li>
+        <li class="done"><b>/metrics Prometheus</b> (histogramas y contadores)</li>
+        <li class="done"><b>OpenTelemetry</b> (auto-instrumentación)</li>
+        <li class="done"><b>Alertas básicas</b> (5xx%, p95, target)</li>
+        <li class="done"><b>Blueprint Render</b> (healthcheck /salud)</li>
+        <li class="wip"><b>Dashboards p95/p99</b> (importados)</li>
+        <li class="wip"><b>SLO 99.9% + Runbooks</b> (activando)</li>
+        <li><b>Security Pack</b> (helmet, rate limit, auditoría)</li>
+        <li><b>Synthetic uptime</b> (blackbox, k6)</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h3>Descargas</h3>
+      <p>Paquetes técnicos (para demo):</p>
+      <div class="downloads grid">
+        <a class="chip" href="#" id="dl-suite">Observability Suite (ZIP)</a>
+        <a class="chip" href="#" id="dl-addons">Addons (ZIP)</a>
+      </div>
+      <p class="muted small">Tip: puedes pasar <code>?theme=green</code> o <code>?theme=dark</code> en la URL.</p>
+    </section>
+
+    <section class="card">
+      <h3>Detalles técnicos</h3>
+      <pre class="code"><code id="tech"></code></pre>
+    </section>
+  </main>
+
+  <footer class="container muted">
+    &copy; <span id="year"></span> Mixtli — Demo para inversionistas.
+  </footer>
+
+  <script src="./assets/config.js"></script>
+  <script src="./assets/app.js"></script>
+</body>
+</html>
