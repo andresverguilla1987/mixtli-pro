@@ -1,0 +1,27 @@
+*** apps/api/src/server.ts.orig	2025-09-07
+--- apps/api/src/server.ts	2025-09-07
+@@
++import { start as startOtel } from './observability/ts/tracing';
++startOtel();
++import requestId from './observability/ts/middleware/requestId';
++import logger from './observability/ts/middleware/logger';
++import { metricsRouter, instrument, httpRequestDuration } from './observability/ts/metrics';
++import { initSentry, sentryRequestHandler, sentryErrorHandler } from './observability/ts/sentry';
++initSentry();
+@@
+-const app = express();
++const app = express();
++app.use(requestId());
++app.use(logger());
++instrument(app);
++app.get('/salud', (req: any, res: any) => {
++  const end = (httpRequestDuration as any).startTimer({ route: '/salud', method: 'GET' });
++  res.json({ ok: true, ts: new Date().toISOString() });
++  end({ status_code: 200 });
++});
++app.use('/metrics', metricsRouter);
+@@
+-app.listen(PORT, () => console.log(`API en puerto ${PORT}`));
++app.use(sentryRequestHandler());
++app.use(sentryErrorHandler());
++app.listen(PORT, () => console.log(`API en puerto ${PORT}`));

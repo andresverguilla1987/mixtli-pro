@@ -1,0 +1,32 @@
+groups:
+- name: api.rules
+  rules:
+  - alert: APIHighErrorRate
+    expr: |
+      sum(rate(http_requests_total{status_code=~"5.."}[5m])) 
+        / sum(rate(http_requests_total[5m])) > 0.05
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Error rate alto (>5%)"
+      description: "Tasa de errores 5xx alta en los últimos 5m."
+
+  - alert: HighLatency95p
+    expr: |
+      histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[10m])) by (le)) > 0.5
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Latencia p95 > 500ms"
+      description: "La latencia p95 de las solicitudes es alta."
+
+  - alert: InstanceDown
+    expr: up == 0
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Target caído"
+      description: "Un target está abajo durante más de 2 minutos."

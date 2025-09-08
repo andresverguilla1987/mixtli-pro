@@ -1,0 +1,29 @@
+groups:
+- name: api.rules.extended
+  rules:
+  - alert: APIHighErrorRateCritical
+    expr: |
+      sum(rate(http_requests_total{status_code=~"5.."}[10m])) 
+        / sum(rate(http_requests_total[10m])) > 0.1
+    for: 10m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Error rate crítico (>10% 10m)"
+      description: "Tasa de 5xx por encima de 10% durante 10m."
+  - alert: High5xxRPS
+    expr: sum(rate(http_requests_total{status_code=~"5.."}[5m])) > 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "5xx sostenidos > 1 rps"
+      description: "Más de 1 5xx/s durante 5m."
+  - alert: NoRequests5m
+    expr: sum(rate(http_requests_total[5m])) == 0
+    for: 5m
+    labels:
+      severity: info
+    annotations:
+      summary: "Sin tráfico en 5m"
+      description: "No se detectan requests; revisar despliegue o routing."

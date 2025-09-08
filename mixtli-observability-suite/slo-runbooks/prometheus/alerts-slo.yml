@@ -1,0 +1,36 @@
+groups:
+- name: slo.alerts
+  rules:
+  # Multiwindow, multi-burn alerts para un SLO de disponibilidad 99.9% (E=0.001 error budget)
+  # Ajusta el objetivo dependiendo de tu SLO (por ejemplo, 99.5% => E=0.005).
+  - alert: SLOErrorBudgetBurnFast
+    expr: |
+      (sum(rate(http_requests_total{status_code=~"5.."}[5m])) 
+        / sum(rate(http_requests_total[5m]))) > (14.4 * 0.001)
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Error budget burn (rápido) >14.4x — 1h de presupuesto en ~4m"
+      description: "Revisa despliegues recientes, dependencias, timeouts y DB. Error ratio muy por encima del SLO."
+
+  - alert: SLOErrorBudgetBurnMedium
+    expr: |
+      (sum(rate(http_requests_total{status_code=~"5.."}[30m])) 
+        / sum(rate(http_requests_total[30m]))) > (6 * 0.001)
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Error budget burn (medio) >6x — 1h de presupuesto en ~10m"
+      description: "Errores sostenidos. Evalúa rollback, feature flags y tráfico."
+
+  - alert: HighLatencyP95Sustained
+    expr: |
+      histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[15m])) by (le)) > 0.5
+    for: 20m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Latencia p95 sostenida > 500ms (15m)"
+      description: "Posible saturación en base de datos, N+1 queries o timeouts de red."
