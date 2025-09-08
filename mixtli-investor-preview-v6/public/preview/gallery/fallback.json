@@ -1,0 +1,32 @@
+[
+  {
+    "title": "Shot 1",
+    "desc": "Captura de producto",
+    "url": "./gallery/shot1.svg"
+  },
+  {
+    "title": "Shot 2",
+    "desc": "Captura de producto",
+    "url": "./gallery/shot2.svg"
+  },
+  {
+    "title": "Shot 3",
+    "desc": "Captura de producto",
+    "url": "./gallery/shot3.svg"
+  },
+  {
+    "title": "Shot 4",
+    "desc": "Captura de producto",
+    "url": "./gallery/shot4.svg"
+  },
+  {
+    "title": "Shot 5",
+    "desc": "Captura de producto",
+    "url": "./gallery/shot5.svg"
+  },
+  {
+    "title": "Shot 6",
+    "desc": "Captura de producto",
+    "url": "./gallery/shot6.svg"
+  }
+]

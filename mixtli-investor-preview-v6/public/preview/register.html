@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es"><head>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Mixtli — Registrarte</title><link rel="stylesheet" href="./assets/styles.css"/>
+</head>
+<body>
+  <div class="container">
+    <header style="display:flex;align-items:center;justify-content:space-between">
+      <h1>Registrarte</h1><a class="btn" href="./">← Regresar</a>
+    </header>
+    <section class="card">
+      <form id="f" class="form">
+        <div class="input"><label>Nombre</label><input id="name" required placeholder="Tu nombre"/></div>
+        <div class="input"><label>Email</label><input id="email" required type="email" placeholder="tu@correo.com"/></div>
+        <div class="input"><label>Contraseña</label><input id="pwd" required type="password" minlength="6" placeholder="mínimo 6 caracteres"/></div>
+        <div class="input"><label>Plan</label>
+          <select id="plan"><option value="free">Free</option><option value="pro">Pro</option><option value="team">Team</option></select>
+        </div>
+        <div class="help">Demo: si no hay backend, se simula el registro y te muestra el resultado.</div>
+        <div><button class="btn" type="submit">Crear cuenta</button></div>
+      </form>
+      <div id="out" class="help" style="margin-top:10px"></div>
+    </section>
+  </div>
+  <div id="toast" class="toast"></div>
+  <script src="./assets/register.js"></script>
+</body></html>
