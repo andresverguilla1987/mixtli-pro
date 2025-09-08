@@ -1,0 +1,17 @@
+services:
+  - type: cron
+    name: mixtli-demo-refresh
+    env: node
+    plan: starter
+    schedule: "0 9 * * *"   # 09:00 UTC (ajusta a tu hora local)
+    region: oregon
+    runtime:
+      # No build necesario; usamos un simple script de shell
+      # pero Render requiere startCommand.
+      # Nota: puedes ponerlo directamente aquí o llamar un script del repo.
+    startCommand: "bash render/cron/reset-demo.sh"
+    envVars:
+      - key: DEMO_REFRESH_URL
+        value: https://mixtli-pro.onrender.com/internal/cron/refresh-demo
+      - key: CRON_KEY
+        sync: false   # márcalo como secreto en el dashboard si no usas render.yaml
