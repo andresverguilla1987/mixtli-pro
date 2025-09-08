@@ -1,20 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
-echo "[start] migrate + boot"
 cd apps/api
 npx prisma migrate deploy
-
-# Pick entrypoint
-ENTRY=""
-for f in dist/server.js dist/index.js dist/app.js; do
-  if [ -f "$f" ]; then ENTRY="$f"; break; fi
-done
-if [ -z "$ENTRY" ]; then
-  echo "[start] No entrypoint in dist/"
-  ls -la dist || true
-  exit 1
+if [ -f dist/server.js ]; then
+  node dist/server.js
+elif [ -f dist/index.js ]; then
+  node dist/index.js
+else
+  node dist/app.js
 fi
-
-echo "[start] entry=$ENTRY"
-# Run with preloaded redis stub
-exec node --import ./dist/disable-redis.mjs "$ENTRY"
