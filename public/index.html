@@ -3,79 +3,137 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mixtli PRO — Transferencias pesadas, instantáneas.</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <title>Mixtli Mini</title>
+  <style>
+    body{font-family:system-ui;background:#0b0b10;color:#e7e7ec;margin:0;padding:24px}
+    .wrap{max-width:860px;margin:0 auto}
+    h1{margin:0 0 16px}
+    section{background:#12121a;border:1px solid #23243a;border-radius:14px;padding:14px;margin:14px 0}
+    label{display:block;margin:8px 0}
+    input,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #2a2c44;background:#0f0f16;color:#e7e7ec}
+    button{padding:10px 14px;border-radius:10px;border:1px solid #2f3350;background:#1b1f3a;color:#e7e7ec;cursor:pointer}
+    pre{white-space:pre-wrap;background:#0e0e14;border:1px dashed #2c2f49;padding:10px;border-radius:10px;max-height:200px;overflow:auto}
+  </style>
 </head>
 <body>
-  <div class="bg-anim"></div>
-  <header class="container top">
-    <div class="brand">
-      <img src="/logo.svg" alt="Mixtli PRO" class="logo" />
-      <h1>Mixtli <span>PRO</span></h1>
-    </div>
-    <nav>
-      <a href="#demo">Demo</a>
-      <a href="#tools">Herramientas</a>
-    </nav>
-  </header>
+<div class="wrap">
+  <h1>Mixtli Mini — Presigned</h1>
 
-  <main>
-    <section class="hero container">
-      <p class="pill">LIVE <span id="liveDot" class="dot"></span> <span id="liveText">verificando...</span></p>
-      <h2>Entrega archivos de <em>cualquier tamaño</em> a <span class="grad">velocidad máxima</span>.</h2>
-      <p class="sub">Infra moderna para <strong>terabytes</strong>, <strong>seguridad</strong> y <strong>escala</strong>.</p>
-      <div class="cta">
-        <button id="btn-check" class="btn primary">Probar API</button>
-        <button id="btn-create" class="btn">Crear usuario demo</button>
-        <button id="btn-list" class="btn ghost">Ver últimos usuarios</button>
-      </div>
-      <p class="hint">Base de API: <code id="baseUrl"></code></p>
-      <div id="result" class="card hidden"></div>
-    </section>
+  <section>
+    <h3>Config</h3>
+    <label>API Base <input id="base" value="" placeholder="http://localhost:10000"></label>
+    <button id="btnHealth">Health</button>
+    <pre id="outHealth"></pre>
+  </section>
 
-    <section id="demo" class="container demo">
-      <h3>Acciones avanzadas</h3>
-      <div class="grid actions">
-        <div class="card mini">
-          <h4>GET por ID</h4>
-          <input id="uIdGet" class="input" type="number" placeholder="ID de usuario" />
-          <button class="btn small" id="btn-get-by-id">GET /api/users/:id</button>
-        </div>
+  <section>
+    <h3>Registro</h3>
+    <label>Email <input id="rEmail" type="email"></label>
+    <label>Pass <input id="rPass" type="password"></label>
+    <button id="btnReg">Crear</button>
+    <pre id="outReg"></pre>
+  </section>
 
-        <div class="card mini">
-          <h4>Actualizar email</h4>
-          <input id="uIdPut" class="input" type="number" placeholder="ID de usuario" />
-          <input id="uEmailPut" class="input" type="email" placeholder="nuevo+id@mixtli.com" />
-          <button class="btn small" id="btn-put-by-id">PUT /api/users/:id</button>
-        </div>
+  <section>
+    <h3>Login</h3>
+    <label>Email <input id="lEmail" type="email"></label>
+    <label>Pass <input id="lPass" type="password"></label>
+    <button id="btnLogin">Entrar</button>
+    <pre id="outLogin"></pre>
+  </section>
 
-        <div class="card mini">
-          <h4>Eliminar</h4>
-          <input id="uIdDel" class="input" type="number" placeholder="ID de usuario" />
-          <button class="btn small danger" id="btn-del-by-id">DELETE /api/users/:id</button>
-        </div>
-      </div>
-    </section>
+  <section>
+    <h3>Upload</h3>
+    <label>Archivo <input id="file" type="file"></label>
+    <label>TTL días <input id="ttl" type="number" value="14" min="1" max="30"></label>
+    <button id="btnPresign">Presign</button>
+    <pre id="outPresign"></pre>
+    <button id="btnPut" disabled>PUT</button>
+    <pre id="outPut"></pre>
+    <button id="btnComplete" disabled>Complete</button>
+    <pre id="outComplete"></pre>
+    <button id="btnLink" disabled>Link</button>
+    <pre id="outLink"></pre>
+  </section>
 
-    <section id="tools" class="container tools">
-      <h3>Herramientas</h3>
-      <div class="card">
-        <div class="row">
-          <code id="curlCmd">curl -X POST {{API}}/api/users -H "Content-Type: application/json" -d '{ "email": "demo+&lt;ts&gt;@mixtli.com", "password": "123456" }'</code>
-          <button class="btn small" id="btn-copy-curl">Copiar cURL</button>
-        </div>
-        <p class="muted">Usa <code>&lt;ts&gt;</code> para generar emails únicos (timestamp).</p>
-      </div>
-    </section>
-  </main>
+  <section>
+    <h3>Enviar por email</h3>
+    <label>Upload ID <input id="mailUpload"></label>
+    <label>Para <input id="mailTo" type="email"></label>
+    <label>Mensaje <textarea id="mailMsg" rows="3"></textarea></label>
+    <button id="btnMail">Enviar</button>
+    <pre id="outMail"></pre>
+  </section>
+</div>
+<script>
+let base = localStorage.getItem('base') || '';
+let token = '';
+let last = null;
+document.getElementById('base').value = base;
 
-  <footer class="container foot">
-    <div class="left"><p>© <span id="yr"></span> Mixtli PRO — Demo</p></div>
-    <div class="right"><a class="btn ghost small" href="mailto:founders@mixtli.com">Contacto</a></div>
-  </footer>
+function h(path){ return base.replace(/\/$/,'') + path; }
 
-  <div id="toast" class="toast hidden"></div>
+document.getElementById('btnHealth').onclick = async () => {
+  base = document.getElementById('base').value.trim();
+  localStorage.setItem('base', base);
+  const r = await fetch(h('/api/health'));
+  document.getElementById('outHealth').textContent = await r.text();
+};
 
-  <script src="/app.js"></script>
+document.getElementById('btnReg').onclick = async () => {
+  const email = document.getElementById('rEmail').value.trim();
+  const password = document.getElementById('rPass').value;
+  const r = await fetch(h('/auth/register'), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email,password}) });
+  document.getElementById('outReg').textContent = await r.text();
+};
+
+document.getElementById('btnLogin').onclick = async () => {
+  const email = document.getElementById('lEmail').value.trim();
+  const password = document.getElementById('lPass').value;
+  const r = await fetch(h('/auth/login'), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email,password}) });
+  const j = await r.json();
+  token = j.token || '';
+  document.getElementById('outLogin').textContent = JSON.stringify(j,null,2);
+};
+
+document.getElementById('btnPresign').onclick = async () => {
+  const f = document.getElementById('file').files[0];
+  const ttl = Number(document.getElementById('ttl').value || 14);
+  const r = await fetch(h('/upload/presign'), { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body: JSON.stringify({ filename:f.name, size:f.size, mime:f.type, ttlDays:ttl }) });
+  const j = await r.json();
+  last = j;
+  document.getElementById('outPresign').textContent = JSON.stringify(j,null,2);
+  document.getElementById('btnPut').disabled = false;
+  document.getElementById('mailUpload').value = j.uploadId;
+};
+
+document.getElementById('btnPut').onclick = async () => {
+  const f = document.getElementById('file').files[0];
+  const r = await fetch(last.putUrl, { method:'PUT', headers:{'Content-Type': f.type || 'application/octet-stream'}, body: f });
+  const etag = r.headers.get('ETag') || r.headers.get('etag') || null;
+  window._etag = etag;
+  document.getElementById('outPut').textContent = 'PUT: ' + r.status + (etag ? '\nETag: '+etag : '');
+  document.getElementById('btnComplete').disabled = false;
+};
+
+document.getElementById('btnComplete').onclick = async () => {
+  const r = await fetch(h('/upload/complete'), { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body: JSON.stringify({ uploadId: last.uploadId, etag: window._etag }) });
+  document.getElementById('outComplete').textContent = await r.text();
+  document.getElementById('btnLink').disabled = false;
+};
+
+document.getElementById('btnLink').onclick = async () => {
+  const r = await fetch(h('/upload/'+last.uploadId+'/link'), { headers:{'Authorization':'Bearer '+token} });
+  document.getElementById('outLink').textContent = await r.text();
+};
+
+document.getElementById('btnMail').onclick = async () => {
+  const uploadId = document.getElementById('mailUpload').value.trim();
+  const to = document.getElementById('mailTo').value.trim();
+  const message = document.getElementById('mailMsg').value;
+  const r = await fetch(h('/email/send'), { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body: JSON.stringify({ uploadId, to, message }) });
+  document.getElementById('outMail').textContent = await r.text();
+};
+</script>
 </body>
 </html>
