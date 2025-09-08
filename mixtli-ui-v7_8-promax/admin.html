@@ -1,0 +1,72 @@
+<!doctype html><html lang="es">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mixtli — Admin</title>
+<link rel="icon" href="./assets/logo.png"/>
+<link rel="stylesheet" href="./assets/styles.css"/>
+<style>
+/* minimal critical fallback in case previous step failed */
+*{box-sizing:border-box}html,body{margin:0;padding:0}body{background:#050b14;color:#eaf4ff;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
+.nav .wrap{max-width:1200px;margin:0 auto;padding:14px 16px;display:flex;align-items:center;justify-content:space-between}
+.card{background:rgba(17,24,39,.65);border:1px solid rgba(148,163,184,.18);border-radius:20px;padding:16px;margin:14px 0}
+.container{max-width:1200px;margin:0 auto;padding:18px}
+</style>
+</head>
+<body>
+<div class="aurora"><span class="a"></span><span class="b"></span><span class="c"></span></div>
+<header class="nav">
+  <div class="wrap">
+    <div class="brand"><img src="./assets/logo.png" alt="Mixtli"/><b>Mixtli</b></div>
+    <nav class="actions">
+      <a class="btn" href="./dashboard.html">Dashboard</a>
+      <a class="btn" href="./billing.html">Planes y Recargas</a>
+      <a class="btn primary" href="./auth.html">Entrar</a>
+    </nav>
+  </div>
+</header>
+<main class="container">
+
+<h1>Admin <span class="badge">PRO</span></h1>
+<div class="card"><div class="shine"></div><div class="meta">Cambia a <b>mode: "supabase"</b> en <code>assets/config.js</code> para usar el panel admin.</div></div>
+<div class="row">
+  <a class="btn" href="#deposits">Depósitos</a>
+  <a class="btn" href="#kyc">KYC</a>
+  <a class="btn" href="#reports">Reportes</a>
+  <a class="btn" href="#tenants">Tenants</a>
+  <a class="btn" href="#fraud">Fraude</a>
+</div>
+<div class="grid">
+  <div class="card" id="deposits"><div class="shine"></div><div class="title">Depósitos</div>
+    <table class="table" id="tbl-dep"><thead><tr><th>ID</th><th>Usuario</th><th>Método</th><th>Monto</th><th>Estado</th></tr></thead><tbody></tbody></table>
+  </div>
+  <div class="card" id="kyc"><div class="shine"></div><div class="title">KYC</div>
+    <table class="table" id="tbl-kyc"><thead><tr><th>Usuario</th><th>Documento</th><th>Estatus</th><th>Fecha</th></tr></thead><tbody></tbody></table>
+  </div>
+  <div class="card" id="reports"><div class="shine"></div><div class="title">Reportes</div>
+    <div class="kpi">
+      <div class="box card"><div class="shine"></div><div>Ingresos hoy</div><h2 id="rev-today">$—</h2></div>
+      <div class="box card"><div class="shine"></div><div>MRR</div><h2 id="mrr">$—</h2></div>
+      <div class="box card"><div class="shine"></div><div>Churn 30d</div><h2 id="churn">—%</h2></div>
+      <div class="box card"><div class="shine"></div><div>Fraude (7d)</div><h2 id="fraud7">—</h2></div>
+    </div>
+  </div>
+  <div class="card" id="tenants"><div class="shine"></div><div class="title">Tenants</div>
+    <table class="table" id="tbl-tenants"><thead><tr><th>Tenant</th><th>Plan</th><th>Uso (GB)</th><th>Usuarios</th></tr></thead><tbody></tbody></table>
+  </div>
+  <div class="card" id="fraud"><div class="shine"></div><div class="title">Fraude</div>
+    <table class="table" id="tbl-fraud"><thead><tr><th>Transacción</th><th>Motivo</th><th>Riesgo</th><th>Acción</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+<script src="./assets/config.js"></script>
+<script src="./assets/admin.js"></script>
+
+</main>
+<footer class="footer">Mixtli — UI pack <span class="gradient-text">v7_8 PROMAX</span></footer>
+<script>
+document.addEventListener('mousemove', e => { document.querySelectorAll('.card').forEach(el => {
+  const r = el.getBoundingClientRect(); const mx = (e.clientX - r.left)/r.width; const my = (e.clientY - r.top)/r.height;
+  el.style.setProperty('--mx', (mx*100)+'%'); el.style.setProperty('--my', (my*100)+'%');
+  const rx = (my - 0.5) * -8; const ry = (mx - 0.5) * 10; el.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+});});
+</script>
+</body></html>
