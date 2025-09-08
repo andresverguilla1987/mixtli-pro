@@ -1,0 +1,166 @@
+<!doctype html><html lang="es">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mixtli — Dashboard</title>
+<link rel="icon" href="./assets/logo.png"/>
+<link rel="stylesheet" href="./assets/styles.css"/>
+<style>
+/* === FUSION critical CSS (inline) === */
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+:root{
+  --bg:#060913;--fg:#eaf2ff;--muted:#a0b2c9;--card:rgba(15,23,42,.65);--border:rgba(148,163,184,.18);
+  --accent:#22d3ee;--accent2:#7c3aed;--ok:#16c784;--warn:#f59e0b;--err:#ef4444
+}
+[data-theme="light"]{--bg:#f6fbff;--fg:#0b1321;--muted:#4a5b75;--card:rgba(255,255,255,.75);--border:rgba(15,23,42,.12)}
+/* accent variants */
+[data-accent="emerald"]{--accent:#34d399;--accent2:#10b981}
+[data-accent="sky"]{--accent:#22d3ee;--accent2:#60a5fa}
+[data-accent="violet"]{--accent:#a78bfa;--accent2:#7c3aed}
+
+body{background:
+  radial-gradient(1200px 600px at 10% -10%,color-mix(in srgb,var(--accent) 18%, transparent),transparent 60%),
+  radial-gradient(1000px 400px at 90% -20%,color-mix(in srgb,var(--accent2) 20%, transparent),transparent 60%),
+  var(--bg);
+  color:var(--fg);font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Arial,sans-serif;line-height:1.35;overflow-x:hidden}
+.container{max-width:1200px;margin:0 auto;padding:16px}
+/* glass nav */
+.nav{position:sticky;top:0;backdrop-filter:saturate(150%) blur(10px);background:linear-gradient(180deg,rgba(2,6,23,.75),rgba(2,6,23,.35));border-bottom:1px solid var(--border);z-index:50}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;padding:14px 16px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{height:28px;width:auto;filter:drop-shadow(0 6px 18px rgba(0,0,0,.4))}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{position:relative;background:rgba(2,6,23,.5);color:var(--fg);padding:10px 14px;border-radius:12px;border:1px solid var(--border);text-decoration:none;font-weight:700}
+.btn.primary{background:linear-gradient(180deg,var(--accent),#0284c7);color:#04131a;border-color:color-mix(in srgb,var(--accent) 80%, black)}
+.btn.ghost{background:transparent}
+/* toggle group */
+.toggle{display:inline-flex;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.toggle button{background:transparent;color:var(--fg);border:none;padding:8px 12px;cursor:pointer}
+.toggle button.active{background:color-mix(in srgb,var(--accent) 25%, transparent);color:#04131a}
+.section{margin:18px 0}
+.card{position:relative;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:16px;margin:12px 0;box-shadow:0 16px 40px rgba(0,0,0,.35)}
+.grid{display:grid;gap:14px}
+.grid.cards{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.title{font-weight:800;margin-bottom:8px}
+.meta{color:var(--muted);font-size:.92rem}
+hr.sep{border:none;border-top:1px solid var(--border);margin:14px 0}
+input,select{background:rgba(2,6,23,.6);border:1px solid var(--border);color:var(--fg);padding:10px 12px;border-radius:12px;outline:none}
+input:focus,select:focus{border-color:var(--accent)}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{padding:10px;border-bottom:1px solid var(--border);text-align:left}
+.table th button{background:transparent;border:none;color:var(--fg);font-weight:800;cursor:pointer}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.kpi .box{background:rgba(2,6,23,.5);border:1px solid var(--border);border-radius:14px;padding:12px;text-align:center}
+.footer{color:var(--muted);text-align:center;padding:24px 0}
+.badge{display:inline-block;padding:4px 8px;border:1px solid var(--border);border-radius:999px;font-size:.8rem}
+/* skeletons */
+.skeleton{position:relative;background:linear-gradient(90deg,#0b1220 25%,#0d1626 37%,#0b1220 63%);background-size:400% 100%;animation:shimmer 1.2s infinite}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:0 0}}
+/* command palette */
+.kbar{position:fixed;inset:0;display:none;place-items:center;background:rgba(2,6,23,.55);backdrop-filter:blur(4px);z-index:60}
+.kbar.show{display:grid}
+.kbar .box{width:min(720px,94vw);background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.kbar header{display:flex;gap:8px;padding:10px;border-bottom:1px solid var(--border)}
+.kbar input{flex:1}
+.kbar .item{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.kbar .item:hover{background:rgba(255,255,255,.04)}
+/* toasts */
+.toast{position:fixed;right:16px;bottom:16px;background:#05101c;color:#eafff7;border:1px solid var(--border);padding:10px 12px;border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.35);display:none;z-index:70}
+.toast.show{display:block}
+/* palette & theme panel */
+.panel{display:flex;gap:8px;align-items:center}
+.key{border:1px solid var(--border);border-radius:8px;padding:2px 6px;font-size:.8rem}
+</style>
+</head>
+<body data-theme="dark" data-accent="sky">
+<a href="#main" class="visually-hidden">Saltar al contenido</a>
+<header class="nav">
+  <div class="container wrap">
+    <div class="brand"><img src="./assets/logo.png" alt="Mixtli"/><b>Mixtli</b></div>
+    <nav class="actions">
+      <div class="panel">
+        <button class="btn" id="kbarBtn">Buscar <span class="key">⌘K</span></button>
+        <div class="toggle" id="themeTog"><button data-mode="dark" class="active">Dark</button><button data-mode="light">Light</button></div>
+        <div class="toggle" id="accentTog"><button data-accent="emerald">🌿</button><button data-accent="sky" class="active">💧</button><button data-accent="violet">💜</button></div>
+      </div>
+      <a class="btn" href="./dashboard.html">Dashboard</a>
+      <a class="btn" href="./billing.html">Planes</a>
+      <a class="btn primary" href="./auth.html">Entrar</a>
+    </nav>
+  </div>
+</header>
+<main id="main" class="container">
+
+<section class="section">
+  <h1 style="margin:0 0 6px"><span class="badge">Overview</span> <b>Dashboard</b></h1>
+  <div class="kpi">
+    <div class="box skeleton" style="height:84px" data-k="storage"></div>
+    <div class="box skeleton" style="height:84px" data-k="objects"></div>
+    <div class="box skeleton" style="height:84px" data-k="egress"></div>
+    <div class="box skeleton" style="height:84px" data-k="plan"></div>
+  </div>
+</section>
+<section class="section">
+  <div class="card">
+    <div class="title">Tu actividad</div>
+    <div class="meta">Ordena por columna o filtra.</div>
+    <div class="actions" style="margin:8px 0">
+      <input id="filter" placeholder="Filtrar… (ej. login)"/>
+    </div>
+    <table class="table" id="tbl-activity">
+      <thead><tr>
+        <th><button data-col="date">Fecha</button></th>
+        <th><button data-col="action">Acción</button></th>
+        <th><button data-col="detail">Detalle</button></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+<script src="./assets/fusion-dashboard.js"></script>
+
+</main>
+<footer class="footer">Mixtli — UI pack v7_9 FUSION</footer>
+
+<div class="kbar" id="kbar" aria-hidden="true">
+  <div class="box">
+    <header><input id="kinput" placeholder="Ir a… (Grafana, Prometheus, Billing, Admin, Auth, Dashboard)" aria-label="Buscar"/></header>
+    <div id="kitems"></div>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+// Theme & accent
+const root = document.body;
+(function initTheme(){
+  const savedTheme = localStorage.getItem('mx_theme') || 'dark';
+  const savedAcc = localStorage.getItem('mx_accent') || 'sky';
+  root.dataset.theme = savedTheme; root.dataset.accent = savedAcc;
+  document.querySelectorAll('#themeTog button').forEach(b=>{b.classList.toggle('active', b.dataset.mode===savedTheme)});
+  document.querySelectorAll('#accentTog button').forEach(b=>{b.classList.toggle('active', b.dataset.accent===savedAcc)});
+})();
+document.getElementById('themeTog').onclick = (e)=>{const b=e.target.closest('button'); if(!b) return; root.dataset.theme=b.dataset.mode; localStorage.setItem('mx_theme', b.dataset.mode); document.querySelectorAll('#themeTog button').forEach(x=>x.classList.toggle('active',x===b));};
+document.getElementById('accentTog').onclick = (e)=>{const b=e.target.closest('button'); if(!b) return; root.dataset.accent=b.dataset.accent; localStorage.setItem('mx_accent', b.dataset.accent); document.querySelectorAll('#accentTog button').forEach(x=>x.classList.toggle('active',x===b));};
+
+// Toast
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+
+// Kbar (Cmd/Ctrl+K)
+const KBAR = document.getElementById('kbar'); const KINPUT = document.getElementById('kinput'); const KITEMS = document.getElementById('kitems');
+const COMMANDS = [
+  { label:'Dashboard', href:'./dashboard.html' },
+  { label:'Planes y Recargas', href:'./billing.html' },
+  { label:'Admin', href:'./admin.html' },
+  { label:'Auth', href:'./auth.html' },
+  { label:'Grafana', href:'/dash/grafana' },
+  { label:'Prometheus', href:'/dash/prom' },
+];
+function openK(){KBAR.classList.add('show'); KBAR.setAttribute('aria-hidden','false'); KINPUT.value=''; renderK(''); KINPUT.focus();}
+function closeK(){KBAR.classList.remove('show'); KBAR.setAttribute('aria-hidden','true');}
+function renderK(q){const Q=q.toLowerCase(); KITEMS.innerHTML = COMMANDS.filter(c=>c.label.toLowerCase().includes(Q)).map(c=>`<div class='item'><span>${c.label}</span><a class='btn' href='${c.href}'>Ir</a></div>`).join('');}
+document.getElementById('kbarBtn').onclick = openK;
+document.addEventListener('keydown',(e)=>{ if((e.metaKey||e.ctrlKey)&& e.key.toLowerCase()==='k'){ e.preventDefault(); openK(); } if(e.key==='Escape'){ closeK(); }});
+KINPUT.addEventListener('input', (e)=>renderK(e.target.value));
+KBAR.addEventListener('click',(e)=>{ if(e.target===KBAR) closeK();});
+</script>
+</body></html>
