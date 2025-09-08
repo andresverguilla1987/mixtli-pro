@@ -1,17 +1,37 @@
-// Helper to wire security middlewares into your Express app.
-// Usage in your app.ts BEFORE routes:
-// import applySecurity from './app-security-bootstrap';
-// applySecurity(app);
-import cors from './middleware/security/cors';
-import apiLimiter from './middleware/security/rateLimit';
-import helmet from './middleware/security/helmet';
+// Lightweight security & hardening bootstrap for Express apps
+// Usage in apps/api/src/app.ts (before routes):
+//   import applySecurity from './app-security-bootstrap';
+//   applySecurity(app);
 
-export function applySecurity(app: any) {
-  try { app.disable?.('x-powered-by'); } catch {}
-  app.use(helmet);
-  app.use(cors);
-  // You can scope limiter only to API routes if you prefer:
-  app.use('/api', apiLimiter);
+import helmet from 'helmet';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+
+type AnyExpress = any;
+
+export default function applySecurity(app: AnyExpress) {
+  // Behind Render/NGINX we want to honor X-Forwarded-* for rate limiting
+  try { app.set?.('trust proxy', 1); } catch {}
+
+  app.use(helmet({
+    contentSecurityPolicy: false, // disable strict CSP by default; tune if you serve views
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+  }));
+
+  app.use(cors({
+    origin: '*',
+    methods: ['GET','HEAD','POST','PUT','PATCH','DELETE','OPTIONS'],
+    allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
+    maxAge: 600
+  }));
+
+  // Basic rate limit (per-IP) — adjust to your traffic patterns
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: parseInt(process.env.RATE_LIMIT_MAX ?? '300', 10),
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+
+  app.use(limiter);
 }
-
-export default applySecurity;
