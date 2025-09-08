@@ -1,0 +1,40 @@
+{
+  "title": "Mixtli Uptime (Synthetic)",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Uptime (probe_success)",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "avg_over_time(probe_success[5m])",
+          "legendFormat": "{{instance}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latencia (probe_duration_seconds)",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "avg by (instance) (rate(probe_duration_seconds_sum[5m]) / rate(probe_duration_seconds_count[5m]))",
+          "legendFormat": "{{instance}}"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "overall": "operacional",
+  "items": [
+    {
+      "id": "EXAMPLE-1",
+      "title": "Latencia elevadas en /upload",
+      "severity": "warning",
+      "started_at": "2025-09-07T20:00:00Z",
+      "summary": "Investigando latencias p95 por encima de 800ms en regi\u00f3n Oregon."
+    }
+  ]
+}

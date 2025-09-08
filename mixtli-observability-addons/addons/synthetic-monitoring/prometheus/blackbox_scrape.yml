@@ -1,0 +1,15 @@
+# Añade esto a tu prometheus.yml bajo scrape_configs
+- job_name: 'blackbox'
+  metrics_path: /probe
+  params:
+    module: [http_2xx]
+  static_configs:
+    - targets:
+      - https://mixtli-pro.onrender.com/salud   # cambia por tu URL real
+  relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_target
+    - target_label: __address__
+      replacement: blackbox-exporter:9115
+    - source_labels: [__param_target]
+      target_label: instance

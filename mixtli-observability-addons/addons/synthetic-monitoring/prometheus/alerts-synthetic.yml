@@ -1,0 +1,11 @@
+groups:
+- name: synthetic.alerts
+  rules:
+  - alert: EndpointDownSynthetic
+    expr: probe_success == 0
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Synthetic: endpoint caído"
+      description: "El probe de blackbox falla para {{ $labels.instance }}."

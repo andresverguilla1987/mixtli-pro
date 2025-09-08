@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Mixtli Status</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; }
+    .ok { color: #0a0; } .warn { color: #c90; } .crit { color: #c00; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+    .muted { color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Mixtli Status</h1>
+  <div id="summary" class="card">Cargando...</div>
+  <div id="incidents"></div>
+  <script>
+    async function load() {
+      const res = await fetch('./incidents/incidents.json?_=' + Date.now());
+      const data = await res.json();
+      const sum = document.getElementById('summary');
+      sum.innerHTML = '<b>Estado:</b> ' + (data.overall || 'operacional') + ' — <span class="muted">' + new Date().toLocaleString() + '</span>';
+      const wrap = document.getElementById('incidents');
+      wrap.innerHTML = '';
+      (data.items||[]).forEach(it => {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.innerHTML = '<h3>' + it.title + '</h3>' +
+          '<div class="muted">' + it.severity + ' — ' + it.started_at + '</div>' +
+          '<p>' + it.summary + '</p>';
+        wrap.appendChild(el);
+      });
+    }
+    load();
+  </script>
+</body>
+</html>

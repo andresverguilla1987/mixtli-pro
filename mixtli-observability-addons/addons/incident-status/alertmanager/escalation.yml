@@ -1,0 +1,32 @@
+route:
+  receiver: default
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 3h
+  routes:
+    - matchers: [ severity="critical" ]
+      receiver: pager
+    - matchers: [ severity="warning" ]
+      receiver: slack
+
+inhibit_rules:
+  - source_matchers: [ severity="critical" ]
+    target_matchers: [ severity="warning" ]
+    equal: ['alertname']
+
+receivers:
+  - name: default
+    email_configs:
+      - to: "REPLACE_ME@example.com"
+        from: "REPLACE_ME@example.com"
+        smarthost: "smtp.example.com:587"
+        auth_username: "REPLACE_ME@example.com"
+        auth_password: "REPLACE_ME_PASSWORD"
+        require_tls: true
+  - name: pager
+    webhook_configs:
+      - url: "https://hooks.slack.com/services/REPLACE/ME/WEBHOOK"
+  - name: slack
+    webhook_configs:
+      - url: "https://hooks.slack.com/services/REPLACE/ME/WEBHOOK"
