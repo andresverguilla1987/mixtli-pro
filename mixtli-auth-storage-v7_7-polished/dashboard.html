@@ -1,0 +1,74 @@
+<!doctype html><html lang="es">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mixtli — Dashboard</title>
+<link rel="icon" href="./assets/logo.png"/>
+<link rel="stylesheet" href="./assets/styles.css"/>
+<style>
+/* Critical (inlined) */
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+:root{
+  --bg:#0a1220;--fg:#e6eef9;--muted:#9aa6b2;--card:#0f1b31;--border:#213454;
+  --accent:#22d3ee;--accent2:#34d399;--ok:#16c784;--warn:#f59e0b;--err:#ef4444
+}
+body{background:
+  radial-gradient(1200px 600px at 15% -10%,rgba(34,211,238,.2),transparent 60%),
+  radial-gradient(800px 400px at 90% -20%,rgba(52,211,153,.2),transparent 60%),
+  var(--bg);
+  color:var(--fg);font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;line-height:1.35}
+.container{max-width:1200px;margin:0 auto;padding:16px}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{height:28px;width:auto;filter:drop-shadow(0 4px 12px rgba(0,0,0,.35))}
+h1,h2,h3{margin:0 0 10px}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.btn{background:linear-gradient(180deg,var(--accent),#3b82f6);color:#02131c;text-decoration:none;padding:10px 14px;border-radius:12px;font-weight:700;border:1px solid #2b4f7a;box-shadow:0 8px 20px rgba(0,0,0,.25);cursor:pointer}
+.btn.secondary{background:#121a2b;color:var(--fg);border:1px solid var(--border)}
+.btn.ghost{background:transparent;border:1px solid var(--border);color:var(--fg)}
+.badge{background:#3b0764;color:#fff;padding:4px 8px;border-radius:999px;font-size:.8rem;margin-left:6px}
+.page{padding:10px 0}
+.card{background:rgba(17,24,39,.65);border:1px solid var(--border);border-radius:18px;padding:16px;margin:14px 0;backdrop-filter:blur(6px)}
+.grid{display:grid;gap:14px}
+.grid.plan-cards{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.title{font-size:1.05rem;font-weight:700;margin-bottom:6px}
+.meta{color:var(--muted);font-size:.92rem}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+hr.sep{border:none;border-top:1px solid var(--border);margin:16px 0}
+input,select{background:#0b1220;border:1px solid var(--border);color:var(--fg);padding:10px 12px;border-radius:12px;outline:none}
+input:focus,select:focus{border-color:var(--accent)}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{padding:10px;border-bottom:1px solid var(--border);text-align:left}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.kpi .box{background:#0b1220;border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+.footer{color:var(--muted);text-align:center;padding:20px 0}
+.notice{background:#1f2937;border:1px solid #645214;color:#f59e0b;padding:10px 12px;border-radius:12px}
+.pill{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid var(--border);font-size:.8rem}
+</style>
+</head>
+<body>
+<nav class="container nav">
+  <div class="brand"><img src="./assets/logo.png" alt="Mixtli"/><b>Mixtli</b></div>
+  <div class="actions">
+    <a class="btn secondary" href="./dashboard.html">Dashboard</a>
+    <a class="btn ghost" href="./billing.html">Planes y Recargas</a>
+  </div>
+</nav>
+<section class="container page">
+
+<h1>Dashboard</h1>
+<div class="kpi">
+  <div class="box"><div>Almacenamiento</div><h2 id="k-storage">— GB</h2></div>
+  <div class="box"><div>Objetos</div><h2 id="k-objects">—</h2></div>
+  <div class="box"><div>Transferencia</div><h2 id="k-egress">— GB</h2></div>
+  <div class="box"><div>Plan</div><h2 id="k-plan">—</h2></div>
+</div>
+<div class="card"><div class="title">Tu actividad</div>
+  <table class="table" id="tbl-activity"><thead><tr><th>Fecha</th><th>Acción</th><th>Detalle</th></tr></thead><tbody></tbody></table>
+</div>
+<p>Ir a <a href="./billing.html">Planes y Recargas</a></p>
+<script src="./assets/config.js"></script>
+<script src="./assets/app.js"></script>
+
+</section>
+<footer class="footer">Mixtli • Demo UI pack v7_7 (inline CSS, listo para file://)</footer>
+</body></html>
