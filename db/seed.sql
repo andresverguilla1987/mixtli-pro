@@ -1,14 +1,12 @@
--- db/seed.sql
--- ⚠️ Plantilla de seed para demo. Reemplaza con tus inserts mínimos.
--- Ejemplo genérico (ajusta a TU esquema):
---
--- TRUNCATE TABLE users RESTART IDENTITY CASCADE;
--- INSERT INTO users (name, email, role, created_at)
--- VALUES ('Demo Owner','demo-owner@example.com','admin', NOW());
---
--- TRUNCATE TABLE customers RESTART IDENTITY CASCADE;
--- INSERT INTO customers (name, email, created_at) VALUES
--- ('Acme Corp','demo+acme@example.com', NOW()),
--- ('Globex','demo+globex@example.com', NOW());
 
--- Agrega aquí tus TRUNCATE/INSERT para dejar todo listo para el pitch.
+-- Seed de demo (ajusta a tus tablas reales)
+
+BEGIN;
+
+-- Ejemplos:
+-- TRUNCATE TABLE users RESTART IDENTITY CASCADE;
+-- INSERT INTO users (name, email) VALUES
+--   ('Demo Admin','admin@mixtli-demo.local'),
+--   ('Demo Agent','agent@mixtli-demo.local');
+
+COMMIT;
