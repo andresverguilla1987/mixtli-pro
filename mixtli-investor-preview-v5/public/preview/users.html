@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es"><head>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Mixtli — Usuarios</title><link rel="stylesheet" href="./assets/styles.css"/>
+</head>
+<body>
+  <div class="container">
+    <header style="display:flex;align-items:center;justify-content:space-between">
+      <h1>Usuarios</h1>
+      <a class="btn" href="./">← Regresar</a>
+    </header>
+    <section class="card">
+      <div class="grid stats">
+        <div class="stat"><div>Total usuarios</div><h2 id="total">—</h2></div>
+        <div class="stat"><div>MAU</div><h2 id="mau">—</h2></div>
+        <div class="stat"><div>WAU</div><h2 id="wau">—</h2></div>
+        <div class="stat"><div>DAU</div><h2 id="dau">—</h2></div>
+      </div>
+    </section>
+    <section class="card">
+      <h3>Signups últimos 30 días</h3>
+      <svg id="spark" class="spark" viewBox="0 0 120 36"></svg>
+    </section>
+    <section class="card">
+      <h3>Altas recientes</h3>
+      <table id="table"><thead><tr><th>Usuario</th><th>Plan</th><th>Alta</th></tr></thead><tbody></tbody></table>
+    </section>
+  </div>
+  <script src="./assets/users.js"></script>
+</body></html>

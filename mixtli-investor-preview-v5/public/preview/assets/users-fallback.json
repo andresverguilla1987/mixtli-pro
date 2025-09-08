@@ -1,0 +1,790 @@
+{
+  "totalUsers": 1173,
+  "dailyActive": 140,
+  "weeklyActive": 375,
+  "monthlyActive": 645,
+  "signupsByDay": [
+    {
+      "date": "2025-05-12",
+      "count": 11
+    },
+    {
+      "date": "2025-05-13",
+      "count": 13
+    },
+    {
+      "date": "2025-05-14",
+      "count": 16
+    },
+    {
+      "date": "2025-05-15",
+      "count": 16
+    },
+    {
+      "date": "2025-05-16",
+      "count": 17
+    },
+    {
+      "date": "2025-05-17",
+      "count": 14
+    },
+    {
+      "date": "2025-05-18",
+      "count": 15
+    },
+    {
+      "date": "2025-05-19",
+      "count": 16
+    },
+    {
+      "date": "2025-05-20",
+      "count": 14
+    },
+    {
+      "date": "2025-05-21",
+      "count": 14
+    },
+    {
+      "date": "2025-05-22",
+      "count": 13
+    },
+    {
+      "date": "2025-05-23",
+      "count": 15
+    },
+    {
+      "date": "2025-05-24",
+      "count": 8
+    },
+    {
+      "date": "2025-05-25",
+      "count": 15
+    },
+    {
+      "date": "2025-05-26",
+      "count": 15
+    },
+    {
+      "date": "2025-05-27",
+      "count": 11
+    },
+    {
+      "date": "2025-05-28",
+      "count": 12
+    },
+    {
+      "date": "2025-05-29",
+      "count": 7
+    },
+    {
+      "date": "2025-05-30",
+      "count": 12
+    },
+    {
+      "date": "2025-05-31",
+      "count": 12
+    },
+    {
+      "date": "2025-06-01",
+      "count": 9
+    },
+    {
+      "date": "2025-06-02",
+      "count": 14
+    },
+    {
+      "date": "2025-06-03",
+      "count": 9
+    },
+    {
+      "date": "2025-06-04",
+      "count": 13
+    },
+    {
+      "date": "2025-06-05",
+      "count": 16
+    },
+    {
+      "date": "2025-06-06",
+      "count": 9
+    },
+    {
+      "date": "2025-06-07",
+      "count": 16
+    },
+    {
+      "date": "2025-06-08",
+      "count": 16
+    },
+    {
+      "date": "2025-06-09",
+      "count": 11
+    },
+    {
+      "date": "2025-06-10",
+      "count": 12
+    },
+    {
+      "date": "2025-06-11",
+      "count": 11
+    },
+    {
+      "date": "2025-06-12",
+      "count": 8
+    },
+    {
+      "date": "2025-06-13",
+      "count": 9
+    },
+    {
+      "date": "2025-06-14",
+      "count": 10
+    },
+    {
+      "date": "2025-06-15",
+      "count": 11
+    },
+    {
+      "date": "2025-06-16",
+      "count": 9
+    },
+    {
+      "date": "2025-06-17",
+      "count": 11
+    },
+    {
+      "date": "2025-06-18",
+      "count": 5
+    },
+    {
+      "date": "2025-06-19",
+      "count": 6
+    },
+    {
+      "date": "2025-06-20",
+      "count": 8
+    },
+    {
+      "date": "2025-06-21",
+      "count": 7
+    },
+    {
+      "date": "2025-06-22",
+      "count": 2
+    },
+    {
+      "date": "2025-06-23",
+      "count": 3
+    },
+    {
+      "date": "2025-06-24",
+      "count": 1
+    },
+    {
+      "date": "2025-06-25",
+      "count": 0
+    },
+    {
+      "date": "2025-06-26",
+      "count": 4
+    },
+    {
+      "date": "2025-06-27",
+      "count": 0
+    },
+    {
+      "date": "2025-06-28",
+      "count": 1
+    },
+    {
+      "date": "2025-06-29",
+      "count": 4
+    },
+    {
+      "date": "2025-06-30",
+      "count": 0
+    },
+    {
+      "date": "2025-07-01",
+      "count": 0
+    },
+    {
+      "date": "2025-07-02",
+      "count": 3
+    },
+    {
+      "date": "2025-07-03",
+      "count": 7
+    },
+    {
+      "date": "2025-07-04",
+      "count": 7
+    },
+    {
+      "date": "2025-07-05",
+      "count": 7
+    },
+    {
+      "date": "2025-07-06",
+      "count": 8
+    },
+    {
+      "date": "2025-07-07",
+      "count": 7
+    },
+    {
+      "date": "2025-07-08",
+      "count": 14
+    },
+    {
+      "date": "2025-07-09",
+      "count": 14
+    },
+    {
+      "date": "2025-07-10",
+      "count": 15
+    },
+    {
+      "date": "2025-07-11",
+      "count": 12
+    },
+    {
+      "date": "2025-07-12",
+      "count": 13
+    },
+    {
+      "date": "2025-07-13",
+      "count": 13
+    },
+    {
+      "date": "2025-07-14",
+      "count": 17
+    },
+    {
+      "date": "2025-07-15",
+      "count": 18
+    },
+    {
+      "date": "2025-07-16",
+      "count": 15
+    },
+    {
+      "date": "2025-07-17",
+      "count": 19
+    },
+    {
+      "date": "2025-07-18",
+      "count": 21
+    },
+    {
+      "date": "2025-07-19",
+      "count": 20
+    },
+    {
+      "date": "2025-07-20",
+      "count": 18
+    },
+    {
+      "date": "2025-07-21",
+      "count": 16
+    },
+    {
+      "date": "2025-07-22",
+      "count": 16
+    },
+    {
+      "date": "2025-07-23",
+      "count": 12
+    },
+    {
+      "date": "2025-07-24",
+      "count": 10
+    },
+    {
+      "date": "2025-07-25",
+      "count": 12
+    },
+    {
+      "date": "2025-07-26",
+      "count": 13
+    },
+    {
+      "date": "2025-07-27",
+      "count": 13
+    },
+    {
+      "date": "2025-07-28",
+      "count": 13
+    },
+    {
+      "date": "2025-07-29",
+      "count": 8
+    },
+    {
+      "date": "2025-07-30",
+      "count": 13
+    },
+    {
+      "date": "2025-07-31",
+      "count": 12
+    },
+    {
+      "date": "2025-08-01",
+      "count": 10
+    },
+    {
+      "date": "2025-08-02",
+      "count": 11
+    },
+    {
+      "date": "2025-08-03",
+      "count": 12
+    },
+    {
+      "date": "2025-08-04",
+      "count": 7
+    },
+    {
+      "date": "2025-08-05",
+      "count": 5
+    },
+    {
+      "date": "2025-08-06",
+      "count": 6
+    },
+    {
+      "date": "2025-08-07",
+      "count": 12
+    },
+    {
+      "date": "2025-08-08",
+      "count": 11
+    },
+    {
+      "date": "2025-08-09",
+      "count": 9
+    },
+    {
+      "date": "2025-08-10",
+      "count": 10
+    },
+    {
+      "date": "2025-08-11",
+      "count": 8
+    },
+    {
+      "date": "2025-08-12",
+      "count": 8
+    },
+    {
+      "date": "2025-08-13",
+      "count": 7
+    },
+    {
+      "date": "2025-08-14",
+      "count": 12
+    },
+    {
+      "date": "2025-08-15",
+      "count": 6
+    },
+    {
+      "date": "2025-08-16",
+      "count": 11
+    },
+    {
+      "date": "2025-08-17",
+      "count": 6
+    },
+    {
+      "date": "2025-08-18",
+      "count": 10
+    },
+    {
+      "date": "2025-08-19",
+      "count": 3
+    },
+    {
+      "date": "2025-08-20",
+      "count": 3
+    },
+    {
+      "date": "2025-08-21",
+      "count": 3
+    },
+    {
+      "date": "2025-08-22",
+      "count": 2
+    },
+    {
+      "date": "2025-08-23",
+      "count": 5
+    },
+    {
+      "date": "2025-08-24",
+      "count": 4
+    },
+    {
+      "date": "2025-08-25",
+      "count": 4
+    },
+    {
+      "date": "2025-08-26",
+      "count": 5
+    },
+    {
+      "date": "2025-08-27",
+      "count": 0
+    },
+    {
+      "date": "2025-08-28",
+      "count": 6
+    },
+    {
+      "date": "2025-08-29",
+      "count": 5
+    },
+    {
+      "date": "2025-08-30",
+      "count": 1
+    },
+    {
+      "date": "2025-08-31",
+      "count": 5
+    },
+    {
+      "date": "2025-09-01",
+      "count": 6
+    },
+    {
+      "date": "2025-09-02",
+      "count": 7
+    },
+    {
+      "date": "2025-09-03",
+      "count": 9
+    },
+    {
+      "date": "2025-09-04",
+      "count": 13
+    },
+    {
+      "date": "2025-09-05",
+      "count": 10
+    },
+    {
+      "date": "2025-09-06",
+      "count": 7
+    },
+    {
+      "date": "2025-09-07",
+      "count": 12
+    },
+    {
+      "date": "2025-09-08",
+      "count": 15
+    }
+  ],
+  "recent": [
+    {
+      "name": "Chris Silva",
+      "email": "chris.silva574@example.com",
+      "signupAt": "2025-09-08T20:13:00",
+      "plan": "free"
+    },
+    {
+      "name": "Chris Silva",
+      "email": "chris.silva920@example.com",
+      "signupAt": "2025-09-07T12:52:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Max Torres",
+      "email": "max.torres657@example.com",
+      "signupAt": "2025-09-04T22:50:00",
+      "plan": "free"
+    },
+    {
+      "name": "Dee Castro",
+      "email": "dee.castro238@example.com",
+      "signupAt": "2025-09-03T07:43:00",
+      "plan": "free"
+    },
+    {
+      "name": "Sam Diaz",
+      "email": "sam.diaz326@example.com",
+      "signupAt": "2025-09-03T04:46:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Chris Cruz",
+      "email": "chris.cruz403@example.com",
+      "signupAt": "2025-09-02T23:10:00",
+      "plan": "team"
+    },
+    {
+      "name": "Kai Torres",
+      "email": "kai.torres949@example.com",
+      "signupAt": "2025-09-01T22:01:00",
+      "plan": "team"
+    },
+    {
+      "name": "Dani Mendez",
+      "email": "dani.mendez152@example.com",
+      "signupAt": "2025-08-28T04:21:00",
+      "plan": "team"
+    },
+    {
+      "name": "Joss Gomez",
+      "email": "joss.gomez610@example.com",
+      "signupAt": "2025-08-25T20:19:00",
+      "plan": "team"
+    },
+    {
+      "name": "Chris Gomez",
+      "email": "chris.gomez99@example.com",
+      "signupAt": "2025-08-18T16:42:00",
+      "plan": "free"
+    },
+    {
+      "name": "Max Mendez",
+      "email": "max.mendez752@example.com",
+      "signupAt": "2025-08-18T05:56:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Chris Gomez",
+      "email": "chris.gomez255@example.com",
+      "signupAt": "2025-08-17T05:31:00",
+      "plan": "team"
+    },
+    {
+      "name": "Alex Perez",
+      "email": "alex.perez472@example.com",
+      "signupAt": "2025-08-16T23:49:00",
+      "plan": "team"
+    },
+    {
+      "name": "Kai Lopez",
+      "email": "kai.lopez239@example.com",
+      "signupAt": "2025-08-15T02:09:00",
+      "plan": "free"
+    },
+    {
+      "name": "Kai Perez",
+      "email": "kai.perez329@example.com",
+      "signupAt": "2025-08-15T00:09:00",
+      "plan": "team"
+    },
+    {
+      "name": "Pat Silva",
+      "email": "pat.silva294@example.com",
+      "signupAt": "2025-08-14T15:34:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Sam Gomez",
+      "email": "sam.gomez269@example.com",
+      "signupAt": "2025-08-13T19:09:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Pat Diaz",
+      "email": "pat.diaz540@example.com",
+      "signupAt": "2025-08-13T05:01:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Dee Diaz",
+      "email": "dee.diaz407@example.com",
+      "signupAt": "2025-08-13T03:06:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Ari Perez",
+      "email": "ari.perez769@example.com",
+      "signupAt": "2025-08-10T18:08:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Dee Cruz",
+      "email": "dee.cruz953@example.com",
+      "signupAt": "2025-08-08T12:36:00",
+      "plan": "free"
+    },
+    {
+      "name": "Joss Lopez",
+      "email": "joss.lopez494@example.com",
+      "signupAt": "2025-08-08T03:16:00",
+      "plan": "team"
+    },
+    {
+      "name": "Max Castro",
+      "email": "max.castro714@example.com",
+      "signupAt": "2025-08-07T21:45:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Max Navarro",
+      "email": "max.navarro430@example.com",
+      "signupAt": "2025-08-04T04:38:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Sam Diaz",
+      "email": "sam.diaz688@example.com",
+      "signupAt": "2025-07-31T18:54:00",
+      "plan": "team"
+    },
+    {
+      "name": "Vale Castro",
+      "email": "vale.castro65@example.com",
+      "signupAt": "2025-07-30T23:37:00",
+      "plan": "free"
+    },
+    {
+      "name": "Sam Gomez",
+      "email": "sam.gomez172@example.com",
+      "signupAt": "2025-07-30T17:34:00",
+      "plan": "free"
+    },
+    {
+      "name": "Alex Cruz",
+      "email": "alex.cruz735@example.com",
+      "signupAt": "2025-07-30T10:02:00",
+      "plan": "free"
+    },
+    {
+      "name": "Vale Silva",
+      "email": "vale.silva990@example.com",
+      "signupAt": "2025-07-28T17:03:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Pat Lopez",
+      "email": "pat.lopez158@example.com",
+      "signupAt": "2025-07-28T10:38:00",
+      "plan": "team"
+    },
+    {
+      "name": "Kai Gomez",
+      "email": "kai.gomez100@example.com",
+      "signupAt": "2025-07-26T21:14:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Pat Cruz",
+      "email": "pat.cruz5@example.com",
+      "signupAt": "2025-07-26T16:47:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Kai Cruz",
+      "email": "kai.cruz821@example.com",
+      "signupAt": "2025-07-25T18:28:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Kai Silva",
+      "email": "kai.silva247@example.com",
+      "signupAt": "2025-07-25T10:17:00",
+      "plan": "free"
+    },
+    {
+      "name": "Pat Gomez",
+      "email": "pat.gomez136@example.com",
+      "signupAt": "2025-07-24T22:46:00",
+      "plan": "free"
+    },
+    {
+      "name": "Vale Silva",
+      "email": "vale.silva437@example.com",
+      "signupAt": "2025-07-23T23:07:00",
+      "plan": "free"
+    },
+    {
+      "name": "Dee Cruz",
+      "email": "dee.cruz339@example.com",
+      "signupAt": "2025-07-23T07:00:00",
+      "plan": "free"
+    },
+    {
+      "name": "Sam Silva",
+      "email": "sam.silva729@example.com",
+      "signupAt": "2025-07-22T20:50:00",
+      "plan": "team"
+    },
+    {
+      "name": "Joss Ramirez",
+      "email": "joss.ramirez172@example.com",
+      "signupAt": "2025-07-22T02:52:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Dee Diaz",
+      "email": "dee.diaz530@example.com",
+      "signupAt": "2025-07-21T07:57:00",
+      "plan": "team"
+    },
+    {
+      "name": "Dani Cruz",
+      "email": "dani.cruz872@example.com",
+      "signupAt": "2025-07-21T03:30:00",
+      "plan": "team"
+    },
+    {
+      "name": "Pat Perez",
+      "email": "pat.perez897@example.com",
+      "signupAt": "2025-07-20T06:53:00",
+      "plan": "free"
+    },
+    {
+      "name": "Dani Gomez",
+      "email": "dani.gomez292@example.com",
+      "signupAt": "2025-07-20T00:24:00",
+      "plan": "team"
+    },
+    {
+      "name": "Pat Perez",
+      "email": "pat.perez828@example.com",
+      "signupAt": "2025-07-19T06:08:00",
+      "plan": "free"
+    },
+    {
+      "name": "Vale Navarro",
+      "email": "vale.navarro615@example.com",
+      "signupAt": "2025-07-18T15:12:00",
+      "plan": "free"
+    },
+    {
+      "name": "Pat Castro",
+      "email": "pat.castro912@example.com",
+      "signupAt": "2025-07-18T13:10:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Kai Ramirez",
+      "email": "kai.ramirez232@example.com",
+      "signupAt": "2025-07-18T08:36:00",
+      "plan": "team"
+    },
+    {
+      "name": "Kai Torres",
+      "email": "kai.torres317@example.com",
+      "signupAt": "2025-07-17T05:31:00",
+      "plan": "free"
+    },
+    {
+      "name": "Sam Silva",
+      "email": "sam.silva263@example.com",
+      "signupAt": "2025-07-17T03:46:00",
+      "plan": "pro"
+    },
+    {
+      "name": "Max Perez",
+      "email": "max.perez646@example.com",
+      "signupAt": "2025-07-16T17:50:00",
+      "plan": "pro"
+    }
+  ]
+}
