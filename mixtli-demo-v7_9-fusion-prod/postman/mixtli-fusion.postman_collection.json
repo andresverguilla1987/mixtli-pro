@@ -1,0 +1,64 @@
+{
+  "info": {
+    "name": "Mixtli Fusion Smoke",
+    "_postman_id": "mixtli-fusion",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Register",
+      "request": {
+        "method": "POST",
+        "url": "{{base}}/auth/register",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"Demo\",\"email\":\"demo+{{ts}}@example.com\",\"password\":\"secret\",\"plan\":\"pro\"}"
+        }
+      }
+    },
+    {
+      "name": "Users Stats",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/users/stats"
+      }
+    },
+    {
+      "name": "Users Recent",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/users/recent"
+      }
+    },
+    {
+      "name": "Grafana Proxy",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/dash/grafana"
+      }
+    },
+    {
+      "name": "Prom Proxy",
+      "request": {
+        "method": "GET",
+        "url": "{{base}}/dash/prom"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base",
+      "value": "http://localhost:10000"
+    },
+    {
+      "key": "ts",
+      "value": "1694000000"
+    }
+  ]
+}

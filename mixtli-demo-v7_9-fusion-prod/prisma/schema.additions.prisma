@@ -1,0 +1,1 @@
+model User { id String @id @default(cuid()) email String @unique name String? plan String @default("free") createdAt DateTime @default(now()) lastActive DateTime @default(now()) @@index([createdAt]) @@index([lastActive]) } model AuditEvent { id String @id @default(cuid()) ts DateTime @default(now()) type String userId String? meta Json? @@index([ts]) @@index([type]) }
