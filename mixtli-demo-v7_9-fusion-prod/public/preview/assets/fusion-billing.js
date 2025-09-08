@@ -54,3 +54,85 @@
 
   render();
 })();
+
+// ===== UNIT_TOPUP =====
+(function UnitTopUp(){
+  const selCountry = document.getElementById('country');
+  const grid = document.getElementById('plans');
+  const cfg = window.MIXTLI_CFG;
+  const Q = cfg.unitTopup || { minGB: 10, maxGB: 1000, tiers: [] };
+
+  function perGb(qty, cur){
+    const t = (Q.tiers||[]).find(t => t.upTo === null ? true : qty <= t.upTo) || Q.tiers[Q.tiers.length-1];
+    return (t && t.price && t.price[cur]) ? t.price[cur] : 0;
+  }
+  function total(qty, cur){ return +(perGb(qty, cur) * qty).toFixed(cur==='COP' ? 0 : 2); }
+
+  // Create card element
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="title">Recarga por GB (min ${Q.minGB})</div>
+    <div class="meta">Elige la cantidad exacta que necesitas. Precio por GB escala según volumen.</div>
+    <div class="row" style="align-items:center">
+      <input id="unitGB" type="number" min="${Q.minGB}" max="${Q.maxGB}" step="1" value="${Q.minGB}" style="max-width:140px"/>
+      <input id="unitRange" type="range" min="${Q.minGB}" max="${Q.maxGB}" step="1" value="${Q.minGB}" style="flex:1"/>
+      <span class="badge" id="perGbBadge">— / GB</span>
+    </div>
+    <hr class="sep"/>
+    <div class="row" style="align-items:baseline">
+      <button class="btn" id="unitCheckout">Checkout</button>
+      <button class="btn" id="unitSim">Simular</button>
+      <span class="badge" id="unitTotal">Total: —</span>
+    </div>
+    <div class="meta" id="unitOut" style="margin-top:8px">—</div>
+  `;
+
+  // Insert card BEFORE existing plan grid for visibilidad
+  grid.parentElement.insertBefore(card, grid);
+
+  const elQty = card.querySelector('#unitGB');
+  const elRange = card.querySelector('#unitRange');
+  const elPer = card.querySelector('#perGbBadge');
+  const elTotal = card.querySelector('#unitTotal');
+  const elOut = card.querySelector('#unitOut');
+  const elCheckout = card.querySelector('#unitCheckout');
+  const elSim = card.querySelector('#unitSim');
+  const crypto = document.getElementById('crypto-quote');
+
+  function update(){
+    let q = parseInt(elQty.value||Q.minGB, 10);
+    if(isNaN(q) || q < Q.minGB) q = Q.minGB;
+    if(q > Q.maxGB) q = Q.maxGB;
+    elQty.value = q; elRange.value = q;
+
+    const cur = selCountry.value;
+    const pgb = perGb(q, cur);
+    const tot = total(q, cur);
+    elPer.textContent = (cur === 'COP' ? '$' + pgb.toFixed(0) : '$' + pgb.toFixed(2)) + ' ' + cur + ' / GB';
+    elTotal.textContent = 'Total: ' + (cur === 'COP' ? '$' + tot.toFixed(0) : '$' + tot.toFixed(2)) + ' ' + cur;
+    elOut.textContent = '—';
+  }
+
+  elQty.addEventListener('input', update);
+  elRange.addEventListener('input', (e)=>{ elQty.value = e.target.value; update(); });
+  selCountry.addEventListener('change', update);
+
+  elCheckout.onclick = ()=>{
+    const q = parseInt(elQty.value, 10); const cur = selCountry.value;
+    const amt = total(q, cur);
+    const url = `https://pay.mixtli.com/checkout?pid=topup_unit&gb=${q}&cur=${cur}&amt=${amt}`;
+    elOut.textContent = 'Link: ' + url;
+    // crypto estimate
+    const r = window.MIXTLI_CFG.cryptoRates || {BTC:900000,ETH:30000,USDC:17};
+    const btc = (amt / r.BTC).toFixed(6), eth=(amt/r.ETH).toFixed(5), usdc=(amt/r.USDC).toFixed(2);
+    if(crypto) crypto.textContent = `≈ ${btc} BTC • ${eth} ETH • ${usdc} USDC`;
+  };
+
+  elSim.onclick = ()=>{
+    const q = parseInt(elQty.value, 10);
+    elOut.textContent = '✔ Simulado: acreditados ' + q + ' GB a tu cuenta.';
+  };
+
+  update();
+})();
