@@ -1,3 +1,4 @@
+# Netlify config for monorepo publishing front/
 [build]
-  base = "front"
   publish = "front"
+# no build command, no functions
