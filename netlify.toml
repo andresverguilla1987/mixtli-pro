@@ -1,9 +1,3 @@
-# Netlify config
 [build]
-  publish = "."
-
-# Redirect default success to gracias.html for the trial form
-[[redirects]]
-  from = "/"
-  to = "/index.html"
-  status = 200
+  base = "front"
+  publish = "front"

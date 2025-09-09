@@ -1,2 +1,1 @@
-# Front Mixtli — Design Lock v1
-Configura API Base, login y sube por presign.
+Front listo para Netlify (Import from Git). Publish directory: `front`.

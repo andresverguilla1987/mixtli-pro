@@ -1,1 +1,1 @@
-Backend mini con presign S3/R2, JWT y cleanup TTL.
+Backend listo para Render (Root Directory: backend) o blueprint con render.yaml del root.
