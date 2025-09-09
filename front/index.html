@@ -1,16 +1,66 @@
-<!doctype html><html lang="es"><head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Mixtli — Bienvenido</title><link rel="stylesheet" href="assets/style.css"/></head><body>
-<header class="header"><div class="brand"><div class="logo">E</div><div class="title">Mixtli</div></div></header>
-<main class="container"><section class="card">
-<h1>Bienvenido</h1><p class="muted">Crea tu cuenta o inicia sesión.</p>
-<div class="grid2"><button id="tabLogin" class="tab active">Entrar</button><button id="tabReg" class="tab">Registrarme</button></div>
-<div id="loginBox"><label>Correo<input id="logEmail" placeholder="tu@correo.com" autocomplete="username"/></label>
-<label>Contraseña<input id="logPass" type="password" placeholder="········" autocomplete="current-password"/></label>
-<button id="btnLogin" class="primary">Entrar</button><pre id="logOut" class="out"></pre></div>
-<div id="regBox" class="hidden"><label>Correo<input id="regEmail" placeholder="tu@correo.com"/></label>
-<label>Contraseña<input id="regPass" type="password" placeholder="Mínimo 6 caracteres"/></label>
-<button id="btnRegister">Crear cuenta</button><pre id="regOut" class="out"></pre></div>
-<div class="row"><label>API Base <input id="apiBase" placeholder="http://localhost:10000"/></label><button id="btnSaveCfg">Guardar</button><span id="health" class="badge">health</span></div>
-<p class="muted">Design Lock v1 — apariencia fija.</p></section></main>
-<script type="module" src="assets/login.js"></script></body></html>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mixtli — Uploader</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Mixtli</h1>
+    <div class="health" id="healthBadge">Checking...</div>
+  </header>
+
+  <section class="card">
+    <h2>Configuración</h2>
+    <div class="row">
+      <label>API Base</label>
+      <input id="apiBase" placeholder="https://mi-api.onrender.com" />
+      <button id="saveApiBase">Guardar</button>
+      <button id="resetApiBase" class="ghost">Reset</button>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Cuenta</h2>
+      <div class="row">
+        <label>Email</label>
+        <input id="email" type="email" placeholder="tucorreo@dominio.com" />
+      </div>
+      <div class="row">
+        <label>Password</label>
+        <input id="password" type="password" placeholder="******" />
+      </div>
+      <div class="row">
+        <button id="btnRegister" class="ghost">Registrarme</button>
+        <button id="btnLogin">Entrar</button>
+        <button id="btnLogout" class="danger">Salir</button>
+      </div>
+      <small id="authMsg" class="muted"></small>
+    </div>
+
+    <div class="card">
+      <h2>Subir archivo</h2>
+      <div class="row">
+        <input id="file" type="file" />
+      </div>
+      <div class="row">
+        <button id="btnUpload" class="primary">Subir y generar enlace</button>
+      </div>
+      <div class="progressWrap">
+        <div id="progress" class="progress" style="width:0%"></div>
+      </div>
+      <pre id="log" class="log"></pre>
+      <div id="result" class="result"></div>
+    </div>
+  </section>
+
+  <footer>
+    <small>Mixtli · Presign R2/S3 · TTL & Links</small>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

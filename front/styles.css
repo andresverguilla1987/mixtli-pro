@@ -1,0 +1,22 @@
+*{box-sizing:border-box}body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;background:#0b0f14;color:#e6edf3}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #1f2a34;background:#0e141b;position:sticky;top:0}
+h1{margin:0;font-size:20px;letter-spacing:.4px}
+h2{margin:0 0 12px 0;font-size:16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 20px}
+@media(max-width:900px){.grid{grid-template-columns:1fr;padding:12px}}
+.card{background:#0f1720;border:1px solid #1f2a34;border-radius:14px;padding:16px;box-shadow:0 0 0 1px rgba(255,255,255,0.02) inset}
+.row{display:flex;gap:10px;align-items:center;margin:8px 0;flex-wrap:wrap}
+label{min-width:90px;color:#9fb0c0}
+input{flex:1;min-width:220px;background:#0b1219;border:1px solid #233041;border-radius:10px;color:#e6edf3;padding:10px}
+button{border:1px solid #294258;background:#122234;color:#e6edf3;border-radius:10px;padding:10px 14px;cursor:pointer}
+button.primary{background:#1b4d2b;border-color:#26663a}
+button.ghost{background:transparent;border-color:#294258}
+button.danger{background:#3d1b1b;border-color:#6e2b2b}
+button:hover{filter:brightness(1.08)}
+.health{font-size:12px;background:#13222f;border:1px solid #233041;border-radius:999px;padding:6px 10px;color:#9fb0c0}
+.progressWrap{height:8px;background:#0b1219;border:1px solid #233041;border-radius:999px;margin:10px 0;overflow:hidden}
+.progress{height:100%;background:#2b7a3f;width:0%;transition:width .2s}
+.log{background:#0b1219;border:1px dashed #233041;border-radius:10px;color:#9fb0c0;padding:10px;height:120px;overflow:auto}
+.result a{color:#67d4ff}
+footer{padding:18px 20px;color:#7f8c99;text-align:center}
+.muted{color:#7f8c99}
