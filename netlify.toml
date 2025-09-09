@@ -1,4 +1,19 @@
-# Netlify config for monorepo publishing front/
 [build]
   publish = "front"
-# no build command, no functions
+  command = ""
+
+[[headers]]
+  for = "/app.js"
+  [headers.values]
+    Cache-Control = "public, max-age=600"
+
+[[headers]]
+  for = "/styles.css"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+# Redirect SPA routes to index.html if needed
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
