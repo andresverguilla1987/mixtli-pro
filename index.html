@@ -3,106 +3,64 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mixtli — Subir y Compartir</title>
-  <link rel="stylesheet" href="assets/styles.css" />
+  <title>Mixtli — Uploader</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">
-    <div class="logo">E</div>
-    <div class="title">Mixtli</div>
-  </div>
-  <nav class="nav"><span id="driverHint" class="tag"></span></nav>
-</header>
+  <header>
+    <h1>Mixtli</h1>
+    <div class="health" id="healthBadge">Checking...</div>
+  </header>
 
-<main class="container">
-  <section class="card" id="authCard">
-    <h1>Bienvenido</h1>
-    <p class="muted">Inicia sesión para subir y compartir archivos.</p>
-    <div class="grid2">
-      <button id="btnTabLogin" class="tab active">Entrar</button>
-      <button id="btnTabReg" class="tab">Registrarme</button>
-    </div>
-    <div id="loginBox" class="box">
-      <label>Email
-        <input id="logEmail" type="email" placeholder="tu@correo.com" autocomplete="username" />
-      </label>
-      <label>Contraseña
-        <input id="logPass" type="password" placeholder="········" autocomplete="current-password" />
-      </label>
-      <button id="btnLogin" class="primary">Entrar</button>
-      <pre id="logOut" class="out"></pre>
-    </div>
-    <div id="regBox" class="box hidden">
-      <label>Email
-        <input id="regEmail" type="email" placeholder="tu@correo.com" autocomplete="username" />
-      </label>
-      <label>Contraseña
-        <input id="regPass" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password" />
-      </label>
-      <button id="btnRegister">Crear cuenta</button>
-      <pre id="regOut" class="out"></pre>
-    </div>
-    <div class="row cfg">
-      <label>API Base
-        <input id="apiBase" placeholder="http://localhost:10000" />
-      </label>
-      <button id="btnSaveCfg">Guardar</button>
-      <span id="health" class="dot">•</span>
-      <span id="healthText" class="muted"></span>
-    </div>
-  </section>
-
-  <section class="card hidden" id="appCard">
-    <div class="row between">
-      <h2>Enviar archivos</h2>
-      <button id="btnLogout" class="ghost">Salir</button>
-    </div>
-
-    <div id="drop" class="drop">
-      <input id="file" type="file" />
-      <p><strong>Arrastra y suelta</strong> o haz clic para elegir.</p>
-      <p class="muted">Se sube directo al bucket, sin pasar por el servidor.</p>
-    </div>
-
-    <div class="row grid3">
-      <label>TTL (días)
-        <input id="ttlDays" type="number" min="1" max="30" value="14" />
-      </label>
-      <label>Correo destino (opcional)
-        <input id="emailTo" type="email" placeholder="destinatario@correo.com" />
-      </label>
-      <label>Mensaje (opcional)
-        <input id="emailMsg" placeholder="Te comparto este archivo" />
-      </label>
-    </div>
-
+  <section class="card">
+    <h2>Configuración</h2>
     <div class="row">
-      <button id="btnUpload" class="primary">Subir y generar enlace</button>
-    </div>
-
-    <div id="progressWrap" class="hidden">
-      <div class="progress"><div id="bar" class="bar" style="width:0%"></div></div>
-      <div class="row between">
-        <span id="statusText" class="muted">Esperando…</span>
-        <span id="sizeText" class="muted"></span>
-      </div>
-    </div>
-
-    <div id="result" class="hidden">
-      <div class="row between">
-        <input id="shareUrl" class="mono" readonly />
-        <button id="btnCopy" class="ghost">Copiar</button>
-      </div>
-      <pre id="debug" class="out"></pre>
+      <label>API Base</label>
+      <input id="apiBase" placeholder="https://mi-api.onrender.com" />
+      <button id="saveApiBase">Guardar</button>
+      <button id="resetApiBase" class="ghost">Reset</button>
     </div>
   </section>
-</main>
 
-<footer class="foot">
-  <span class="muted">Mixtli · Presigned direct-to-bucket</span>
-</footer>
+  <section class="grid">
+    <div class="card">
+      <h2>Cuenta</h2>
+      <div class="row">
+        <label>Email</label>
+        <input id="email" type="email" placeholder="tucorreo@dominio.com" />
+      </div>
+      <div class="row">
+        <label>Password</label>
+        <input id="password" type="password" placeholder="******" />
+      </div>
+      <div class="row">
+        <button id="btnRegister" class="ghost">Registrarme</button>
+        <button id="btnLogin">Entrar</button>
+        <button id="btnLogout" class="danger">Salir</button>
+      </div>
+      <small id="authMsg" class="muted"></small>
+    </div>
 
-<script type="module" src="assets/app.js"></script>
+    <div class="card">
+      <h2>Subir archivo</h2>
+      <div class="row">
+        <input id="file" type="file" />
+      </div>
+      <div class="row">
+        <button id="btnUpload" class="primary">Subir y generar enlace</button>
+      </div>
+      <div class="progressWrap">
+        <div id="progress" class="progress" style="width:0%"></div>
+      </div>
+      <pre id="log" class="log"></pre>
+      <div id="result" class="result"></div>
+    </div>
+  </section>
+
+  <footer>
+    <small>Mixtli · Presign R2/S3 · TTL & Links</small>
+  </footer>
+
+  <script src="app.js"></script>
 </body>
 </html>
