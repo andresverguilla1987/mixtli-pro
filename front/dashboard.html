@@ -1,13 +1,13 @@
 <!doctype html><html lang="es"><head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Mixtli — Subir</title><link rel="stylesheet" href="assets/style.css"/></head><body>
 <header class="header"><div class="brand"><div class="logo">E</div><div class="title">Mixtli</div></div></header>
 <main class="container"><section class="card">
 <div class="row"><h2>Enviar archivos</h2><button id="btnLogout">Salir</button></div>
-<div style="border:1px dashed #1e2435;border-radius:12px;padding:20px;margin-top:8px;text-align:center;background:#0c1222">
-<input id="file" type="file"/><p class="muted">PUT directo con presign</p></div>
+<div class="drop"><input id="file" type="file"/><p><strong>Arrastra y suelta</strong> o haz clic.</p><p class="muted">PUT directo por presign.</p></div>
 <div class="grid3"><label>TTL (días)<input id="ttl" value="14"/></label><label>Correo (opcional)<input id="emailTo"/></label><label>Mensaje<input id="emailMsg" placeholder="Te comparto este archivo"/></label></div>
 <div class="row"><button id="btnUpload" class="primary">Subir y generar enlace</button></div>
-<div class="row" style="margin-top:14px"><div class="progress" style="flex:1"><div id="bar" class="bar"></div></div><span id="pct" class="muted mono">0%</span></div>
+<div class="row" style="margin-top:14px"><div class="progress" style="flex:1"><div id="bar" class="bar"></div></div><span id="pct" class="mono">0%</span></div>
 <div style="margin-top:14px"><div class="row"><input id="shareUrl" class="mono" readonly/><button id="btnCopy">Copiar</button></div><pre id="debug" class="out"></pre></div>
-</section></main><script type="module" src="assets/dashboard.js"></script></body></html>
+</section></main>
+<script type="module" src="assets/dashboard.js"></script></body></html>
