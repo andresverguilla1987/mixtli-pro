@@ -1,1 +1,1 @@
-export const CFG = { API_BASE: localStorage.getItem('mixtli.api') || 'http://localhost:10000' };
+export const CFG={API_BASE:localStorage.getItem('mixtli.api')||'http://localhost:10000'};
