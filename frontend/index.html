@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mixtli — Subir y Compartir</title>
+  <style>body{font-family:system-ui;margin:24px}</style>
 </head>
 <body>
   <h1>Mixtli — Subir y compartir</h1>
@@ -32,8 +33,11 @@ document.getElementById("btnUpload").onclick = async ()=>{
     const presign = await doPresign(file);
     log.textContent += JSON.stringify(presign,null,2)+"\n";
     const status = await upload(file, presign);
+    // Fallback público por si el server aun no arma publicUrl
+    const publicBase = "https://pub-f411a341ba7f44a28234293891897c59.r2.dev";
+    const link = presign.publicUrl || (presign.key ? publicBase + "/" + encodeURIComponent(presign.key) : "(sin url)");
     log.textContent += "PUT status: "+status+"\n";
-    log.textContent += "Public URL: "+presign.publicUrl+"\n";
+    log.textContent += "Public URL: "+link+"\n";
   }catch(e){ log.textContent += "Error: "+e.message; }
 };
 </script>

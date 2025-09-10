@@ -1,9 +1,9 @@
 import express from "express";
-import cors from "cors";
 import crypto from "crypto";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+// ===== Env vars =====
 const {
   PORT = process.env.PORT || 10000,
   R2_ACCESS_KEY_ID,
@@ -11,24 +11,29 @@ const {
   R2_BUCKET,
   R2_ACCOUNT_ID,
   PRESIGN_EXPIRES = 3600,
-  PUBLIC_BASE_URL,
   ALLOWED_ORIGINS = "http://localhost:5173,https://*.netlify.app"
 } = process.env;
 
+// Normaliza y LOGUEA PUBLIC_BASE_URL
+const PUBLIC_BASE = (process.env.PUBLIC_BASE_URL || "").trim().replace(/\/$/, "");
+console.log("PUBLIC_BASE_URL ->", PUBLIC_BASE || "(NOT SET)");
+
+// Validación mínima
 if (!R2_ACCOUNT_ID || !R2_BUCKET || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
   console.error("Faltan env vars: R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY");
 }
 
 const R2_ENDPOINT = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
 
+// ===== App =====
 const app = express();
-app.use(express.json({limit:"10mb"}));
+app.use(express.json({limit:"25mb"}));
 
 // CORS seguro
-const allowed = ALLOWED_ORIGINS.split(",").map(s => s.trim());
+const allowList = ALLOWED_ORIGINS.split(",").map(s => s.trim()).filter(Boolean);
 app.use((req, res, next) => {
   const origin = req.headers.origin || "";
-  const ok = allowed.some(pat => {
+  const ok = allowList.some(pat => {
     if (pat.includes("*")) {
       const re = new RegExp("^" + pat.replace(/[.+?^${}()|[\]\\]/g,"\\$&").replace("\*",".*") + "$");
       return re.test(origin);
@@ -43,6 +48,7 @@ app.use((req, res, next) => {
   next();
 });
 
+// S3/R2 client
 const s3 = new S3Client({
   region: "auto",
   endpoint: R2_ENDPOINT,
@@ -52,19 +58,19 @@ const s3 = new S3Client({
   }
 });
 
-function safeKey(name="file.bin"){
+function makeKey(name="file.bin"){
   const ts = Date.now();
   const rnd = crypto.randomBytes(3).toString("hex");
-  const base = name.replace(/[^a-zA-Z0-9._-]/g,"_");
+  const base = (name || "file.bin").replace(/[^a-zA-Z0-9._-]/g,"_");
   return `${ts}-${rnd}-${base}`;
 }
 
-app.get("/health", (req,res)=> res.json({ok:true,time:new Date().toISOString()}));
+app.get("/health", (req,res)=> res.json({ok:true, time:new Date().toISOString()}));
 
 app.post("/presign", async (req, res) => {
   try{
     const { filename = "file.bin", contentType = "application/octet-stream" } = req.body || {};
-    const Key = safeKey(filename);
+    const Key = makeKey(filename);
 
     const putCmd = new PutObjectCommand({
       Bucket: R2_BUCKET,
@@ -73,7 +79,7 @@ app.post("/presign", async (req, res) => {
     });
     const url = await getSignedUrl(s3, putCmd, { expiresIn: Number(PRESIGN_EXPIRES) });
 
-    const publicUrl = PUBLIC_BASE_URL ? `${PUBLIC_BASE_URL.replace(/\/$/,"")}/${encodeURIComponent(Key)}` : null;
+    const publicUrl = PUBLIC_BASE ? `${PUBLIC_BASE}/${encodeURIComponent(Key)}` : null;
 
     res.json({
       key: Key,
@@ -88,6 +94,7 @@ app.post("/presign", async (req, res) => {
   }
 });
 
+// Proxy opcional por si el público no está habilitado
 app.get("/download/:key", async (req, res) => {
   try{
     const Key = req.params.key;
