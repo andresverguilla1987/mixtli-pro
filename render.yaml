@@ -1,34 +1,21 @@
 services:
-- type: web
-  name: mixtli-backend
-  env: docker
-  rootDir: .
-  plan: free
-  autoDeploy: true
-  envVars:
-  - key: PORT
-    value: 10000
-  - key: STORAGE_DRIVER
-    value: R2
-  - key: JWT_SECRET
-    sync: false
-  - key: R2_ACCOUNT_ID
-    sync: false
-  - key: R2_BUCKET
-    sync: false
-  - key: R2_ACCESS_KEY_ID
-    sync: false
-  - key: R2_SECRET_ACCESS_KEY
-    sync: false
-  - key: R2_PUBLIC_BASE_URL
-    sync: false
-  - key: CORS_ORIGINS
-    sync: false
-  - key: DEFAULT_TTL_DAYS
-    value: 14
-  - key: PLAN_FREE_MAX
-    value: 52428800
-  - key: PLAN_PRO_MAX
-    value: 2147483648
-  - key: PLAN_ENTERPRISE_MAX
-    value: 10737418240
+  - type: web
+    name: mixtli-pro
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: ""
+    startCommand: "node server.js"
+    envVars:
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: "http://localhost:5173,https://*.netlify.app"

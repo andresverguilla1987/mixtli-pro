@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mixtli — Subir y Compartir</title>
+  <style>
+    :root { color-scheme: dark; }
+    body{font-family: system-ui,Arial; background:#0b0e14; color:#e6e6e6; margin:0; padding:24px}
+    .card{max-width:780px; margin:0 auto; background:#0f131b; border:1px solid #1a2130; border-radius:16px; padding:24px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    h1{font-size:22px; margin:0 0 16px}
+    .row{display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap}
+    input[type=text]{flex:1; min-width:260px; background:#0b0f17; border:1px solid #2a3347; color:#d8e1ff; padding:10px 12px; border-radius:12px}
+    input[type=file]{color:#cde; padding:8px}
+    button{background:#4e8cff; color:#fff; border:0; padding:10px 14px; border-radius:12px; cursor:pointer}
+    button:disabled{opacity:.5; cursor:not-allowed}
+    .log{white-space:pre-wrap; background:#0b0f17; padding:12px; border-radius:12px; border:1px solid #2a3347; min-height:160px}
+    .ok{color:#a7ffb0}
+    .err{color:#ffb0b0}
+    .muted{color:#8aa0c6}
+    .pill{display:inline-block; background:#111827; border:1px solid #1f2937; border-radius:999px; padding:3px 10px; font-size:12px; color:#bcd}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h1>Mixtli — Subir y compartir (R2 presign)</h1>
+      <span class="pill" id="origin"></span>
+    </div>
+    <div class="row">
+      <input id="apiBase" type="text" placeholder="API Base" />
+      <input id="presignPath" type="text" value="/presign" />
+      <button id="save">Guardar</button>
+    </div>
+    <div class="row">
+      <input id="file" type="file" />
+      <button id="btnUpload">Subir y generar enlace</button>
+    </div>
+    <div class="row">
+      <div id="result" class="ok"></div>
+    </div>
+    <div class="log" id="log"></div>
+    <p class="muted">Tip: Puedes fijar la API con ?api=URL y ?path=/presign en la URL.</p>
+  </div>
+
+<script>
+const $ = (id)=>document.getElementById(id);
+$("origin").textContent = "origin: " + window.location.origin;
+
+function qp(name, def){try{const u=new URL(location.href);return u.searchParams.get(name)||def}catch{ return def }}
+const DEFAULT_API = qp("api","https://mixtli-pro.onrender.com");
+const DEFAULT_PATH = qp("path","/presign");
+
+$("apiBase").value = DEFAULT_API;
+$("presignPath").value = DEFAULT_PATH;
+
+function log(...a){
+  const el = $("log");
+  el.textContent += a.map(x => typeof x === "string" ? x : JSON.stringify(x,null,2)).join(" ") + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+
+$("save").onclick = ()=> log("Guardado", {api: $("apiBase").value, path: $("presignPath").value});
+
+async function doPresign(file){
+  const api = $("apiBase").value.replace(/\/$/, "");
+  const path = $("presignPath").value.startsWith("/") ? $("presignPath").value : "/" + $("presignPath").value;
+  const url = api + path;
+  log("POST", url);
+  const r = await fetch(url, {
+    method:"POST",
+    mode:"cors",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size })
+  });
+  const txt = await r.text();
+  log("Presign status:", r.status, r.statusText, txt.slice(0,300));
+  if(!r.ok) throw new Error("Presign " + r.status + " " + r.statusText + " " + txt);
+  try{ return JSON.parse(txt) }catch(e){ throw new Error("Respuesta no JSON: "+txt) }
+}
+
+async function uploadWithPresign(file, p){
+  const { url, method="PUT", headers={} } = p;
+  log("PUT", url);
+  const r = await fetch(url, { method, headers, body:file });
+  const t = await r.text();
+  log("PUT status:", r.status, r.statusText, t.slice(0,200));
+  if(!r.ok) throw new Error("PUT "+r.status+" "+r.statusText+" "+t);
+  return true;
+}
+
+$("btnUpload").onclick = async ()=>{
+  $("result").textContent = "";
+  $("log").textContent = "";
+  const file = $("file").files[0];
+  if(!file) return alert("Selecciona un archivo.");
+  try{
+    const p = await doPresign(file);
+    await uploadWithPresign(file, p);
+    const link = p.publicUrl || p.url || "(sin URL pública)";
+    $("result").innerHTML = "✅ Listo: <a href='"+link+"' target='_blank'>"+link+"</a>";
+  }catch(e){
+    $("result").textContent = "❌ " + e.message;
+  }
+};
+</script>
+</body>
+</html>

@@ -1,79 +1,108 @@
 import express from "express";
-import bodyParser from "body-parser";
 import cors from "cors";
-import pino from "pino";
+import crypto from "crypto";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const log = pino();
+// ---------- Config ----------
+const {
+  PORT = 10000,
+  R2_ACCESS_KEY_ID,
+  R2_SECRET_ACCESS_KEY,
+  R2_BUCKET,
+  R2_ACCOUNT_ID,
+  PRESIGN_EXPIRES = 3600, // 1h
+  PUBLIC_BASE_URL,        // ej: https://pub-XXXXXX.r2.dev/MiBucket  (opcional)
+  ALLOWED_ORIGINS = "http://localhost:5173,https://*.netlify.app"
+} = process.env;
+
+// S3-compatible endpoint de R2 (sin region obligatoria)
+const R2_ENDPOINT = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
+
 const app = express();
+app.use(express.json({limit:"10mb"}));
 
-// CORS for the API (NOT for R2)
-const origins = (process.env.CORS_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true);
-    if (origins.length === 0) return cb(null, true);
-    if (origins.includes(origin)) return cb(null, true);
-    return cb(new Error("Origin not allowed: " + origin), false);
-  },
-  credentials: false,
-}));
+// CORS sólido (localhost + Netlify). Acepta comodines *.netlify.app
+const allowed = ALLOWED_ORIGINS.split(",").map(s => s.trim());
+app.use((req, res, next) => {
+  const origin = req.headers.origin || "";
+  const ok = allowed.some(pat => {
+    if (pat.includes("*")) {
+      const re = new RegExp("^" + pat.replace(/[.+?^${}()|[\]\\]/g,"\\$&").replace("\*",".*") + "$");
+      return re.test(origin);
+    }
+    return pat === origin;
+  });
+  if (ok) res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Vary","Origin");
+  res.setHeader("Access-Control-Allow-Methods","GET,POST,PUT,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers","Content-Type, Authorization");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 
-app.use(bodyParser.json({ limit: "50mb" }));
-
-const r2 = new S3Client({
+// S3 client hacia R2
+const s3 = new S3Client({
   region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  endpoint: R2_ENDPOINT,
   credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-  },
-  forcePathStyle: true,
-});
-
-const BUCKET = process.env.R2_BUCKET;
-
-app.get("/api/health", (_, res) => res.json({ status: "ok", driver: "R2" }));
-app.get("/salud", (_, res) => res.json({ status: "ok", driver: "R2" }));
-
-// NO ContentType in signature to avoid mismatches
-app.post("/upload/presign", async (req, res) => {
-  try {
-    const { filename } = req.body || {};
-    if (!filename) return res.status(400).json({ error: "filename requerido" });
-    const safe = String(filename).replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 180);
-    const key = `u/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${safe}`;
-
-    const cmd = new PutObjectCommand({ Bucket: BUCKET, Key: key });
-    const url = await getSignedUrl(r2, cmd, { expiresIn: 60 });
-    res.json({ putUrl: url, uploadId: key, headers: {} });
-  } catch (err) {
-    log.error({ err }, "presign failed");
-    res.status(500).json({ error: "presign failed" });
+    accessKeyId: R2_ACCESS_KEY_ID || "",
+    secretAccessKey: R2_SECRET_ACCESS_KEY || ""
   }
 });
 
-app.post("/upload/complete", async (req, res) => {
-  const { uploadId } = req.body || {};
-  if (!uploadId) return res.status(400).json({ error: "uploadId requerido" });
-  res.json({ ok: true, uploadId });
-});
+function safeKey(name="file.bin"){
+  const ts = Date.now();
+  const rnd = crypto.randomBytes(3).toString("hex");
+  const base = name.replace(/[^a-zA-Z0-9._-]/g,"_");
+  return `${ts}-${rnd}-${base}`;
+}
 
-app.get("/upload/:id/link", async (req, res) => {
-  try {
-    const key = req.params.id;
-    const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
-    const url = await getSignedUrl(r2, cmd, { expiresIn: 600 });
-    res.json({ url });
-  } catch (err) {
-    log.error({ err }, "link failed");
-    res.status(500).json({ error: "link failed" });
+// Health
+app.get("/health", (req,res)=> res.json({ok:true,time:new Date().toISOString()}));
+
+// Presign PUT para subir a R2
+app.post("/presign", async (req, res) => {
+  try{
+    const { filename = "file.bin", contentType = "application/octet-stream" } = req.body || {};
+    const Key = safeKey(filename);
+
+    const putCmd = new PutObjectCommand({
+      Bucket: R2_BUCKET,
+      Key,
+      ContentType: contentType
+    });
+    const url = await getSignedUrl(s3, putCmd, { expiresIn: Number(PRESIGN_EXPIRES) });
+
+    // URL pública recomendada (si configuras PUBLIC_BASE_URL) para mínimo pedos
+    // Ejemplo PUBLIC_BASE_URL: https://pub-XXXX.r2.dev/MiBucket
+    const publicUrl = PUBLIC_BASE_URL ? `${PUBLIC_BASE_URL.replace(/\/$/,"")}/${encodeURIComponent(Key)}` : null;
+
+    res.json({
+      key: Key,
+      url,
+      method: "PUT",
+      headers: { "Content-Type": contentType },
+      publicUrl // si existe, úsala para compartir; evita proxys y reduce broncas
+    });
+  }catch(err){
+    console.error("presign error:", err);
+    res.status(500).json({ error: String(err?.message || err) });
   }
 });
 
-// Basic root
-app.get("/", (_, res) => res.type("text/plain").send("ok"));
+// Proxy de descarga opcional (por si no quieres bucket público)
+app.get("/download/:key", async (req, res) => {
+  try{
+    const Key = req.params.key;
+    const getCmd = new GetObjectCommand({ Bucket: R2_BUCKET, Key });
+    const obj = await s3.send(getCmd);
+    res.setHeader("Content-Type", obj.ContentType || "application/octet-stream");
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    obj.Body.pipe(res);
+  }catch(err){
+    res.status(404).json({ error: "Not found" });
+  }
+});
 
-const port = process.env.PORT || 10000;
-app.listen(port, () => log.info({ port, origins, driver: "R2", msg: "up" }));
+app.listen(PORT, ()=> console.log("Mixtli API on :" + PORT));
