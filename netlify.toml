@@ -2,19 +2,12 @@
   publish = "front"
   command = ""
 
-# Cache headers via Netlify config (no need for _headers file)
 [[headers]]
-  for = "/app.js"
+  for = "/*.js"
   [headers.values]
-    Cache-Control = "public, max-age=600"
+  Cache-Control = "public, max-age=600"
 
 [[headers]]
   for = "/styles.css"
   [headers.values]
-    Cache-Control = "public, max-age=86400"
-
-# SPA-style redirect to index.html (works for plain front too)
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+  Cache-Control = "public, max-age=86400"
