@@ -3,43 +3,150 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mixtli — Subir y Compartir</title>
-  <style>body{font-family:system-ui;margin:24px}</style>
+  <title>Mixtli — Subir y compartir</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin:0; background:#0b0e14; color:#e6eefc; font-family: ui-sans-serif, system-ui, Arial; }
+    .wrap { max-width: 920px; margin: 30px auto; padding: 24px; }
+    .card { background:#0f131b; border:1px solid #1b2333; border-radius:18px; padding:22px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+    h1 { margin:0 0 14px; font-size:24px; }
+    .muted { color:#9bb0d4; font-size:13px }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px }
+    input[type=text]{ flex:1; min-width:260px; background:#0b0f17; border:1px solid #2a3347; color:#d8e1ff; padding:10px 12px; border-radius:12px }
+    button{ background:#4e8cff; color:#fff; border:0; padding:10px 14px; border-radius:12px; cursor:pointer }
+    button:disabled{ opacity:.5; cursor:not-allowed }
+    .drop{ margin:10px 0; padding:24px; border:2px dashed #2a3347; border-radius:16px; text-align:center; color:#bcd }
+    .drop.drag{ border-color:#6fa3ff; color:#dff }
+    .grid{ display:grid; grid-template-columns: 1fr; gap:12px }
+    .ok{ color:#a7ffb0 }
+    .err{ color:#ffb0b0 }
+    .log{ white-space: pre-wrap; background:#0b0f17; padding:12px; border-radius:12px; border:1px solid #2a3347; min-height:140px }
+    .pill{ display:inline-block; background:#111827; border:1px solid #1f2937; border-radius:999px; padding:4px 10px; font-size:12px; color:#bcd }
+    .preview img{ max-width:100%; border-radius:12px; border:1px solid #223047 }
+    .row-right{ margin-left:auto }
+  </style>
 </head>
 <body>
-  <h1>Mixtli — Subir y compartir</h1>
-  <input id="file" type="file" />
-  <button id="btnUpload">Subir y generar enlace</button>
-  <pre id="log"></pre>
+<div class="wrap">
+  <div class="card">
+    <div class="row">
+      <h1 style="margin-right:10px">Mixtli — Subir y compartir</h1>
+      <span class="pill" id="origin"></span>
+      <span class="pill row-right" id="status">listo</span>
+    </div>
+
+    <div class="row">
+      <input id="apiBase" type="text" value="https://mixtli-pro.onrender.com" />
+      <input id="presignPath" type="text" value="/presign" />
+      <button id="save">Guardar</button>
+    </div>
+
+    <div class="drop" id="drop">
+      Arrastra aquí un archivo o usa el selector ↓
+    </div>
+
+    <div class="row">
+      <input id="file" type="file" />
+      <button id="btnUpload">Subir y generar enlace</button>
+    </div>
+
+    <div class="grid">
+      <div class="log" id="log"></div>
+      <div id="result"></div>
+    </div>
+
+    <p class="muted">Tip: puedes fijar la API con <code>?api=URL</code> y <code>?path=/presign</code> en la barra.</p>
+  </div>
+</div>
+
 <script>
+const $ = (id)=>document.getElementById(id);
+$("origin").textContent = "origin: " + window.location.origin;
+
+function qp(name, def){ try{ const u=new URL(location.href); return u.searchParams.get(name)||def }catch{ return def } }
+$("apiBase").value = qp("api", $("apiBase").value);
+$("presignPath").value = qp("path", "/presign");
+
+function setStatus(t){ $("status").textContent = t }
+
+function log(...a){
+  const el = $("log");
+  el.textContent += a.map(x => typeof x === "string" ? x : JSON.stringify(x,null,2)).join(" ") + "\\n";
+  el.scrollTop = el.scrollHeight;
+}
+
+$("save").onclick = ()=> log("Guardado", { api:$("apiBase").value, path:$("presignPath").value });
+
 async function doPresign(file){
-  const url = "https://mixtli-pro.onrender.com/presign";
+  const api = $("apiBase").value.replace(/\\/$/, "");
+  const path = $("presignPath").value.startsWith("/") ? $("presignPath").value : "/" + $("presignPath").value;
+  const url = api + path;
+  log("POST", url);
   const r = await fetch(url, {
-    method:"POST",
+    method:"POST", mode:"cors",
     headers:{"Content-Type":"application/json"},
     body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size })
   });
-  return r.json();
+  const txt = await r.text();
+  log("Presign status:", r.status, r.statusText, txt.slice(0,300));
+  if(!r.ok) throw new Error("Presign " + r.status + " " + r.statusText + " " + txt);
+  try{ return JSON.parse(txt) }catch(e){ throw new Error("Respuesta no JSON: "+txt) }
 }
-async function upload(file, presign){
-  const r = await fetch(presign.url, {method:"PUT", headers:{"Content-Type":file.type}, body:file});
-  return r.status;
+
+async function uploadWithPresign(file, p){
+  const { url, method="PUT", headers={} } = p;
+  log("PUT", url.slice(0,120) + "...");
+  const r = await fetch(url, { method, headers, body:file });
+  const t = await r.text();
+  log("PUT status:", r.status, r.statusText, t.slice(0,200));
+  if(!r.ok) throw new Error("PUT "+r.status+" "+r.statusText+" "+t);
+  return true;
 }
-document.getElementById("btnUpload").onclick = async ()=>{
-  const file = document.getElementById("file").files[0];
-  const log = document.getElementById("log");
-  log.textContent = "Subiendo " + file.name + "...\n";
-  try{
-    const presign = await doPresign(file);
-    log.textContent += JSON.stringify(presign,null,2)+"\n";
-    const status = await upload(file, presign);
-    // Fallback público por si el server aun no arma publicUrl
-    const publicBase = "https://pub-f411a341ba7f44a28234293891897c59.r2.dev";
-    const link = presign.publicUrl || (presign.key ? publicBase + "/" + encodeURIComponent(presign.key) : "(sin url)");
-    log.textContent += "PUT status: "+status+"\n";
-    log.textContent += "Public URL: "+link+"\n";
-  }catch(e){ log.textContent += "Error: "+e.message; }
+
+function showResult(link){
+  const result = $("result");
+  result.innerHTML = `
+    <div style="margin:12px 0">
+      ✅ Listo: <a href="${link}" target="_blank" rel="noopener noreferrer">${link}</a>
+      <button id="copyUrl" style="margin-left:8px">Copiar</button>
+    </div>
+    <div class="preview"><img src="${link}" alt="preview"/></div>
+  `;
+  $("copyUrl").onclick = async ()=>{ await navigator.clipboard.writeText(link); alert("URL copiada"); };
+}
+
+async function handleFile(file){
+  setStatus("presign...");
+  const p = await doPresign(file);
+  setStatus("subiendo...");
+  await uploadWithPresign(file, p);
+  const PUBLIC_BASE = "https://pub-f411a341ba7f44a28234293891897c59.r2.dev";
+  const link = p.publicUrl || (p.key ? `${PUBLIC_BASE}/${encodeURIComponent(p.key)}` : null);
+  if (!link) throw new Error("No se pudo construir el link público.");
+  showResult(link);
+  setStatus("listo ✅");
+}
+
+$("btnUpload").onclick = async ()=>{
+  $("log").textContent = "";
+  $("result").textContent = "";
+  const file = $("file").files[0];
+  if(!file) return alert("Selecciona un archivo.");
+  try{ await handleFile(file) }catch(e){ log("Error:", e.message); setStatus("error ❌") }
 };
+
+// drag & drop
+const drop = $("drop");
+["dragenter","dragover"].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.add("drag") }));
+["dragleave","drop"].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.remove("drag") }));
+drop.addEventListener("drop", async e=>{
+  const f = e.dataTransfer.files?.[0];
+  if (!f) return;
+  $("file").files = e.dataTransfer.files;
+  $("log").textContent = "";
+  $("result").textContent = "";
+  try{ await handleFile(f) }catch(err){ log("Error:", err.message); setStatus("error ❌") }
+});
 </script>
 </body>
 </html>
