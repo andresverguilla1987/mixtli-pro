@@ -1,0 +1,28 @@
+[
+  {
+    "AllowedOrigins": [
+      "https://<tu-sitio-netlify>.netlify.app",
+      "https://mixtli-pro.onrender.com",
+      "http://localhost:3000"
+    ],
+    "AllowedMethods": [
+      "PUT",
+      "GET",
+      "HEAD"
+    ],
+    "AllowedHeaders": [
+      "content-type",
+      "content-length",
+      "authorization",
+      "x-amz-date",
+      "x-amz-content-sha256",
+      "x-amz-security-token",
+      "x-amz-user-agent",
+      "x-amz-acl"
+    ],
+    "ExposeHeaders": [
+      "ETag"
+    ],
+    "MaxAgeSeconds": 86400
+  }
+]

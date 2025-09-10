@@ -1,3 +1,13 @@
 [build]
   publish = "front"
   command = ""
+
+[[headers]]
+  for = "/app.js"
+  [headers.values]
+    cache-control = "public, max-age=600"
+
+[[headers]]
+  for = "/styles.css"
+  [headers.values]
+    cache-control = "public, max-age=86400"

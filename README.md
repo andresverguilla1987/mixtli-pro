@@ -1,18 +1,20 @@
-Mixtli R2 Hotfix (front + backend)
+# Mixtli — Front (Netlify) FIX ZIP
 
-1) Render (backend):
-   - Start: node server.js
-   - Build: :
-   - Env: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, PORT=10000
-   - Salud: GET /salud
+Soluciona:
+1) Publicación desde `/front` (via `netlify.toml`).
+2) Uploader con PUT presignado sin `no-cors` ni `Authorization`.
 
-2) Netlify (front):
-   - publish = "front" (netlify.toml)
-   - build command vacío
-   - En la UI, pon API Base = https://<tu-servicio>.onrender.com
+## Pasos
+1. Edita `assets/config.js` y pon tu API base (https):
+   ```js
+   export const API_BASE = "https://mixtli-pro.onrender.com";
+   ```
+2. Sube a GitHub y conecta a Netlify **o** sube el ZIP.  
+3. Aplica en **Cloudflare R2** una sola CORS Policy (ver `r2_cors.json`).  
+4. Prueba subir un archivo desde el sitio Netlify.
 
-3) Cloudflare R2 (CORS):
-   - Pega r2-cors.json en Settings > CORS Policy de tu bucket (ajusta tu dominio si quieres)
+Endpoints intentados por el front:  
+- `POST {API_BASE}/upload/presign`  
+- `POST {API_BASE}/presign`  
 
-4) Prueba:
-   - Subir archivo → verás share URL (GET presign) en el log.
+Respuestas soportadas: `{url}` o `{uploadUrl}` o `{presignedUrl}`.

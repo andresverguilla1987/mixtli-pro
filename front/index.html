@@ -1,25 +1,59 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mixtli — Logger</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mixtli — Uploader</title>
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-<header><div class="brand">Mixtli</div></header>
-<main>
+  <header>
+    <h1>Mixtli</h1>
+    <div class="pill" id="driverPill">OK (R2)</div>
+  </header>
+
   <section class="card">
-    <h3>Config</h3>
-    <label>API Base <input id="apiBase" placeholder="https://mixtli-pro.onrender.com"></label>
-    <button id="saveCfg">Guardar</button>
+    <h2>Configuración</h2>
+    <div class="row">
+      <label>API Base</label>
+      <input id="apiBase" placeholder="https://tu-backend.com" />
+      <button id="saveBase">Guardar</button>
+      <button id="resetBase" class="ghost">Reset</button>
+    </div>
   </section>
-  <section class="card">
-    <h3>Subir</h3>
-    <input type="file" id="file">
-    <button id="btnUpload">Subir</button>
-    <pre id="log" class="log"></pre>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Cuenta</h2>
+      <div class="row">
+        <label>Email</label>
+        <input id="email" placeholder="tu@correo.com" />
+      </div>
+      <div class="row">
+        <label>Contraseña</label>
+        <input id="password" type="password" placeholder="******" />
+      </div>
+      <div class="row actions">
+        <button id="btnRegister" class="ghost">Registrarme</button>
+        <button id="btnLogin">Entrar</button>
+        <button id="btnLogout" class="danger">Salir</button>
+      </div>
+      <div class="mini" id="authStatus">Sesión no iniciada.</div>
+    </div>
+
+    <div class="card">
+      <h2>Subir archivo</h2>
+      <div class="row">
+        <input type="file" id="file" />
+      </div>
+      <div class="row actions">
+        <button id="btnUpload" class="primary">Subir y generar enlace</button>
+      </div>
+      <pre id="log" class="log"></pre>
+    </div>
   </section>
-</main>
-<script src="app.js"></script>
-</body></html>
+
+  <script type="module" src="../assets/config.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
