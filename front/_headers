@@ -1,8 +1,1 @@
-/**
-  Cache básico para assets
-*/
-:Authority: *
-/app.js:
-  Cache-Control: public, max-age=600
-/styles.css:
-  Cache-Control: public, max-age=86400
+chore: remove legacy _headers (use netlify.toml)
