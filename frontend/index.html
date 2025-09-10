@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mixtli — Subir y Compartir</title>
+  <title>Mixtli — Subir y Compartir (R2 presign)</title>
   <style>
     :root { color-scheme: dark; }
     body{font-family: system-ui,Arial; background:#0b0e14; color:#e6e6e6; margin:0; padding:24px}
@@ -24,11 +24,11 @@
 <body>
   <div class="card">
     <div class="row" style="justify-content:space-between;align-items:center">
-      <h1>Mixtli — Subir y compartir (R2 presign)</h1>
+      <h1>Mixtli — Subir y compartir</h1>
       <span class="pill" id="origin"></span>
     </div>
     <div class="row">
-      <input id="apiBase" type="text" placeholder="API Base" />
+      <input id="apiBase" type="text" placeholder="API Base" value="https://mixtli-pro.onrender.com" />
       <input id="presignPath" type="text" value="/presign" />
       <button id="save">Guardar</button>
     </div>
@@ -48,11 +48,8 @@ const $ = (id)=>document.getElementById(id);
 $("origin").textContent = "origin: " + window.location.origin;
 
 function qp(name, def){try{const u=new URL(location.href);return u.searchParams.get(name)||def}catch{ return def }}
-const DEFAULT_API = qp("api","https://mixtli-pro.onrender.com");
-const DEFAULT_PATH = qp("path","/presign");
-
-$("apiBase").value = DEFAULT_API;
-$("presignPath").value = DEFAULT_PATH;
+$("apiBase").value = qp("api",$("apiBase").value);
+$("presignPath").value = qp("path","/presign");
 
 function log(...a){
   const el = $("log");

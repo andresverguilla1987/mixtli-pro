@@ -4,25 +4,27 @@ import crypto from "crypto";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-// ---------- Config ----------
 const {
   PORT = 10000,
   R2_ACCESS_KEY_ID,
   R2_SECRET_ACCESS_KEY,
   R2_BUCKET,
   R2_ACCOUNT_ID,
-  PRESIGN_EXPIRES = 3600, // 1h
-  PUBLIC_BASE_URL,        // ej: https://pub-XXXXXX.r2.dev/MiBucket  (opcional)
+  PRESIGN_EXPIRES = 3600,
+  PUBLIC_BASE_URL,
   ALLOWED_ORIGINS = "http://localhost:5173,https://*.netlify.app"
 } = process.env;
 
-// S3-compatible endpoint de R2 (sin region obligatoria)
+if (!R2_ACCOUNT_ID || !R2_BUCKET || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
+  console.error("Faltan env vars: R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY");
+}
+
 const R2_ENDPOINT = `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
 
 const app = express();
 app.use(express.json({limit:"10mb"}));
 
-// CORS sólido (localhost + Netlify). Acepta comodines *.netlify.app
+// CORS seguro
 const allowed = ALLOWED_ORIGINS.split(",").map(s => s.trim());
 app.use((req, res, next) => {
   const origin = req.headers.origin || "";
@@ -41,7 +43,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// S3 client hacia R2
 const s3 = new S3Client({
   region: "auto",
   endpoint: R2_ENDPOINT,
@@ -58,10 +59,8 @@ function safeKey(name="file.bin"){
   return `${ts}-${rnd}-${base}`;
 }
 
-// Health
 app.get("/health", (req,res)=> res.json({ok:true,time:new Date().toISOString()}));
 
-// Presign PUT para subir a R2
 app.post("/presign", async (req, res) => {
   try{
     const { filename = "file.bin", contentType = "application/octet-stream" } = req.body || {};
@@ -74,8 +73,6 @@ app.post("/presign", async (req, res) => {
     });
     const url = await getSignedUrl(s3, putCmd, { expiresIn: Number(PRESIGN_EXPIRES) });
 
-    // URL pública recomendada (si configuras PUBLIC_BASE_URL) para mínimo pedos
-    // Ejemplo PUBLIC_BASE_URL: https://pub-XXXX.r2.dev/MiBucket
     const publicUrl = PUBLIC_BASE_URL ? `${PUBLIC_BASE_URL.replace(/\/$/,"")}/${encodeURIComponent(Key)}` : null;
 
     res.json({
@@ -83,7 +80,7 @@ app.post("/presign", async (req, res) => {
       url,
       method: "PUT",
       headers: { "Content-Type": contentType },
-      publicUrl // si existe, úsala para compartir; evita proxys y reduce broncas
+      publicUrl
     });
   }catch(err){
     console.error("presign error:", err);
@@ -91,7 +88,6 @@ app.post("/presign", async (req, res) => {
   }
 });
 
-// Proxy de descarga opcional (por si no quieres bucket público)
 app.get("/download/:key", async (req, res) => {
   try{
     const Key = req.params.key;
