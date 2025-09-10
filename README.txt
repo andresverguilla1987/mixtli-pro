@@ -1,15 +1,22 @@
-Mixtli front fix
-================
+Mixtli — CORS + Presign DIAGNOSTIC
 
-Archivos contenidos:
-- front/app.js        → Lógica del UI (corregida): registro, login local, y flujo de subida
-                         Presign → PUT → Complete con tolerancia a varias rutas.
-- index.html          → Página de ejemplo con los IDs que el JS espera. Úsalo para validar.
-- r2_cors.json        → Plantilla de CORS para Cloudflare R2 (ajusta tu dominio Netlify).
+1) Servir el front (no usar file://):
+   npx serve -p 5173
+   Abrir http://localhost:5173
 
-Uso rápido
-----------
-1) Copia `front/app.js` a tu proyecto (reemplaza el existente) y haz commit en `main`.
-2) (Opcional) Abre `index.html` para verificar que tu HTML tenga los mismos IDs.
-3) En el sitio (Netlify) pon en "API Base": https://mixtli-pro.onrender.com y guarda.
-4) Regístrate (o da Entrar) y sube un archivo. Verás el log y/o la URL resultante.
+2) Probar tu API real:
+   - En el input "API Base", pon tu URL (p.ej. https://mixtli-pro.onrender.com)
+   - En "Ruta presign", pon /presign o /api/uploads/presign (la que exista)
+   - Da clic en "Probar preflight (OPTIONS)".
+     Debe mostrar Access-Control-Allow-Origin y Allow-Methods.
+   - Si el preflight da 0 o vacío, el navegador lo bloqueó por CORS.
+
+3) Validación por curl (preflight simulado):
+   curl -i -X OPTIONS https://mixtli-pro.onrender.com/presign      -H "Origin: http://localhost:5173"      -H "Access-Control-Request-Method: POST"      -H "Access-Control-Request-Headers: content-type"
+
+   Esperado: 204 y cabeceras Access-Control-Allow-*. Si no aparecen, ajusta CORS en el API.
+
+4) Si con curl ves las cabeceras pero el front falla, revisa la consola -> pestaña Network -> OPTIONS y POST.
+
+5) Si usas Cloudflare R2, pon una sola CORS policy en el bucket con PUT/GET/HEAD y AllowedOrigins = tu Netlify + http://localhost:5173
+

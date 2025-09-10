@@ -1,55 +1,117 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Mixtli Fix</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mixtli CORS Diagnostic</title>
+  <style>
+    body { font-family: system-ui, Arial; background:#0b0e14; color:#e6e6e6; padding: 20px; }
+    .row { margin-bottom: 10px; }
+    input, button { padding: 8px 12px; }
+    textarea { width: 100%; height: 220px; background:#0f131b; color:#cbe2ff; }
+    code { background:#11151f; padding:2px 6px; border-radius:6px; }
+  </style>
 </head>
 <body>
-  <h2>Mixtli Front Fix</h2>
-  <input type="file" id="fileInput" />
-  <button onclick="handleUpload()">Subir y generar enlace</button>
+  <h2>Mixtli — Diagnóstico CORS / Presign</h2>
+  <div class="row">Origin del front: <code id="origin"></code></div>
+  <div class="row">
+    API Base: <input id="apiBase" size="48" value="https://mixtli-pro.onrender.com" />
+    Ruta presign: <input id="presignPath" size="24" value="/presign" />
+    <button id="btnSave">Guardar</button>
+  </div>
+  <div class="row">
+    <input type="file" id="fileInput" />
+    <button id="btnPresign">Probar presign</button>
+    <button id="btnUpload">Subir con presign</button>
+    <button id="btnPreflight">Probar preflight (OPTIONS)</button>
+  </div>
+  <div class="row">
+    <textarea id="log" placeholder="Logs..."></textarea>
+  </div>
 
-  <script>
-    const API_BASE = "https://mixtli-pro.onrender.com";
-    const PRESIGN_PATH = "/presign"; // cámbialo si tu server usa /api/uploads/presign
+<script>
+const $ = (id) => document.getElementById(id);
+$("origin").textContent = window.location.origin;
 
-    async function doPresign(file) {
-      const r = await fetch(API_BASE + PRESIGN_PATH, {
-        method: "POST",
-        mode: "cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type,
-          size: file.size
-        })
-      });
-      if (!r.ok) {
-        const txt = await r.text().catch(() => "");
-        throw new Error("Presign " + r.status + " :: " + txt);
+function log(...args){
+  const line = args.map(a => typeof a === 'string' ? a : JSON.stringify(a, null, 2)).join(' ');
+  $("log").value += line + "\n";
+  $("log").scrollTop = $("log").scrollHeight;
+}
+
+function getCfg(){
+  return {
+    apiBase: $("apiBase").value.replace(/\/$/, ''),
+    presignPath: $("presignPath").value.startsWith('/') ? $("presignPath").value : '/' + $("presignPath").value
+  };
+}
+
+$("btnSave").onclick = () => { log("Guardado", getCfg()); };
+
+async function doPresign(file){
+  const { apiBase, presignPath } = getCfg();
+  log("POST", apiBase + presignPath);
+  const r = await fetch(apiBase + presignPath, {
+    method: "POST",
+    mode: "cors",
+    headers: { "Content-Type":"application/json" },
+    body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size })
+  });
+  log("Presign status:", r.status, r.statusText);
+  const text = await r.text();
+  try { return JSON.parse(text); } catch(e){ throw new Error("No JSON: " + text); }
+}
+
+async function doUpload(file, presign){
+  const { url, method = "PUT", headers = {} } = presign;
+  log("PUT", url);
+  const r = await fetch(url, { method, headers, body: file });
+  const t = await r.text();
+  log("PUT status:", r.status, r.statusText, " body:", t.slice(0, 200));
+  if(!r.ok) throw new Error("PUT failed " + r.status + " :: " + t);
+  return true;
+}
+
+$("btnPresign").onclick = async () => {
+  $("log").value = "";
+  try {
+    const f = $("fileInput").files[0] || new File(["hola"], "test.txt", {type:"text/plain"});
+    const p = await doPresign(f);
+    log("Presign OK:", p);
+  } catch (e){ log("Presign ERROR:", e.message); }
+};
+
+$("btnUpload").onclick = async () => {
+  $("log").value = "";
+  try {
+    const f = $("fileInput").files[0] || new File(["hola"], "test.txt", {type:"text/plain"});
+    const p = await doPresign(f);
+    await doUpload(f, p);
+    log("Subida OK");
+  } catch(e){ log("Subida ERROR:", e.message); }
+};
+
+$("btnPreflight").onclick = async () => {
+  $("log").value = "";
+  try {
+    const { apiBase, presignPath } = getCfg();
+    const url = apiBase + presignPath;
+    log("OPTIONS (preflight)", url);
+    const r = await fetch(url, {
+      method: "OPTIONS",
+      mode: "cors",
+      headers: {
+        "Access-Control-Request-Method":"POST",
+        "Access-Control-Request-Headers":"content-type"
       }
-      return r.json();
-    }
-
-    async function uploadWithPresign(file) {
-      const { url, method = "PUT", headers = {} } = await doPresign(file);
-      const put = await fetch(url, { method, headers, body: file });
-      if (!put.ok) {
-        const t = await put.text().catch(() => "");
-        throw new Error("PUT " + put.status + " :: " + t);
-      }
-      alert("Archivo subido: " + url);
-    }
-
-    async function handleUpload() {
-      const f = document.getElementById("fileInput").files[0];
-      if (!f) return alert("Selecciona un archivo primero.");
-      try {
-        await uploadWithPresign(f);
-      } catch (err) {
-        alert("Error en subida: " + err.message);
-      }
-    }
-  </script>
+    });
+    log("Preflight status:", r.status, r.statusText);
+    log("Access-Control-Allow-Origin:", r.headers.get("access-control-allow-origin"));
+    log("Access-Control-Allow-Methods:", r.headers.get("access-control-allow-methods"));
+    log("Access-Control-Allow-Headers:", r.headers.get("access-control-allow-headers"));
+  } catch(e){ log("Preflight ERROR:", e.message); }
+};
+</script>
 </body>
 </html>

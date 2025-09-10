@@ -2,28 +2,38 @@ import express from "express";
 import cors from "cors";
 
 const app = express();
-app.use(express.json());
 
-// Middleware CORS abierto para pruebas (ajusta a tus dominios)
-app.use((req, res, next) => {
-  const origin = req.headers.origin || "*";
-  res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Vary", "Origin");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") return res.sendStatus(204);
-  next();
-});
+// CORS seguro (ajusta dominios permitidos)
+const allowed = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "https://TU-DOMINIO.netlify.app"
+];
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // permitir herramientas tipo curl
+    if (allowed.includes(origin)) return cb(null, true);
+    return cb(null, true); // para pruebas: permitir todo; cámbialo luego
+  },
+  methods: ["GET","POST","PUT","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization"]
+}));
 
+app.use(express.json({limit:"10mb"}));
+
+// Responder al preflight explícitamente
+app.options("*", (req, res) => res.sendStatus(204));
+
+app.get("/health", (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+
+// Endpoint presign de ejemplo (REEMPLAZA con tu R2 real)
 app.post("/presign", (req, res) => {
-  // Simulación de presign (reemplaza con tu lógica de R2/S3)
-  const { filename } = req.body;
-  res.json({
-    url: "https://bucket.r2.cloud/" + filename,
-    method: "PUT",
-    headers: { "Content-Type": "application/octet-stream" }
-  });
+  const { filename, contentType } = req.body || {};
+  if (!filename) return res.status(400).json({ error: "filename requerido" });
+  // Demo: URL ficticia; en tu real arma el signed URL hacia R2/S3
+  const url = "https://r2-demo.invalid/upload/" + encodeURIComponent(filename);
+  return res.json({ url, method: "PUT", headers: { "Content-Type": contentType || "application/octet-stream" } });
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log("API en puerto " + port));
+app.listen(port, () => console.log("Diag API en puerto " + port));
