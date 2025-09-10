@@ -4,63 +4,70 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mixtli — Uploader</title>
-  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body { background:#0b1016; color:#e5eef7; font-family: ui-sans-serif, system-ui, -apple-system; }
+    .wrap { max-width: 980px; margin: 24px auto; padding: 0 12px; }
+    .card { background:#101722; border:1px solid #1d2a3a; border-radius:12px; padding:16px; margin-bottom:16px; }
+    h1 { font-weight:700; font-size:26px; }
+    input, button, textarea { border-radius:10px; border:1px solid #273244; background:#0f1622; color:#e5eef7; padding:10px 12px; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .label { width:130px; color:#8aa1bd; }
+    .btn { background:#133d21; border-color:#1f6a33; padding:10px 14px; cursor:pointer; }
+    .btn.secondary { background:#13213d; border-color:#2d4d86; }
+    .btn.danger { background:#3d1313; border-color:#6a1f1f; }
+    .mt8 { margin-top:8px; } .mt12{margin-top:12px;} .mt16{margin-top:16px;}
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    textarea { width:100%; height:120px; }
+    .status { color:#a9c1ff; }
+  </style>
 </head>
 <body>
-  <header>
+  <div class="wrap">
     <h1>Mixtli</h1>
-    <div class="health" id="healthBadge">Checking...</div>
-  </header>
-
-  <section class="card">
-    <h2>Configuración</h2>
-    <div class="row">
-      <label>API Base</label>
-      <input id="apiBase" placeholder="https://mi-api.onrender.com" />
-      <button id="saveApiBase">Guardar</button>
-      <button id="resetApiBase" class="ghost">Reset</button>
-    </div>
-  </section>
-
-  <section class="grid">
-    <div class="card">
-      <h2>Cuenta</h2>
-      <div class="row">
-        <label>Email</label>
-        <input id="email" type="email" placeholder="tucorreo@dominio.com" />
-      </div>
-      <div class="row">
-        <label>Password</label>
-        <input id="password" type="password" placeholder="******" />
-      </div>
-      <div class="row">
-        <button id="btnRegister" class="ghost">Registrarme</button>
-        <button id="btnLogin">Entrar</button>
-        <button id="btnLogout" class="danger">Salir</button>
-      </div>
-      <small id="authMsg" class="muted"></small>
-    </div>
 
     <div class="card">
-      <h2>Subir archivo</h2>
-      <div class="row">
-        <input id="file" type="file" />
+      <h3>Configuración</h3>
+      <div class="row mt8">
+        <div class="label">API Base</div>
+        <input id="apiBase" placeholder="https://mixtli-pro.onrender.com" style="flex:1" />
+        <button id="btnSave" class="btn">Guardar</button>
+        <button id="btnReset" class="btn secondary">Reset</button>
       </div>
-      <div class="row">
-        <button id="btnUpload" class="primary">Subir y generar enlace</button>
-      </div>
-      <div class="progressWrap">
-        <div id="progress" class="progress" style="width:0%"></div>
-      </div>
-      <pre id="log" class="log"></pre>
-      <div id="result" class="result"></div>
+      <div class="mt8 status" id="status"></div>
     </div>
-  </section>
 
-  <footer>
-    <small>Mixtli · Presign R2/S3 · TTL & Links</small>
-  </footer>
+    <div class="grid">
+      <div class="card">
+        <h3>Cuenta</h3>
+        <div class="row mt8">
+          <div class="label">Email</div>
+          <input id="email" placeholder="tu@correo.com" style="flex:1" />
+        </div>
+        <div class="row mt8">
+          <div class="label">Contraseña</div>
+          <input id="password" type="password" placeholder="******" style="flex:1" />
+        </div>
+        <div class="row mt12">
+          <button id="btnRegister" class="btn">Registrarme</button>
+          <button id="btnLogin" class="btn secondary">Entrar</button>
+          <button id="btnLogout" class="btn danger">Salir</button>
+        </div>
+        <div class="mt8" id="sessionNote">Sesión no iniciada.</div>
+      </div>
 
-  <script src="app.js"></script>
+      <div class="card">
+        <h3>Subir archivo</h3>
+        <div class="row mt8"><input id="file" type="file" style="flex:1" /></div>
+        <div class="row mt12"><button id="btnUpload" class="btn">Subir y generar enlace</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Log</h3>
+      <textarea id="log" spellcheck="false" placeholder="Eventos..."></textarea>
+    </div>
+  </div>
+
+  <script src="./front/app.js"></script>
 </body>
 </html>
