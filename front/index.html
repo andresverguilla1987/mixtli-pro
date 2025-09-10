@@ -1,18 +1,25 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mixtli No-Type PATCH</title><link rel="stylesheet" href="styles.css"></head>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mixtli — Logger</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
 <body>
-  <header><h1>Mixtli — No-Type R2 Patch</h1></header>
-  <main>
-    <section class="card">
-      <label>API Base <input id="apiBase" placeholder="https://mixtli-pro.onrender.com"></label>
-      <button id="saveCfg">Guardar</button>
-    </section>
-    <section class="card">
-      <input type="file" id="file">
-      <button id="btnUpload">Subir</button>
-      <pre id="log" class="log"></pre>
-    </section>
-  </main>
-  <script src="app.js"></script>
+<header><div class="brand">Mixtli</div></header>
+<main>
+  <section class="card">
+    <h3>Config</h3>
+    <label>API Base <input id="apiBase" placeholder="https://mixtli-pro.onrender.com"></label>
+    <button id="saveCfg">Guardar</button>
+  </section>
+  <section class="card">
+    <h3>Subir</h3>
+    <input type="file" id="file">
+    <button id="btnUpload">Subir</button>
+    <pre id="log" class="log"></pre>
+  </section>
+</main>
+<script src="app.js"></script>
 </body></html>

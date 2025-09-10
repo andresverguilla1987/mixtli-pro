@@ -1,12 +1,26 @@
 import express from "express";
 import bodyParser from "body-parser";
+import cors from "cors";
 import pino from "pino";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const log = pino();
 const app = express();
-app.use(bodyParser.json({ limit: "10mb" }));
+
+// CORS for the API (NOT for R2)
+const origins = (process.env.CORS_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (origins.length === 0) return cb(null, true);
+    if (origins.includes(origin)) return cb(null, true);
+    return cb(new Error("Origin not allowed: " + origin), false);
+  },
+  credentials: false,
+}));
+
+app.use(bodyParser.json({ limit: "50mb" }));
 
 const r2 = new S3Client({
   region: "auto",
@@ -21,19 +35,21 @@ const r2 = new S3Client({
 const BUCKET = process.env.R2_BUCKET;
 
 app.get("/api/health", (_, res) => res.json({ status: "ok", driver: "R2" }));
+app.get("/salud", (_, res) => res.json({ status: "ok", driver: "R2" }));
 
-// NO ContentType in signature
+// NO ContentType in signature to avoid mismatches
 app.post("/upload/presign", async (req, res) => {
   try {
     const { filename } = req.body || {};
     if (!filename) return res.status(400).json({ error: "filename requerido" });
     const safe = String(filename).replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 180);
     const key = `u/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${safe}`;
+
     const cmd = new PutObjectCommand({ Bucket: BUCKET, Key: key });
     const url = await getSignedUrl(r2, cmd, { expiresIn: 60 });
     res.json({ putUrl: url, uploadId: key, headers: {} });
-  } catch (e) {
-    log.error({ e }, "presign failed");
+  } catch (err) {
+    log.error({ err }, "presign failed");
     res.status(500).json({ error: "presign failed" });
   }
 });
@@ -50,10 +66,14 @@ app.get("/upload/:id/link", async (req, res) => {
     const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
     const url = await getSignedUrl(r2, cmd, { expiresIn: 600 });
     res.json({ url });
-  } catch (e) {
+  } catch (err) {
+    log.error({ err }, "link failed");
     res.status(500).json({ error: "link failed" });
   }
 });
 
+// Basic root
+app.get("/", (_, res) => res.type("text/plain").send("ok"));
+
 const port = process.env.PORT || 10000;
-app.listen(port, () => log.info({ port, driver: "R2", msg: "up" }));
+app.listen(port, () => log.info({ port, origins, driver: "R2", msg: "up" }));
