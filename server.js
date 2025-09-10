@@ -1,80 +1,29 @@
 import express from "express";
-import bodyParser from "body-parser";
-import pino from "pino";
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import cors from "cors";
 
-const log = pino();
 const app = express();
-app.use(bodyParser.json({ limit: "10mb" }));
+app.use(express.json());
 
-const r2 = new S3Client({
-  region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-  },
-  forcePathStyle: true,
+// Middleware CORS abierto para pruebas (ajusta a tus dominios)
+app.use((req, res, next) => {
+  const origin = req.headers.origin || "*";
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
 });
 
-const BUCKET = process.env.R2_BUCKET;
-
-app.get("/api/health", (_, res) => res.json({ status: "ok", driver: "R2" }));
-app.get("/salud", (_, res) => res.json({ status: "ok", driver: "R2" }));
-
-// === Mantiene el contrato original ===
-// POST /upload/presign  body: { filename, size, mime }
-// → { putUrl, uploadId, headers: { "Content-Type": mime } }
-app.post("/upload/presign", async (req, res) => {
-  try {
-    const { filename, size, mime } = req.body || {};
-    if (!filename || !mime) {
-      return res.status(400).json({ error: "filename y mime requeridos" });
-    }
-    const safeName = String(filename).replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 180);
-    const key = `u/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${safeName}`;
-
-    const cmd = new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: key,
-      ContentType: mime, // FIRMA con el Content-Type que enviará el navegador
-    });
-    const url = await getSignedUrl(r2, cmd, { expiresIn: 60 });
-
-    res.json({
-      putUrl: url,
-      uploadId: key,
-      headers: { "Content-Type": mime }, // el front debe usar esto tal cual
-    });
-  } catch (err) {
-    log.error({ err }, "presign error");
-    res.status(500).json({ error: "presign failed" });
-  }
+app.post("/presign", (req, res) => {
+  // Simulación de presign (reemplaza con tu lógica de R2/S3)
+  const { filename } = req.body;
+  res.json({
+    url: "https://bucket.r2.cloud/" + filename,
+    method: "PUT",
+    headers: { "Content-Type": "application/octet-stream" }
+  });
 });
 
-// POST /upload/complete  body: { uploadId, etag? }
-// → { ok: true, uploadId }
-app.post("/upload/complete", async (req, res) => {
-  const { uploadId } = req.body || {};
-  if (!uploadId) return res.status(400).json({ error: "uploadId requerido" });
-  // Aquí podrías guardar metadatos si quieres.
-  res.json({ ok: true, uploadId });
-});
-
-// GET /upload/:id/link → { url }  (presign GET temporal para compartir/descargar)
-app.get("/upload/:id/link", async (req, res) => {
-  try {
-    const key = req.params.id;
-    if (!key) return res.status(400).json({ error: "id requerido" });
-    const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
-    const url = await getSignedUrl(r2, cmd, { expiresIn: 600 });
-    res.json({ url });
-  } catch (err) {
-    log.error({ err }, "link error");
-    res.status(500).json({ error: "link failed" });
-  }
-});
-
-const port = process.env.PORT || 10000;
-app.listen(port, () => log.info({ port, driver: "R2", msg: "up" }));
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log("API en puerto " + port));
