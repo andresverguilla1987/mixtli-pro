@@ -20,31 +20,38 @@ const r2 = new S3Client({
 
 const BUCKET = process.env.R2_BUCKET;
 
-app.get("/salud", (_, res) => res.json({ status: "ok", driver: "R2" }));
+app.get("/api/health", (_, res) => res.json({ status: "ok", driver: "R2" }));
 
-app.post("/api/upload/presign", async (req, res) => {
+// NO ContentType in signature
+app.post("/upload/presign", async (req, res) => {
   try {
-    const { key, contentType } = req.body || {};
-    if (!key || !contentType) return res.status(400).json({ error: "key y contentType requeridos" });
-    const cmd = new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType });
+    const { filename } = req.body || {};
+    if (!filename) return res.status(400).json({ error: "filename requerido" });
+    const safe = String(filename).replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 180);
+    const key = `u/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${safe}`;
+    const cmd = new PutObjectCommand({ Bucket: BUCKET, Key: key });
     const url = await getSignedUrl(r2, cmd, { expiresIn: 60 });
-    res.json({ url, method: "PUT", headers: { "Content-Type": contentType }, key });
-  } catch (err) {
-    log.error({ err }, "presign upload failed");
-    res.status(500).json({ error: "presign upload failed" });
+    res.json({ putUrl: url, uploadId: key, headers: {} });
+  } catch (e) {
+    log.error({ e }, "presign failed");
+    res.status(500).json({ error: "presign failed" });
   }
 });
 
-app.post("/api/download/presign", async (req, res) => {
+app.post("/upload/complete", async (req, res) => {
+  const { uploadId } = req.body || {};
+  if (!uploadId) return res.status(400).json({ error: "uploadId requerido" });
+  res.json({ ok: true, uploadId });
+});
+
+app.get("/upload/:id/link", async (req, res) => {
   try {
-    const { key, expiresIn = 600 } = req.body || {};
-    if (!key) return res.status(400).json({ error: "key requerido" });
+    const key = req.params.id;
     const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
-    const url = await getSignedUrl(r2, cmd, { expiresIn: Math.min(3600, Math.max(60, +expiresIn || 600)) });
-    res.json({ url, method: "GET", key });
-  } catch (err) {
-    log.error({ err }, "presign download failed");
-    res.status(500).json({ error: "presign download failed" });
+    const url = await getSignedUrl(r2, cmd, { expiresIn: 600 });
+    res.json({ url });
+  } catch (e) {
+    res.status(500).json({ error: "link failed" });
   }
 });
 

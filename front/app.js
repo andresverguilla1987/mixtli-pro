@@ -1,59 +1,35 @@
 const $ = s => document.querySelector(s);
-const apiInput = $("#apiBase");
-const logEl = $("#log");
-const LS_KEY = "mixtli_api_base";
+const LS = "mixtli_api_base";
 
-function log(obj){ logEl.textContent = (typeof obj === "string") ? obj : JSON.stringify(obj,null,2); }
-function apiBase(){ return (apiInput.value || "").trim().replace(/\/$/,""); }
-function loadCfg(){ apiInput.value = localStorage.getItem(LS_KEY) || "https://mixtli-pro.onrender.com"; }
-function saveCfg(){ localStorage.setItem(LS_KEY, apiInput.value.trim()); }
+function apiBase(){ return (localStorage.getItem(LS) || "https://mixtli-pro.onrender.com").replace(/\/$/,""); }
+function setBase(v){ localStorage.setItem(LS, v.trim()); }
 
-$("#saveCfg").onclick = ()=>{ saveCfg(); alert("Guardado"); };
-$("#resetCfg").onclick = ()=>{ localStorage.removeItem(LS_KEY); loadCfg(); };
+document.addEventListener("DOMContentLoaded", () => {
+  const apiInput = document.getElementById("apiBase");
+  apiInput.value = apiBase();
+  document.getElementById("saveCfg").onclick = ()=> setBase(apiInput.value);
 
-async function presignUpload(key, contentType){
-  const r = await fetch(apiBase()+"/api/upload/presign", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ key, contentType })
-  });
-  if(!r.ok) throw new Error(await r.text());
-  return r.json();
-}
-
-async function presignDownload(key, expiresIn=600){
-  const r = await fetch(apiBase()+"/api/download/presign", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ key, expiresIn })
-  });
-  if(!r.ok) throw new Error(await r.text());
-  return r.json();
-}
-
-$("#btnUpload").onclick = async () => {
-  try{
-    const f = $("#file").files[0];
+  document.getElementById("btnUpload").onclick = async () => {
+    const f = document.getElementById("file").files[0];
     if(!f) return alert("Elige un archivo");
-    const contentType = f.type || "application/octet-stream";
-    const key = "u/demo/"+Date.now()+"-"+f.name;
 
-    const up = await presignUpload(key, contentType);
-    const put = await fetch(up.url, {
-      method: up.method || "PUT",
-      headers: up.headers || { "Content-Type": contentType },
-      body: f,
-      mode: "cors",
-    });
-    const txt = await put.text();
-    if(!put.ok) throw new Error("PUT "+put.status+"\n"+txt);
+    try{
+      const pres = await fetch(apiBase()+"/upload/presign", {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ filename: f.name })
+      }).then(r => r.json());
 
-    const dl = await presignDownload(key);
-    log({ ok:true, key, putStatus: put.status, share: dl.url });
-  }catch(e){
-    log({ error: e.message });
-    alert("Error de red en PUT (ver detalle abajo)");
-  }
-};
+      // IMPORTANT: send NO headers. Browser will set its own Content-Type for the Blob,
+      // but it's not part of the signature because we didn't sign ContentType.
+      const put = await fetch(pres.putUrl, { method:"PUT", body:f, mode:"cors" });
+      const txt = await put.text();
+      if(!put.ok) throw new Error("PUT "+put.status+"\n"+txt);
 
-loadCfg();
+      const link = await fetch(apiBase()+"/upload/"+encodeURIComponent(pres.uploadId)+"/link").then(r=>r.json());
+      document.getElementById("log").textContent = JSON.stringify({ ok:true, link:link.url }, null, 2);
+    }catch(e){
+      document.getElementById("log").textContent = e.message;
+      alert("Sigue fallando el PUT. Revisa el log debajo.");
+    }
+  };
+});
