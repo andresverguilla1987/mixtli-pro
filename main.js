@@ -5,40 +5,66 @@ document.addEventListener('DOMContentLoaded', ()=>{
   const apiLabel = document.getElementById('apiLabel'); if(apiLabel) apiLabel.textContent = "API: " + API_BASE;
   document.getElementById('year').textContent = new Date().getFullYear();
   document.getElementById('origin').textContent = window.location.origin;
-  document.getElementById('btnSetApi').onclick = ()=>{
+  document.getElementById('btnSetApi').addEventListener('click', (e)=>{
+    e.preventDefault();
     const v = prompt("API Base:", API_BASE);
     if(v){ localStorage.setItem('mixtli_api', v); location.reload(); }
-  }
+  });
 });
 
-// ===== Helpers de UI =====
+// ===== Helpers =====
 const $ = (id) => document.getElementById(id);
 const statusEl = $("status");
 const listEl = $("list");
 const resultEl = $("result");
 
-function setStatus(t){ statusEl.textContent = t }
+function setStatus(t){ if(statusEl) statusEl.textContent = t; }
+
+async function copyToClipboard(text){
+  try{
+    if(navigator.clipboard && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')){
+      await navigator.clipboard.writeText(text);
+    }else{
+      // Fallback para entornos no seguros
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    alert("URL copiada");
+  }catch(e){
+    console.error("Clipboard error", e);
+    prompt("Copia manual:", text);
+  }
+}
+
 function toastOK(text, url){
   const id = "f" + Math.random().toString(36).slice(2,8);
   const row = document.createElement("div");
   row.className = "file-row";
-  row.innerHTML = \`
-    <span class="name">\${text}</span>
-    <a class="pill" href="\${url}" target="_blank" rel="noopener">Abrir</a>
-    <button class="btn ghost" id="\${id}">Copiar</button>
-  \`;
+  row.innerHTML = `
+    <span class="name">${text}</span>
+    <a class="pill" href="${url}" target="_blank" rel="noopener">Abrir</a>
+    <button class="btn ghost" id="${id}" type="button">Copiar</button>
+  `;
   listEl.prepend(row);
-  document.getElementById(id).onclick = async ()=>{ await navigator.clipboard.writeText(url); alert("URL copiada"); };
+  document.getElementById(id).onclick = ()=> copyToClipboard(url);
 }
+
 function showPreview(url){
-  resultEl.innerHTML = \`
+  resultEl.innerHTML = `
     <div style="margin:8px 0">
-      ✅ Enlace listo: <a href="\${url}" target="_blank" rel="noopener">\${url}</a>
-      <button id="copyNow" class="btn ghost" style="margin-left:8px">Copiar</button>
+      ✅ Enlace listo: <a href="${url}" target="_blank" rel="noopener">${url}</a>
+      <button id="copyNow" class="btn ghost" type="button" style="margin-left:8px">Copiar</button>
     </div>
-    <div class="preview"><img src="\${url}" alt="preview"/></div>
-  \`;
-  $("copyNow").onclick = async ()=>{ await navigator.clipboard.writeText(url); alert("URL copiada"); };
+    <div class="preview"><img src="${url}" alt="preview"/></div>
+  `;
+  document.getElementById("copyNow").onclick = ()=> copyToClipboard(url);
 }
 
 // ===== Upload =====
@@ -51,6 +77,7 @@ async function doPresign(file){
   if(!r.ok){ throw new Error("Presign " + r.status + " " + await r.text()) }
   return r.json();
 }
+
 async function upload(file, presign){
   const r = await fetch(presign.url, { method:"PUT", headers:{"Content-Type":file.type}, body:file });
   if(!r.ok){ throw new Error("PUT " + r.status + " " + r.statusText) }
