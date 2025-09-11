@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Mixtli — Uploader (File-Safe)</title>
+<style>
+  :root{--bg:#0b0f14;--panel:#0f1621;--border:#1e2a3a;--text:#e6eef7;--muted:#8aa0b6;--accent:#2b8a3e}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
+  .wrap{max-width:980px;margin:20px auto;padding:0 16px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px;margin:12px 0}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:9px 12px;cursor:pointer;font-weight:700}
+  .btn.ghost{background:#0b121b;border:1px solid var(--border);color:#e6eef7}
+  input[type="text"]{width:100%;background:#0b121b;color:#e6eef7;border:1px solid var(--border);border-radius:10px;padding:10px}
+  .drop{border:2px dashed #2a3a52;padding:22px;border-radius:14px;text-align:center;color:#9eb1c8}
+  .progress{height:12px;background:#0b121b;border:1px solid var(--border);border-radius:999px;overflow:hidden}
+  .bar{height:100%;width:0%;background:var(--accent);transition:width .15s ease}
+  .logs{white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#0b121b;color:#c9d1d9;border:1px solid var(--border);border-radius:10px;padding:10px;max-height:260px;overflow:auto}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Mixtli — Uploader (File‑Safe)</h1>
+    <p class="muted">Diseñado para abrirse con doble clic (<code>file://</code>). Usa URLs **absolutas** a tu API.</p>
+
+    <div class="card">
+      <div class="row">
+        <button class="btn ghost" id="testHealth">Probar /api/health</button>
+        <button class="btn ghost" id="testPresign">Probar presign</button>
+        <span id="msg" class="muted tiny"></span>
+      </div>
+      <div class="logs" id="logs"></div>
+    </div>
+
+    <div class="card">
+      <h3>Subida</h3>
+      <div id="drop" class="drop">Arrastra aquí o <label class="btn ghost">elige<input id="file" type="file" hidden/></label></div>
+      <div class="row">
+        <button class="btn" id="btnUpload" disabled>Subir</button>
+        <span id="status" class="muted"></span>
+      </div>
+      <div class="progress" style="margin-top:8px;"><div id="bar" class="bar"></div></div>
+      <div class="row" style="color:#9eb1c8;font-size:12px;"><span id="pct">0%</span> · <span id="speed">0 MB/s</span> · <span id="eta">ETA --s</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Resultado</h3>
+      <div class="row">
+        <input id="publicUrl" type="text" placeholder="..." readonly/>
+        <button class="btn ghost" id="open" disabled>Abrir</button>
+        <button class="btn ghost" id="copy" disabled>Copiar</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const API_BASE = "https://mixtli-pro.onrender.com"; // CAMBIA si tu API es otra
+
+const $=s=>document.querySelector(s);
+const logs=$("#logs");
+function log(...a){ try{ logs.textContent += a.map(x=>typeof x==='string'?x:JSON.stringify(x,null,2)).join(" ")+"\\n"; logs.scrollTop=logs.scrollHeight; }catch{} }
+
+async function fetchText(url, opts={}){
+  try{ const r=await fetch(url, opts); const t=await r.text(); return {ok:r.ok,status:r.status,text:t}; }
+  catch(e){ return {ok:false,status:0,text:String(e)}; }
+}
+
+$("#testHealth").onclick=async()=>{
+  const url=API_BASE.replace(/\\/$/,"")+"/api/health";
+  log("GET", url);
+  const r=await fetchText(url);
+  log("health:", r.status, r.text.slice(0,400));
+  $("#msg").textContent = "Health "+r.status+(r.ok?" ✓":" ✗");
+};
+
+$("#testPresign").onclick=async()=>{
+  const url=API_BASE.replace(/\\/$/,"")+"/api/presign?filename=ping.txt&contentType=text/plain";
+  log("GET", url);
+  const r=await fetchText(url);
+  log("presign:", r.status, r.text.slice(0,400));
+  $("#msg").textContent = "Presign "+r.status+(r.ok?" ✓":" ✗");
+};
+
+const drop=$("#drop"), fileEl=$("#file"), btn=$("#btnUpload"), status=$("#status");
+const bar=$("#bar"), pct=$("#pct"), speed=$("#speed"), eta=$("#eta");
+const publicUrl=$("#publicUrl"), openBtn=$("#open"), copyBtn=$("#copy");
+
+let file=null;
+fileEl.onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(f){file=f;btn.disabled=false;status.textContent=`Archivo: ${f.name}`;}};
+["dragenter","dragover"].forEach(evt=>drop.addEventListener(evt, e=>{ e.preventDefault(); drop.style.opacity=".9"; }));
+["dragleave","drop"].forEach(evt=>drop.addEventListener(evt, e=>{ e.preventDefault(); drop.style.opacity="1"; }));
+drop.addEventListener("drop", e=>{ const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f){file=f;btn.disabled=false;status.textContent=`Archivo: ${f.name}`;}});
+
+function setResult(url){
+  publicUrl.value=url||"";
+  openBtn.disabled=!url; copyBtn.disabled=!url;
+}
+openBtn.onclick=()=>{ if(publicUrl.value) window.open(publicUrl.value,"_blank"); };
+copyBtn.onclick=async()=>{ try{ await navigator.clipboard.writeText(publicUrl.value); }catch{} };
+
+function putWithProgress(presign, file){
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();
+    xhr.open(presign.method||"PUT", presign.url, true);
+    const headers=presign.headers||{}; Object.keys(headers).forEach(k=>{ try{xhr.setRequestHeader(k, headers[k]); }catch{} });
+    const start=Date.now();
+    xhr.upload.onprogress=(e)=>{
+      if(e.lengthComputable){
+        const p=Math.round((e.loaded/e.total)*100); bar.style.width=p+"%"; pct.textContent=p+"%";
+        const secs=(Date.now()-start)/1000; const sp=secs>0?(e.loaded/1024/1024)/secs:0; speed.textContent=sp.toFixed(2)+" MB/s";
+        const rem=e.total-e.loaded; const etaS=sp>0?(rem/1024/1024)/sp:0; eta.textContent="ETA "+(etaS>60?Math.round(etaS/60)+"m":Math.round(etaS)+"s");
+      }
+    };
+    xhr.onload=()=>{ const ok=xhr.status>=200&&xhr.status<300; ok?resolve():reject(new Error("PUT "+xhr.status)); };
+    xhr.onerror=()=>reject(new Error("Network/CORS PUT"));
+    xhr.send(file);
+  });
+}
+
+async function getPresign(filename, contentType){
+  const getURL=API_BASE.replace(/\\/$/,"") + `/api/presign?filename=${encodeURIComponent(filename)}&contentType=${encodeURIComponent(contentType)}`;
+  log("GET", getURL);
+  try{ const r=await fetch(getURL); if(r.ok) return await r.json(); log("GET presign status", r.status);}catch(e){ log("GET presign error", String(e)); }
+  const postURL=API_BASE.replace(/\\/$/,"") + "/api/presign";
+  log("POST", postURL);
+  const r2=await fetch(postURL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename,contentType})});
+  if(!r2.ok){ const t=await r2.text(); log("POST presign body", t); throw new Error("presign "+r2.status); }
+  return await r2.json();
+}
+
+$("#btnUpload").onclick=async()=>{
+  if(!file){ alert("Selecciona un archivo"); return; }
+  bar.style.width="0%"; pct.textContent="0%"; speed.textContent="0 MB/s"; eta.textContent="ETA --s";
+  status.textContent="Generando presign...";
+  try{
+    const presign=await getPresign(file.name, file.type||"application/octet-stream");
+    if(!presign||!presign.url) throw new Error("presign inválido");
+    status.textContent="Subiendo...";
+    await putWithProgress(presign, file);
+    status.textContent="Subida completa ✓";
+    setResult(presign.publicUrl || (presign.publicBase&&presign.key? presign.publicBase.replace(/\\/$/,"")+"/"+presign.key: ""));
+  }catch(e){
+    status.textContent="Error: "+e.message;
+    log("upload error", e.message);
+    alert("Falló presign/PUT: "+e.message+"\\nSi ves esto desde file://, tu backend probablemente bloquea CORS para Origin:null. Sirve el HTML con http://localhost o usa el paquete Netlify All‑in‑One.");
+  }
+};
+</script>
+</body>
+</html>
