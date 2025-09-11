@@ -1,2 +1,31 @@
+# Netlify proxy: cualquier request a /api/* se reenvía a tu backend
+# Resultado: el navegador ve la misma origin (tu dominio Netlify)
+# y NO necesitas pelearte con CORS en el front.
+
 [build]
-  publish = "frontend"
+  # sitio estático; si usas puro HTML/JS/CSS no necesitas build
+  publish = "."
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://mixtli-pro.onrender.com/api/:splat"
+  status = 200
+  force = true
+  headers = { X-Forwarded-Host = ":host" }
+
+# Opcional: cache agresivo para assets, no para HTML
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
