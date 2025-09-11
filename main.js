@@ -1,118 +1,69 @@
-// ===== Config =====
-const API_BASE = (localStorage.getItem('mixtli_api') || new URLSearchParams(location.search).get('api') || "https://mixtli-pro.onrender.com").replace(/\/$/,"");
-
-document.addEventListener('DOMContentLoaded', ()=>{
-  const apiLabel = document.getElementById('apiLabel'); if(apiLabel) apiLabel.textContent = "API: " + API_BASE;
-  document.getElementById('year').textContent = new Date().getFullYear();
-  document.getElementById('origin').textContent = window.location.origin;
-  document.getElementById('btnSetApi').addEventListener('click', (e)=>{
-    e.preventDefault();
-    const v = prompt("API Base:", API_BASE);
-    if(v){ localStorage.setItem('mixtli_api', v); location.reload(); }
-  });
-});
-
-// ===== Helpers =====
-const $ = (id) => document.getElementById(id);
+const API_BASE = (localStorage.getItem('mixtli_api') || "https://mixtli-pro.onrender.com").replace(/\/$/,"");
+const $ = (id)=>document.getElementById(id);
 const statusEl = $("status");
-const listEl = $("list");
 const resultEl = $("result");
+const debugEl = $("debug");
 
-function setStatus(t){ if(statusEl) statusEl.textContent = t; }
-
-async function copyToClipboard(text){
-  try{
-    if(navigator.clipboard && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')){
-      await navigator.clipboard.writeText(text);
-    }else{
-      // Fallback para entornos no seguros
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    }
-    alert("URL copiada");
-  }catch(e){
-    console.error("Clipboard error", e);
-    prompt("Copia manual:", text);
-  }
+function logDebug(msg){
+  console.log(msg);
+  debugEl.textContent += msg + "\n";
 }
 
-function toastOK(text, url){
-  const id = "f" + Math.random().toString(36).slice(2,8);
-  const row = document.createElement("div");
-  row.className = "file-row";
-  row.innerHTML = `
-    <span class="name">${text}</span>
-    <a class="pill" href="${url}" target="_blank" rel="noopener">Abrir</a>
-    <button class="btn ghost" id="${id}" type="button">Copiar</button>
-  `;
-  listEl.prepend(row);
-  document.getElementById(id).onclick = ()=> copyToClipboard(url);
-}
+function setStatus(t){ statusEl.textContent = t; }
 
-function showPreview(url){
-  resultEl.innerHTML = `
-    <div style="margin:8px 0">
-      ✅ Enlace listo: <a href="${url}" target="_blank" rel="noopener">${url}</a>
-      <button id="copyNow" class="btn ghost" type="button" style="margin-left:8px">Copiar</button>
-    </div>
-    <div class="preview"><img src="${url}" alt="preview"/></div>
-  `;
-  document.getElementById("copyNow").onclick = ()=> copyToClipboard(url);
-}
-
-// ===== Upload =====
 async function doPresign(file){
+  logDebug("Solicitando presign...");
   const r = await fetch(API_BASE + "/presign", {
     method:"POST",
     headers:{ "Content-Type":"application/json" },
     body: JSON.stringify({ filename:file.name, contentType:file.type, size:file.size })
   });
-  if(!r.ok){ throw new Error("Presign " + r.status + " " + await r.text()) }
-  return r.json();
+  logDebug("Respuesta presign: " + r.status);
+  const txt = await r.text();
+  logDebug("Cuerpo presign: " + txt);
+  if(!r.ok) throw new Error("Presign fallo " + r.status);
+  return JSON.parse(txt);
 }
 
 async function upload(file, presign){
+  logDebug("Subiendo a R2: " + presign.url);
   const r = await fetch(presign.url, { method:"PUT", headers:{"Content-Type":file.type}, body:file });
-  if(!r.ok){ throw new Error("PUT " + r.status + " " + r.statusText) }
+  logDebug("PUT status: " + r.status + " " + r.statusText);
+  if(!r.ok) throw new Error("PUT fallo " + r.status);
   return true;
 }
+
+function showPreview(url){
+  resultEl.innerHTML = `✅ Enlace listo: <a href="${url}" target="_blank">${url}</a>`;
+}
+
+$("btnUpload").onclick = async ()=>{
+  const f = $("file").files[0];
+  if(!f) return alert("Selecciona un archivo");
+  resultEl.textContent = "";
+  debugEl.textContent = "";
+  setStatus("presign...");
+  try{
+    const presign = await doPresign(f);
+    setStatus("subiendo...");
+    await upload(f, presign);
+    const link = presign.publicUrl || "https://pub-f411a341ba7f44a28234293891897c59.r2.dev/" + encodeURIComponent(presign.key);
+    showPreview(link);
+    setStatus("listo ✅");
+  }catch(e){
+    setStatus("error ❌");
+    logDebug("Error: " + e.message);
+    alert(e.message);
+  }
+};
 
 const drop = $("drop");
 drop.addEventListener("click", ()=> $("file").click());
 ["dragenter","dragover"].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.add("drag") }));
 ["dragleave","drop"].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove("drag") }));
 drop.addEventListener("drop", async e=>{
-  const f = e.dataTransfer.files?.[0]; if(!f) return;
+  e.preventDefault();
+  const f = e.dataTransfer.files?.[0];
+  if(!f) return;
   $("file").files = e.dataTransfer.files;
-  await startUpload(f);
 });
-
-$("btnUpload").onclick = async ()=>{
-  const f = $("file").files[0];
-  if(!f) return alert("Selecciona un archivo");
-  await startUpload(f);
-};
-
-async function startUpload(file){
-  resultEl.innerHTML = "";
-  setStatus("presign...");
-  try{
-    const presign = await doPresign(file);
-    setStatus("subiendo...");
-    await upload(file, presign);
-    const link = presign.publicUrl || "https://pub-f411a341ba7f44a28234293891897c59.r2.dev/" + encodeURIComponent(presign.key);
-    showPreview(link);
-    toastOK(file.name, link);
-    setStatus("listo ✅");
-  }catch(e){
-    setStatus("error ❌");
-    alert(e.message);
-  }
-}

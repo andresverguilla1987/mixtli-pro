@@ -3,74 +3,32 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mixtli — Compartir Archivos</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>Mixtli — Debug Upload</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    :root{color-scheme:dark}
-    *{box-sizing:border-box}
-    body{margin:0;background:#0a0f1a;color:#e6edf7;font-family:'Inter',system-ui,Arial}
-    .container{max-width:1024px;margin:0 auto;padding:24px}
-    .nav{display:flex;align-items:center;gap:16px}
-    .brand{display:flex;align-items:center;gap:10px;font-weight:700}
-    .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#60a5fa,#a78bfa)}
-    .spacer{flex:1}
-    .btn{background:#2563eb;border:0;color:#fff;padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600}
-    .btn.secondary{background:#111827;border:1px solid #1f2937}
-    .btn.ghost{background:transparent;border:1px solid #1f2937}
-    .card{background:#0f1624;border:1px solid #1b2333;border-radius:18px;padding:22px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
-    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}
-    .h1{font-size:28px;margin:0 0 10px}
-    .muted{color:#9fb0c9}
-    .input{width:100%;background:#0b1220;border:1px solid #223047;color:#e6edf7;border-radius:12px;padding:12px}
-    .drop{margin:14px 0;padding:32px;border:2px dashed #28344a;border-radius:16px;text-align:center;color:#b9c6dc}
+    body{margin:0;font-family:Inter,system-ui;background:#0a0f1a;color:#e6edf7}
+    .container{max-width:900px;margin:0 auto;padding:20px}
+    .h1{font-size:28px;font-weight:600}
+    .btn{background:#2563eb;color:#fff;border:0;border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:600}
+    .btn.ghost{background:#111827;border:1px solid #1f2937;color:#9fb0c9}
+    .pill{padding:4px 8px;border-radius:6px;font-size:12px;border:1px solid #1f2937;background:#111827;color:#9fb0c9}
+    .drop{margin:12px 0;padding:40px;border:2px dashed #374151;border-radius:10px;text-align:center;color:#9fb0c9}
     .drop.drag{border-color:#60a5fa;color:#d5e3ff}
-    .list{display:grid;gap:12px;margin-top:12px}
-    .file-row{display:flex;gap:10px;align-items:center;background:#0b1220;border:1px solid #223047;border-radius:12px;padding:10px}
-    .file-row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .pill{padding:4px 10px;border-radius:999px;font-size:12px;border:1px solid #1f2937;background:#101826;color:#c9d5eb}
-    .preview img{max-width:100%;border-radius:12px;border:1px solid #223047}
-    a{color:#93c5fd}
-    .footer{margin-top:28px;color:#8aa0bd;font-size:13px;text-align:center}
-    .badge{background:#0b1220;border:1px solid #1f2937;border-radius:10px;padding:6px 10px;margin-left:8px;font-size:12px}
-    .hidden{display:none}
+    #debug{margin-top:16px;white-space:pre-wrap;background:#111827;border:1px solid #1f2937;padding:12px;border-radius:8px;font-size:13px}
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="nav">
-      <div class="brand"><div class="logo"></div> Mixtli</div>
-      <span class="badge" id="apiLabel">API: https://mixtli-pro.onrender.com</span>
-      <div class="spacer"></div>
-      <a class="btn ghost" href="#" id="btnSetApi">Cambiar API</a>
-    </div>
+    <h1 class="h1">Mixtli — Debug Upload</h1>
+    <p>Prueba de subida con logs visibles.</p>
 
-    <div class="grid" style="margin-top:18px">
-      <div class="card">
-        <h1 class="h1">Sube y comparte en segundos</h1>
-        <p class="muted">Arrastra tu archivo o usa el selector. Recibirás un enlace público para compartir.</p>
-        <div class="drop" id="drop">Arrastra aquí un archivo o haz clic para seleccionar</div>
-        <input id="file" type="file" class="input" />
-        <div style="display:flex;gap:10px;margin-top:12px">
-          <button id="btnUpload" class="btn">Subir archivo</button>
-          <span id="status" class="pill">listo</span>
-        </div>
+    <div class="drop" id="drop">Arrastra aquí un archivo o haz clic para seleccionar</div>
+    <input id="file" type="file" style="margin-bottom:12px" />
+    <button id="btnUpload" class="btn">Subir archivo</button>
+    <span id="status" class="pill">listo</span>
 
-        <div id="result" style="margin-top:16px"></div>
-      </div>
-      <div class="card">
-        <div style="display:flex;align-items:center;gap:10px">
-          <strong>Actividad</strong>
-          <span class="pill" id="origin"></span>
-        </div>
-        <div class="list" id="list"></div>
-      </div>
-    </div>
-
-    <div class="footer">
-      © <span id="year"></span> Mixtli — Hecho para compartir sin complicaciones.
-    </div>
+    <div id="result" style="margin-top:16px"></div>
+    <div id="debug"></div>
   </div>
 
   <script src="./main.js"></script>

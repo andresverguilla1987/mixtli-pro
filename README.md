@@ -1,18 +1,12 @@
-# Mixtli — Frontend sin login (No-Auth)
-Versión simplificada y profesional del sitio: **sin modal de autenticación**. Subir → presign → PUT → link público.
+# Mixtli — Debug Build
+Este build muestra logs detallados de cada paso (presign y PUT).
 
-## Cómo usar
-1) **Sírvelo por HTTP** (no `file://`):
-   ```bash
-   npx http-server -p 8080
-   # o
-   python -m http.server 8080
-   ```
-   Abre `http://127.0.0.1:8080/`
-   (o súbelo a Netlify).
-2) **API**
-   - Por defecto apunta a `https://mixtli-pro.onrender.com`.
-   - Puedes cambiarla con el botón “Cambiar API” (guarda en localStorage) o con `?api=https://tu-api.com`.
+## Uso
+1. Sirve con `npx http-server` o Netlify (no uses file://).
+2. Sube un archivo.
+3. En el panel **Debug** verás:
+   - Status de presign (200/403/etc).
+   - Cuerpo de respuesta.
+   - URL de PUT y su status.
 
-## Nota CORS
-Desde `file://` el navegador manda `Origin: null` y tu backend (por seguridad) no lo permite. Por eso **usa http/https** para evitar CORS.
+Así puedes ver exactamente en qué parte falla (presign o PUT).
