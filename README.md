@@ -1,12 +1,38 @@
-# Mixtli — Debug Build
-Este build muestra logs detallados de cada paso (presign y PUT).
+# Mixtli — ZIP Corrector (CORS & Diagnóstico)
 
-## Uso
-1. Sirve con `npx http-server` o Netlify (no uses file://).
-2. Sube un archivo.
-3. En el panel **Debug** verás:
-   - Status de presign (200/403/etc).
-   - Cuerpo de respuesta.
-   - URL de PUT y su status.
+Este paquete te ayuda a **arreglar “no envía”** mostrando exactamente qué está mal y dándote los textos para copiar/pegar en Render y R2.
 
-Así puedes ver exactamente en qué parte falla (presign o PUT).
+## Contenido
+- `diagnostics.html` — Lee `/diagnostics` y te muestra:
+  - `publicBase`, `bucket`, `corsAllowList`
+  - Genera una **sugerencia de ALLOWED_ORIGINS** incluyendo tu origen actual
+  - Botón para **copiar** la lista
+- `r2-cors.json` — Plantilla CORS para el bucket R2 (incluye localhost + Netlify)
+- `upload-check.html` — Prueba de subida punta a punta con **logs** (presign y PUT)
+
+## Cómo usar
+1) Sirve este folder por HTTP (no `file://`):
+   ```bash
+   npx http-server -p 8080
+   # o
+   python -m http.server 8080
+   ```
+   Abre `http://127.0.0.1:8080/diagnostics.html`
+
+2) En `diagnostics.html`:
+   - Pon la URL de tu API (ej. `https://mixtli-pro.onrender.com`) y pulsa **Cargar**.
+   - Si tu origen actual no está en la lista sugerida, el corrector lo añade automáticamente.
+   - Copia la cadena de **ALLOWED_ORIGINS** y pégala en Render → Environment.
+   - Descarga `r2-cors.json` y súbelo en la configuración CORS del bucket R2.
+
+3) Verifica con `upload-check.html`:
+   - Pone status/cuerpo del `/presign`
+   - Muestra el status del PUT a R2
+   - Si todo ok, te da el enlace público
+
+## Tips
+- Después de cambiar variables en Render, usa **Manual Deploy → Clear build cache & deploy**.
+- En R2, si ya tenías CORS, **reemplázalo** con el JSON del paquete.
+- Si sigues viendo errores 415/413, ajusta en el backend:
+  - `ALLOWED_MIME_PREFIXES` (ej. `image/,application/pdf,video/`)
+  - `MAX_UPLOAD_MB` (ej. `100`)

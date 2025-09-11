@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mixtli — Diagnóstico & Corrector</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{color-scheme:dark}
+  body{margin:0;background:#0a0f1a;color:#e6edf7;font-family:Inter,system-ui,Arial}
+  .wrap{max-width:960px;margin:0 auto;padding:20px}
+  .card{background:#0f1624;border:1px solid #1b2333;border-radius:14px;padding:16px;margin:12px 0}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .btn{background:#2563eb;color:#fff;border:0;border-radius:10px;padding:8px 12px;font-weight:600;cursor:pointer}
+  .btn.ghost{background:#111827;border:1px solid #1f2937;color:#b9c6dc}
+  input,textarea{width:100%;background:#0b1220;border:1px solid #223047;color:#e6edf7;border-radius:10px;padding:10px}
+  code,pre{background:#0b1220;border:1px solid #223047;border-radius:10px;padding:10px;color:#dbeafe}
+  .pill{padding:4px 10px;border-radius:999px;border:1px solid #1f2937;background:#101826;color:#c9d5eb}
+  .muted{color:#9fb0c9}
+  .ok{color:#86efac}
+  .err{color:#fca5a5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mixtli — Diagnóstico & Corrector</h1>
+  <div class="card">
+    <div class="row">
+      <input id="api" placeholder="https://mixtli-pro.onrender.com" value="https://mixtli-pro.onrender.com">
+      <button id="load" class="btn">Cargar /diagnostics</button>
+      <span class="pill" id="status">listo</span>
+    </div>
+    <pre id="json">—</pre>
+  </div>
+
+  <div class="card">
+    <h3>Orígenes recomendados (Render → ALLOWED_ORIGINS)</h3>
+    <p class="muted">Incluye tu origen actual y algunos comunes. Si usas Netlify, reemplaza <code>https://TU-SITIO.netlify.app</code>.</p>
+    <pre id="origins">http://127.0.0.1:8080,http://localhost:8080,http://localhost:5173,https://TU-SITIO.netlify.app</pre>
+    <div class="row">
+      <button class="btn ghost" id="copy1">Copiar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Plantilla CORS para Cloudflare R2 (Bucket)</h3>
+    <p class="muted">Carga este JSON en CORS del bucket. Reemplaza el Netlify si aplica.</p>
+    <pre id="r2json">{
+  "AllowedOrigins": [
+    "http://127.0.0.1:8080",
+    "http://localhost:8080",
+    "http://localhost:5173",
+    "https://TU-SITIO.netlify.app"
+  ],
+  "AllowedMethods": ["PUT", "GET", "HEAD"],
+  "AllowedHeaders": ["*"],
+  "ExposeHeaders": ["ETag", "Location", "x-amz-request-id"],
+  "MaxAgeSeconds": 300
+}</pre>
+    <div class="row">
+      <button class="btn ghost" id="copy2">Copiar</button>
+      <a class="btn" href="./r2-cors.json" download>Descargar r2-cors.json</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Chequeos</h3>
+    <ul>
+      <li>✅ <strong>publicBase</strong> debe apuntar a <code>https://pub-....r2.dev</code></li>
+      <li>✅ <strong>bucket</strong> debe ser el nombre real (ej. <code>mixtli</code>)</li>
+      <li>✅ <strong>corsAllowList</strong> debe incluir tu origen actual</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const $ = (id)=>document.getElementById(id);
+$("copy1").onclick = async ()=>{ await navigator.clipboard.writeText($("origins").textContent.trim()); alert("Copiado"); };
+$("copy2").onclick = async ()=>{ await navigator.clipboard.writeText($("r2json").textContent.trim()); alert("Copiado"); };
+$("load").onclick = async ()=>{
+  $("status").textContent = "cargando...";
+  $("json").textContent = "—";
+  try{
+    const base = $("api").value.replace(/\/$/,"");
+    const r = await fetch(base + "/diagnostics");
+    const j = await r.json();
+    $("json").textContent = JSON.stringify(j, null, 2);
+    $("status").textContent = r.ok ? "ok ✅" : "error ❌";
+    // Si falta el origen actual, lo sugerimos
+    try{
+      const u = new URL(window.location.href);
+      const origins = $("origins").textContent.split(",").map(s=>s.trim());
+      if (!origins.includes(u.origin)) {
+        origins.unshift(u.origin);
+        $("origins").textContent = origins.join(",");
+      }
+    }catch{}
+  }catch(e){
+    $("status").textContent = "error ❌";
+    $("json").textContent = String(e);
+  }
+};
+</script>
+</body>
+</html>
