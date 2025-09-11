@@ -1,24 +1,20 @@
-# Netlify proxy para Mixtli
+# Mixtli v1.1 Failsafe
 
-Evita CORS desde el front: cualquier request a `/api/*` se **proxy** a tu backend,
-así el navegador cree que todo viene del mismo dominio de Netlify.
+Build con **eventos cableados a prueba de balas** + **overlay de logs** y **botón de test** para que no te quedes con botones muertos.
 
-## Archivos
-- `netlify.toml` — regla oficial de Netlify (recomendado)
-- `_redirects` — alternativa equivalente (por si prefieres este formato)
+## Qué trae
+- Guardar/Reset de **API Base** (localStorage).
+- Botón **Probar** → hace GET `/api/health` y te muestra el status.
+- **Log**: overlay con errores JS/Promise y trazas de las llamadas (útil para depurar).
+- Subida con presign (GET y fallback POST) + PUT con barra, %/velocidad/ETA y preview.
+- Script cargado con `defer` (por si el DOM no estaba listo).
 
 ## Uso
-1. Copia `netlify.toml` (o `_redirects`) a la **raíz** de tu sitio estático (donde está tu `index.html`).
-2. En tu front deja las llamadas como `/api/...` (sin dominio).
-3. Despliega a Netlify.  
-   - Netlify enviará `/api/*` → `https://mixtli-pro.onrender.com/api/:splat`
+1. Abre la pestaña **Config**.
+2. API Base:
+   - Si usas proxy Netlify → déjalo vacío.
+   - Si no, pon `https://mixtli-pro.onrender.com` (sin `/api`).
+3. Pulsa **Probar** → debe mostrar `Health 200: {"status":"ok",...}`.
+4. Ve a **Subir/Compartir**, elige archivo y sube.
 
-> Si tu API vive en otro dominio, **cambia** esa URL en ambos archivos.
-
-## Verificación
-- Abre DevTools → Network, haz una subida:  
-  - Las llamadas a `/api/presign` deben responder 200 (servidas por Netlify, proxy a tu backend).  
-  - No debe aparecer “Failed to fetch”.
-
-## Tip
-Si trabajas local con `netlify dev`, también respetará estas reglas de proxy y podrás probar sin CORS.
+Si algo falla, abre el **Log** y verás el detalle (CORS, 404, etc.).

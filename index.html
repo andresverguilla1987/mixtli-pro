@@ -3,64 +3,48 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Mixtli — Subir y Compartir</title>
+  <title>Mixtli — v1.1 Failsafe</title>
   <link rel="stylesheet" href="./styles.css"/>
   <meta name="theme-color" content="#0b0f14"/>
 </head>
 <body>
   <div id="toastHost" class="toastHost"></div>
+  <div id="devlog" class="devlog" hidden></div>
   <div class="page">
     <header class="topbar">
       <div class="brand">
-        <svg class="brandmark" viewBox="0 0 64 64" aria-hidden="true">
-          <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#8be9fd"/><stop offset="1" stop-color="#50fa7b"/></linearGradient></defs>
-          <path d="M20 40a12 12 0 1 1 2-23.8 16 16 0 0 1 28.8 5.9A10 10 0 1 1 52 40H20z" fill="url(#g)" opacity=".9"/>
-        </svg>
+        <span class="logo">☁️</span>
         <span class="name">Mixtli</span>
-        <span class="badge">v1.1</span>
+        <span class="badge">v1.1 · failsafe</span>
       </div>
       <nav class="tabs">
-        <button class="tab active" data-view="welcome">Bienvenido</button>
-        <button class="tab" data-view="auth">Entrar / Registrarme</button>
+        <button class="tab active" data-view="config">Config</button>
         <button class="tab" data-view="transfer">Subir / Compartir</button>
       </nav>
     </header>
 
-    <main class="view show" id="welcome">
-      <section class="hero card">
-        <h1>Bienvenido</h1>
-        <p class="muted">Interfaz estable — <b>Design Lock v1</b> con mejoras visuales y de usabilidad.</p>
-        <div class="row">
-          <button class="primary" data-goto="transfer">Ir a Subir / Compartir</button>
+    <!-- CONFIG -->
+    <main class="view show" id="config">
+      <section class="card">
+        <h2>Configuración</h2>
+        <div class="grid2">
+          <label>
+            <span>API Base</span>
+            <input id="apiBase" type="url" placeholder="https://mixtli-pro.onrender.com (o vacío si usas proxy)"/>
+          </label>
+          <div class="row actions">
+            <button class="secondary" data-action="saveApi">Guardar</button>
+            <button class="secondary" data-action="resetApi">Reset</button>
+            <button class="secondary" data-action="testApi">Probar</button>
+            <button class="secondary" data-action="toggleLog">Log</button>
+          </div>
         </div>
+        <p class="muted tiny">Tip: si usas proxy Netlify, deja vacío. Si no, pon tu dominio sin “/api”.</p>
+        <div id="apiStatus" class="muted"></div>
       </section>
     </main>
 
-    <main class="view" id="auth">
-      <section class="auth card">
-        <div class="pill">
-          <button class="pillbtn active" data-auth="login">Entrar</button>
-          <button class="pillbtn" data-auth="register">Registrarme</button>
-        </div>
-        <form class="authform" id="authForm" onsubmit="return false;">
-          <div class="grid2">
-            <label>
-              <span>Correo</span>
-              <input type="email" id="authEmail" placeholder="tucorreo@ejemplo.com" autocomplete="email"/>
-            </label>
-            <label>
-              <span>Contraseña</span>
-              <input type="password" id="authPass" placeholder="••••••••" autocomplete="current-password"/>
-            </label>
-          </div>
-          <div class="row">
-            <button class="primary" id="authSubmit">Continuar</button>
-            <span class="muted">Demostración visual — sin cambios de backend.</span>
-          </div>
-        </form>
-      </section>
-    </main>
-
+    <!-- TRANSFER -->
     <main class="view" id="transfer">
       <section class="card">
         <h2>Subir archivo</h2>
@@ -101,22 +85,14 @@
         <div id="preview" class="preview" hidden>
           <img id="imgPreview" alt="Preview"/>
         </div>
-        <p class="muted tiny">Si no es imagen, igualmente podrás abrir/descargar el archivo desde el enlace público.</p>
-      </section>
-
-      <section class="card">
-        <h2>Últimas subidas (esta sesión)</h2>
-        <div id="recent" class="recent"></div>
       </section>
     </main>
 
     <footer class="footer">
-      <span class="muted tiny">Design Lock v1 · UI estable · 2025</span>
+      <span class="muted tiny">Failsafe build · 2025</span>
     </footer>
   </div>
 
-  <!-- API base fija -->
-  <script>window.API_BASE = "https://mixtli-pro.onrender.com";</script>
-  <script src="./app.js"></script>
+  <script defer src="./app.js"></script>
 </body>
 </html>
