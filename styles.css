@@ -1,22 +1,45 @@
-*{box-sizing:border-box}body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;background:#0b0f14;color:#e6edf3}
-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #1f2a34;background:#0e141b;position:sticky;top:0}
-h1{margin:0;font-size:20px;letter-spacing:.4px}
-h2{margin:0 0 12px 0;font-size:16px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 20px}
-@media(max-width:900px){.grid{grid-template-columns:1fr;padding:12px}}
-.card{background:#0f1720;border:1px solid #1f2a34;border-radius:14px;padding:16px;box-shadow:0 0 0 1px rgba(255,255,255,0.02) inset}
-.row{display:flex;gap:10px;align-items:center;margin:8px 0;flex-wrap:wrap}
-label{min-width:90px;color:#9fb0c0}
-input{flex:1;min-width:220px;background:#0b1219;border:1px solid #233041;border-radius:10px;color:#e6edf3;padding:10px}
-button{border:1px solid #294258;background:#122234;color:#e6edf3;border-radius:10px;padding:10px 14px;cursor:pointer}
-button.primary{background:#1b4d2b;border-color:#26663a}
-button.ghost{background:transparent;border-color:#294258}
-button.danger{background:#3d1b1b;border-color:#6e2b2b}
-button:hover{filter:brightness(1.08)}
-.health{font-size:12px;background:#13222f;border:1px solid #233041;border-radius:999px;padding:6px 10px;color:#9fb0c0}
-.progressWrap{height:8px;background:#0b1219;border:1px solid #233041;border-radius:999px;margin:10px 0;overflow:hidden}
-.progress{height:100%;background:#2b7a3f;width:0%;transition:width .2s}
-.log{background:#0b1219;border:1px dashed #233041;border-radius:10px;color:#9fb0c0;padding:10px;height:120px;overflow:auto}
-.result a{color:#67d4ff}
-footer{padding:18px 20px;color:#7f8c99;text-align:center}
-.muted{color:#7f8c99}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  background: #0b0f14;
+  color: #e6eef7;
+}
+.wrap { max-width: 920px; margin: 24px auto; padding: 0 16px; }
+header h1 { margin: 0 0 8px; font-size: 28px; }
+.sub { color: #93a4b7; }
+.card {
+  background: #0f1621;
+  border: 1px solid #1e2a3a;
+  border-radius: 16px;
+  padding: 16px;
+  margin: 16px 0;
+  box-shadow: 0 10px 30px rgba(0,0,0,.3);
+}
+h2 { margin-top: 0; font-size: 18px; }
+textarea {
+  width: 100%; min-height: 160px; resize: vertical;
+  background: #0b121b; color: #e6eef7; border: 1px solid #1e2a3a; border-radius: 12px; padding: 12px;
+}
+.row { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+button {
+  background: #2b8a3e; border: none; padding: 10px 14px; color: white; border-radius: 10px;
+  cursor: pointer; font-weight: 600;
+}
+button[disabled] { opacity: .6; cursor: not-allowed; }
+.muted { color: #8aa0b6; }
+.tiny { color: #6f8298; font-size: 12px; }
+.drop {
+  border: 2px dashed #2a3a52; padding: 22px; border-radius: 14px; text-align: center; color: #9eb1c8;
+}
+.drop.drag { background: #0b121b; border-color: #3e5676; color: #c6d7ea; }
+.btnLink { color: #7ec2ff; text-decoration: underline; cursor: pointer; }
+.progressWrap {
+  width: 100%; height: 12px; background: #0b121b; border: 1px solid #1e2a3a; border-radius: 999px; margin-top: 10px;
+}
+.progressBar { height: 100%; width: 0%; background: #2b8a3e; border-radius: 999px; transition: width .15s ease; }
+.preview { margin-top: 12px; }
+.preview img { max-width: 100%; border-radius: 12px; border: 1px solid #1e2a3a; }
+input[type="url"] {
+  flex: 1; min-width: 280px; background: #0b121b; color: #e6eef7; border: 1px solid #1e2a3a; border-radius: 10px; padding: 10px;
+}

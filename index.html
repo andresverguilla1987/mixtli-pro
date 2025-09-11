@@ -1,117 +1,71 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mixtli CORS Diagnostic</title>
-  <style>
-    body { font-family: system-ui, Arial; background:#0b0e14; color:#e6e6e6; padding: 20px; }
-    .row { margin-bottom: 10px; }
-    input, button { padding: 8px 12px; }
-    textarea { width: 100%; height: 220px; background:#0f131b; color:#cbe2ff; }
-    code { background:#11151f; padding:2px 6px; border-radius:6px; }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mixtli — Demo Presign PUT + Preview</title>
+  <link rel="stylesheet" href="./styles.css"/>
 </head>
 <body>
-  <h2>Mixtli — Diagnóstico CORS / Presign</h2>
-  <div class="row">Origin del front: <code id="origin"></code></div>
-  <div class="row">
-    API Base: <input id="apiBase" size="48" value="https://mixtli-pro.onrender.com" />
-    Ruta presign: <input id="presignPath" size="24" value="/presign" />
-    <button id="btnSave">Guardar</button>
+  <div class="wrap">
+    <header>
+      <h1>Mixtli — Demo Presign PUT + Preview</h1>
+      <p class="sub">Pega tu JSON de <code>presign</code>, sube un archivo, y mira el <em>publicUrl</em>.</p>
+    </header>
+
+    <section class="card">
+      <h2>1) Pega tu JSON de <code>presign</code></h2>
+      <textarea id="presignJson" placeholder='{
+  "key": "123-abc-foto.jpg",
+  "url": "https://...r2.cloudflarestorage.com/123-abc-foto.jpg?...",
+  "method": "PUT",
+  "headers": { "Content-Type": "image/jpeg" },
+  "publicUrl": "https://pub-xxxxxxx.r2.dev/123-abc-foto.jpg",
+  "expiresIn": 3600
+}'></textarea>
+      <div class="row">
+        <button id="btnParse">Cargar presign</button>
+        <span id="presignStatus" class="muted"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2) Selecciona archivo para subir</h2>
+      <div id="drop" class="drop">
+        Arrastra y suelta aquí o
+        <label class="btnLink">
+          elige un archivo
+          <input id="fileInput" type="file" accept="image/*,video/*,application/pdf,.zip,.rar,.7z,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx" hidden />
+        </label>
+      </div>
+      <div id="fileInfo" class="muted"></div>
+      <div id="progressWrap" class="progressWrap" hidden>
+        <div id="progressBar" class="progressBar"></div>
+      </div>
+      <div class="row">
+        <button id="btnUpload" disabled>Subir con PUT</button>
+        <span id="uploadStatus" class="muted"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3) Preview / Comprobar</h2>
+      <div class="row">
+        <input id="publicUrl" type="url" placeholder="Pega aquí el publicUrl si no vino en el presign…" />
+        <button id="btnOpen" disabled>Abrir</button>
+        <button id="btnCopy" disabled>Copiar URL</button>
+      </div>
+      <div id="preview" class="preview" hidden>
+        <img id="imgPreview" alt="Preview" />
+      </div>
+      <p id="note" class="muted">Si el archivo no es imagen, el botón <b>Abrir</b> te lo mostrará/descargará en una pestaña nueva.</p>
+    </section>
+
+    <footer>
+      <p class="tiny">Hecho para pruebas rápidas. Si te sirve, se integra directo a tu UI.</p>
+    </footer>
   </div>
-  <div class="row">
-    <input type="file" id="fileInput" />
-    <button id="btnPresign">Probar presign</button>
-    <button id="btnUpload">Subir con presign</button>
-    <button id="btnPreflight">Probar preflight (OPTIONS)</button>
-  </div>
-  <div class="row">
-    <textarea id="log" placeholder="Logs..."></textarea>
-  </div>
 
-<script>
-const $ = (id) => document.getElementById(id);
-$("origin").textContent = window.location.origin;
-
-function log(...args){
-  const line = args.map(a => typeof a === 'string' ? a : JSON.stringify(a, null, 2)).join(' ');
-  $("log").value += line + "\n";
-  $("log").scrollTop = $("log").scrollHeight;
-}
-
-function getCfg(){
-  return {
-    apiBase: $("apiBase").value.replace(/\/$/, ''),
-    presignPath: $("presignPath").value.startsWith('/') ? $("presignPath").value : '/' + $("presignPath").value
-  };
-}
-
-$("btnSave").onclick = () => { log("Guardado", getCfg()); };
-
-async function doPresign(file){
-  const { apiBase, presignPath } = getCfg();
-  log("POST", apiBase + presignPath);
-  const r = await fetch(apiBase + presignPath, {
-    method: "POST",
-    mode: "cors",
-    headers: { "Content-Type":"application/json" },
-    body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size })
-  });
-  log("Presign status:", r.status, r.statusText);
-  const text = await r.text();
-  try { return JSON.parse(text); } catch(e){ throw new Error("No JSON: " + text); }
-}
-
-async function doUpload(file, presign){
-  const { url, method = "PUT", headers = {} } = presign;
-  log("PUT", url);
-  const r = await fetch(url, { method, headers, body: file });
-  const t = await r.text();
-  log("PUT status:", r.status, r.statusText, " body:", t.slice(0, 200));
-  if(!r.ok) throw new Error("PUT failed " + r.status + " :: " + t);
-  return true;
-}
-
-$("btnPresign").onclick = async () => {
-  $("log").value = "";
-  try {
-    const f = $("fileInput").files[0] || new File(["hola"], "test.txt", {type:"text/plain"});
-    const p = await doPresign(f);
-    log("Presign OK:", p);
-  } catch (e){ log("Presign ERROR:", e.message); }
-};
-
-$("btnUpload").onclick = async () => {
-  $("log").value = "";
-  try {
-    const f = $("fileInput").files[0] || new File(["hola"], "test.txt", {type:"text/plain"});
-    const p = await doPresign(f);
-    await doUpload(f, p);
-    log("Subida OK");
-  } catch(e){ log("Subida ERROR:", e.message); }
-};
-
-$("btnPreflight").onclick = async () => {
-  $("log").value = "";
-  try {
-    const { apiBase, presignPath } = getCfg();
-    const url = apiBase + presignPath;
-    log("OPTIONS (preflight)", url);
-    const r = await fetch(url, {
-      method: "OPTIONS",
-      mode: "cors",
-      headers: {
-        "Access-Control-Request-Method":"POST",
-        "Access-Control-Request-Headers":"content-type"
-      }
-    });
-    log("Preflight status:", r.status, r.statusText);
-    log("Access-Control-Allow-Origin:", r.headers.get("access-control-allow-origin"));
-    log("Access-Control-Allow-Methods:", r.headers.get("access-control-allow-methods"));
-    log("Access-Control-Allow-Headers:", r.headers.get("access-control-allow-headers"));
-  } catch(e){ log("Preflight ERROR:", e.message); }
-};
-</script>
+  <script src="./app.js"></script>
 </body>
 </html>

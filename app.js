@@ -1,134 +1,156 @@
-// Mixtli Front (Netlify-ready)
-const DEFAULT_API_BASE = "https://mixtli-pro.onrender.com"; // Puedes cambiarlo si cambias de servicio
+(() => {
+  let presign = null;
+  let file = null;
 
-const els = {
-  apiBase: document.getElementById('apiBase'),
-  saveApiBase: document.getElementById('saveApiBase'),
-  resetApiBase: document.getElementById('resetApiBase'),
-  healthBadge: document.getElementById('healthBadge'),
-  email: document.getElementById('email'),
-  password: document.getElementById('password'),
-  btnRegister: document.getElementById('btnRegister'),
-  btnLogin: document.getElementById('btnLogin'),
-  btnLogout: document.getElementById('btnLogout'),
-  file: document.getElementById('file'),
-  btnUpload: document.getElementById('btnUpload'),
-  progress: document.getElementById('progress'),
-  log: document.getElementById('log'),
-  result: document.getElementById('result'),
-  authMsg: document.getElementById('authMsg'),
-};
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
 
-function getApiBase(){ return localStorage.getItem('apiBase') || DEFAULT_API_BASE; }
-function setApiBase(v){ localStorage.setItem('apiBase', v); els.apiBase.value = v; ping(); }
-function token(){ return localStorage.getItem('token') || ''; }
-function setToken(t){ localStorage.setItem('token', t); }
-function log(msg){ els.log.textContent += (msg + "\n"); els.log.scrollTop = els.log.scrollHeight; }
-function setProgress(p){ els.progress.style.width = `${Math.max(0, Math.min(100, p))}%`; }
+  const presignJson = $("#presignJson");
+  const btnParse = $("#btnParse");
+  const presignStatus = $("#presignStatus");
+  const fileInput = $("#fileInput");
+  const drop = $("#drop");
+  const fileInfo = $("#fileInfo");
+  const btnUpload = $("#btnUpload");
+  const uploadStatus = $("#uploadStatus");
+  const progressWrap = $("#progressWrap");
+  const progressBar = $("#progressBar");
+  const publicUrlInput = $("#publicUrl");
+  const btnOpen = $("#btnOpen");
+  const btnCopy = $("#btnCopy");
+  const preview = $("#preview");
+  const imgPreview = $("#imgPreview");
 
-async function ping(){
-  els.healthBadge.textContent = 'Checking...';
-  try{
-    const res = await fetch(getApiBase() + '/api/health', {cache:'no-store'});
-    if(!res.ok) throw new Error(res.statusText);
-    const j = await res.json();
-    els.healthBadge.textContent = `OK (${j.driver || 'driver?'})`;
-  }catch(e){
-    els.healthBadge.textContent = 'API OFF';
-  }
-}
-
-function init(){
-  els.apiBase.value = getApiBase();
-  els.saveApiBase.onclick = ()=> setApiBase(els.apiBase.value.trim());
-  els.resetApiBase.onclick = ()=> setApiBase(DEFAULT_API_BASE);
-
-  els.btnRegister.onclick = async ()=>{
-    try{
-      const email = els.email.value.trim(), password = els.password.value;
-      const r = await fetch(getApiBase() + '/auth/register', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ email, password })
-      });
-      const j = await r.json();
-      if(!r.ok) throw new Error(j.error || 'Registro falló');
-      els.authMsg.textContent = 'Registrado. Ahora inicia sesión.';
-    }catch(e){ els.authMsg.textContent = e.message; }
-  };
-
-  els.btnLogin.onclick = async ()=>{
-    try{
-      const email = els.email.value.trim(), password = els.password.value;
-      const r = await fetch(getApiBase() + '/auth/login', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ email, password })
-      });
-      const j = await r.json();
-      if(!r.ok) throw new Error(j.error || 'Login falló');
-      setToken(j.token);
-      els.authMsg.textContent = 'Sesión iniciada.';
-    }catch(e){ els.authMsg.textContent = e.message; }
-  };
-
-  els.btnLogout.onclick = ()=>{ localStorage.removeItem('token'); els.authMsg.textContent = 'Sesión cerrada.'; };
-
-  els.btnUpload.onclick = async ()=>{
-    const f = els.file.files[0];
-    if(!f){ alert('Elige un archivo'); return; }
-    const t = token(); if(!t){ alert('Primero inicia sesión'); return; }
-    els.result.innerHTML = ''; setProgress(0); els.log.textContent = '';
-
-    try{
-      // 1) Presign
-      const pres = await fetch(getApiBase() + '/upload/presign', {
-        method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer ' + t},
-        body: JSON.stringify({ filename: f.name, size: f.size, mime: f.type || 'application/octet-stream' })
-      });
-      const j = await pres.json();
-      if(!pres.ok) throw new Error(j.error || 'Presign falló');
-      log('Presign OK');
-
-      // 2) PUT a bucket (con progreso)
-      await new Promise((resolve, reject)=>{
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', j.putUrl, true);
-        xhr.setRequestHeader('Content-Type', f.type || 'application/octet-stream');
-        xhr.upload.onprogress = (e)=>{ if(e.lengthComputable){ setProgress(Math.round(e.loaded * 100 / e.total)); } };
-        xhr.onload = ()=>{
-          if(xhr.status >= 200 && xhr.status < 300) resolve(); else reject(new Error('PUT falló: ' + xhr.status));
-        };
-        xhr.onerror = ()=> reject(new Error('Error de red en PUT'));
-        xhr.send(f);
-      });
-      log('PUT OK');
-
-      // 3) Complete
-      const etag = ''; // opcional: algunos providers devuelven ETag
-      const comp = await fetch(getApiBase() + '/upload/complete', {
-        method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer ' + t},
-        body: JSON.stringify({ uploadId: j.uploadId, etag })
-      });
-      const jc = await comp.json();
-      if(!comp.ok) throw new Error(jc.error || 'Complete falló');
-      log('Complete OK');
-
-      // 4) Link
-      const linkRes = await fetch(getApiBase() + '/upload/' + j.uploadId + '/link', {
-        headers:{'Authorization':'Bearer ' + t}
-      });
-      const jl = await linkRes.json();
-      if(!linkRes.ok || !jl.url) throw new Error(jl.error || 'No se pudo generar link');
-      els.result.innerHTML = `<p>Listo: <a href="${jl.url}" target="_blank" rel="noopener">Descargar</a></p>`;
-      log('Listo!');
-    }catch(e){
-      log('ERROR: ' + e.message);
-      alert(e.message);
+  function setPublicUrl(url) {
+    if (!url) return;
+    publicUrlInput.value = url;
+    btnOpen.disabled = false;
+    btnCopy.disabled = false;
+    // pre-visualiza si es imagen
+    if (/(\.png|\.jpg|\.jpeg|\.gif|\.webp|\.avif)$/i.test(url)) {
+      imgPreview.src = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+      preview.hidden = false;
+    } else {
+      preview.hidden = true;
+      imgPreview.removeAttribute('src');
     }
-  };
+  }
 
-  ping();
-}
+  btnParse.addEventListener('click', () => {
+    try {
+      const parsed = JSON.parse(presignJson.value);
+      if (!parsed || !parsed.url || !parsed.method) throw new Error("JSON inválido o faltan campos");
+      presign = parsed;
+      presignStatus.textContent = "Presign cargado ✓";
+      presignStatus.style.color = "#7ee787";
+      if (presign.publicUrl) setPublicUrl(presign.publicUrl);
+      btnUpload.disabled = !file || !presign;
+    } catch (e) {
+      presignStatus.textContent = "Error: " + e.message;
+      presignStatus.style.color = "#ff9797";
+      presign = null;
+      btnUpload.disabled = true;
+    }
+  });
 
-document.addEventListener('DOMContentLoaded', init);
+  function onGotFile(f) {
+    file = f;
+    fileInfo.textContent = file ? `Archivo: ${file.name} (${Math.ceil(file.size/1024)} KB)` : "";
+    btnUpload.disabled = !file || !presign;
+  }
+
+  fileInput.addEventListener('change', (ev) => {
+    if (ev.target.files && ev.target.files[0]) onGotFile(ev.target.files[0]);
+  });
+
+  // Drag & drop
+  ["dragenter","dragover"].forEach(evt => drop.addEventListener(evt, (e) => {
+    e.preventDefault(); e.stopPropagation(); drop.classList.add("drag");
+  }));
+  ["dragleave","drop"].forEach(evt => drop.addEventListener(evt, (e) => {
+    e.preventDefault(); e.stopPropagation(); drop.classList.remove("drag");
+  }));
+  drop.addEventListener("drop", (e) => {
+    const dt = e.dataTransfer;
+    if (dt && dt.files && dt.files[0]) onGotFile(dt.files[0]);
+  });
+
+  btnUpload.addEventListener('click', async () => {
+    if (!presign || !file) return;
+    uploadStatus.textContent = "Subiendo…";
+    uploadStatus.style.color = "";
+    progressWrap.hidden = false;
+    progressBar.style.width = "0%";
+
+    // Usamos XMLHttpRequest para tener progreso
+    const xhr = new XMLHttpRequest();
+    xhr.open(presign.method || "PUT", presign.url, true);
+
+    // Headers del presign
+    const headers = presign.headers || {};
+    Object.keys(headers).forEach((k) => {
+      try { xhr.setRequestHeader(k, headers[k]); } catch (_) {}
+    });
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        progressBar.style.width = pct + "%";
+      }
+    };
+
+    xhr.onload = () => {
+      const ok = xhr.status >= 200 && xhr.status < 300;
+      if (ok) {
+        uploadStatus.textContent = "Subida completa ✓ (" + xhr.status + ")";
+        uploadStatus.style.color = "#7ee787";
+        // Establece la URL pública si viene en el JSON
+        if (presign.publicUrl) setPublicUrl(presign.publicUrl);
+      } else {
+        uploadStatus.textContent = "Fallo (" + xhr.status + "): " + (xhr.responseText || "Sin cuerpo");
+        uploadStatus.style.color = "#ff9797";
+      }
+    };
+    xhr.onerror = () => {
+      uploadStatus.textContent = "Error de red/ CORS.";
+      uploadStatus.style.color = "#ff9797";
+    };
+    xhr.send(file);
+  });
+
+  btnOpen.addEventListener('click', () => {
+    const url = publicUrlInput.value.trim();
+    if (!url) return;
+    window.open(url, "_blank");
+  });
+
+  btnCopy.addEventListener('click', async () => {
+    const url = publicUrlInput.value.trim();
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      btnCopy.textContent = "Copiado ✓";
+      setTimeout(() => (btnCopy.textContent = "Copiar URL"), 1000);
+    } catch {
+      // fallback
+      btnCopy.textContent = "Listo ✓";
+      setTimeout(() => (btnCopy.textContent = "Copiar URL"), 1000);
+    }
+  });
+
+  // Quality of life: si el usuario pegó algo en el textarea y es válido, auto-carga
+  presignJson.addEventListener('blur', () => {
+    if (!presign) {
+      try {
+        const parsed = JSON.parse(presignJson.value);
+        if (parsed && parsed.url && parsed.method) {
+          presign = parsed;
+          presignStatus.textContent = "Presign cargado ✓";
+          presignStatus.style.color = "#7ee787";
+          if (presign.publicUrl) setPublicUrl(presign.publicUrl);
+          btnUpload.disabled = !file || !presign;
+        }
+      } catch {}
+    }
+  });
+})();

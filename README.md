@@ -1,15 +1,29 @@
-# Mixtli — Autofix
-Este ZIP trae todo:
-- Backend Node listo (raíz) con /health, /version, /diagnostics, /presign, /download/:key
-- Frontend (frontend/index.html) con drag&drop + preview
-- Ejemplo de variables de entorno:
+# Mixtli — Demo Presign PUT + Preview
 
-R2_BUCKET=mixtli
-R2_ACCOUNT_ID=8351c372def0e354a3196aff085f0ae
-R2_ACCESS_KEY_ID=...
-R2_SECRET_ACCESS_KEY=...
-PUBLIC_BASE_URL=https://pub-f411a341ba7f44a28234293891897c59.r2.dev
-ALLOWED_ORIGINS=http://localhost:5173,https://meek-alfajores-1c364d.netlify.app
-PRESIGN_EXPIRES=3600
-MAX_UPLOAD_MB=50
-ALLOWED_MIME_PREFIXES=image/,application/pdf
+Pequeña página estática para probar tu **presign PUT** a Cloudflare R2 y visualizar el **publicUrl**.
+
+## ¿Qué incluye?
+- `index.html`: UI minimal (dark) para pegar tu JSON de presign, elegir archivo y subir.
+- `app.js`: Lógica con `XMLHttpRequest` para barra de progreso y manejo de headers de presign.
+- `styles.css`: Estilos sencillos.
+- **Sin backend**: 100% estático, ideal para Netlify.
+
+## Uso
+1. Despliega el contenido del ZIP en Netlify (o abre `index.html` localmente).
+2. Pega en el textarea el JSON de `presign` que te entrega tu API, p. ej.:
+   ```json
+   {
+     "key": "1757549600482-f48917-GP010345.JPG",
+     "url": "https://...r2.cloudflarestorage.com/1757549600482-f48917-GP010345.JPG?...",
+     "method": "PUT",
+     "headers": { "Content-Type": "image/jpeg" },
+     "publicUrl": "https://pub-xxxxxx.r2.dev/1757549600482-f48917-GP010345.JPG",
+     "expiresIn": 3600
+   }
+   ```
+3. Arrastra/elige un archivo y pulsa **Subir con PUT**.
+4. Si el `presign` traía `publicUrl`, se llenará solo. Si no, pégalo manualmente para abrirlo/compartirlo.
+
+## Notas
+- Si falla con CORS, ajusta tu **CORS del bucket R2** para permitir `PUT` desde tu dominio (Origin de Netlify) y headers `Content-Type` + `x-amz-*` que tu presign incluya.
+- Los botones **Abrir/Copiar** funcionan para cualquier tipo de archivo (si es imagen, verás preview).
