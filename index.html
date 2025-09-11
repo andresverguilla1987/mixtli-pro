@@ -8,11 +8,16 @@
   <meta name="theme-color" content="#0b0f14"/>
 </head>
 <body>
+  <div id="toastHost" class="toastHost"></div>
   <div class="page">
     <header class="topbar">
       <div class="brand">
-        <span class="logo">☁️</span>
+        <svg class="brandmark" viewBox="0 0 64 64" aria-hidden="true">
+          <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#8be9fd"/><stop offset="1" stop-color="#50fa7b"/></linearGradient></defs>
+          <path d="M20 40a12 12 0 1 1 2-23.8 16 16 0 0 1 28.8 5.9A10 10 0 1 1 52 40H20z" fill="url(#g)" opacity=".9"/>
+        </svg>
         <span class="name">Mixtli</span>
+        <span class="badge">v1.1</span>
       </div>
       <nav class="tabs">
         <button class="tab active" data-view="welcome">Bienvenido</button>
@@ -24,7 +29,7 @@
     <main class="view show" id="welcome">
       <section class="hero card">
         <h1>Bienvenido</h1>
-        <p class="muted">Interfaz estable — <b>Design Lock v1</b>. Súper simple: sube y comparte.</p>
+        <p class="muted">Interfaz estable — <b>Design Lock v1</b> con mejoras visuales y de usabilidad.</p>
         <div class="row">
           <button class="primary" data-goto="transfer">Ir a Subir / Compartir</button>
         </div>
@@ -59,7 +64,7 @@
     <main class="view" id="transfer">
       <section class="card">
         <h2>Subir archivo</h2>
-        <p class="muted">Selecciona o arrastra un archivo. Se genera presign automático y se sube a R2.</p>
+        <p class="muted">Selecciona o arrastra un archivo. Presign automático → PUT a R2.</p>
 
         <div id="drop" class="drop">
           Arrastra y suelta aquí o
@@ -73,6 +78,11 @@
 
         <div id="progressWrap" class="progressWrap" hidden>
           <div id="progressBar" class="progressBar"></div>
+        </div>
+        <div id="progressMeta" class="progressMeta" hidden>
+          <span id="progressPct">0%</span>
+          <span id="progressSpeed">0 MB/s</span>
+          <span id="progressEta">ETA: --s</span>
         </div>
 
         <div class="row">
@@ -93,6 +103,11 @@
         </div>
         <p class="muted tiny">Si no es imagen, igualmente podrás abrir/descargar el archivo desde el enlace público.</p>
       </section>
+
+      <section class="card">
+        <h2>Últimas subidas (esta sesión)</h2>
+        <div id="recent" class="recent"></div>
+      </section>
     </main>
 
     <footer class="footer">
@@ -100,7 +115,7 @@
     </footer>
   </div>
 
-  <!-- API base fija al dominio del usuario -->
+  <!-- API base fija -->
   <script>window.API_BASE = "https://mixtli-pro.onrender.com";</script>
   <script src="./app.js"></script>
 </body>

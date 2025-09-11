@@ -1,13 +1,12 @@
-# Mixtli — Design Lock v1 (clean, presign automático)
+# Mixtli — Design Lock v1.1 (polish)
 
-Versión **limpia** (sin debug) de la UI estable con flujo de presign automático. API base fija en:
-`https://mixtli-pro.onrender.com`
+Misma estructura **Design Lock v1**, pero con mejoras VISIBLES sin reestructurar:
+- Logo SVG + badge de versión
+- Toasts (copiado, éxito, errores)
+- Progreso con **%**, **velocidad** y **ETA**
+- **Galería de últimas subidas** (en memoria) con Abrir/Copiar
+- Badges de tipo de archivo y tamaño
 
-## Flujo
-1. Usuario elige/arrastra archivo.
-2. Frontend pide presign a `/api/presign` (GET y si falla, POST).
-3. PUT a R2 con barra de progreso.
-4. Muestra `publicUrl` (preview si es imagen).
+API base fija en: `https://mixtli-pro.onrender.com`
 
-## Deploy
-- Subir carpeta/repo a Netlify, GitHub Pages o cualquier host estático.
+Deploy: subir a Netlify/Pages. No requiere build.
