@@ -1,18 +1,23 @@
-# Mixtli Uploader Netlify Ready
+# Mixtli Fix Kit — Frontend + Backend
 
-Repositorio mínimo para GitHub/Netlify.
+Este ZIP arregla el flujo completo con dos piezas:
+- **frontend/** (Netlify): llama a `/api/*` y usa proxy → te olvidas de CORS en el navegador.
+- **backend/** (Render): API de presign con CORS y health.
 
-## Qué incluye
-- `index.html` — Uploader standalone v2 (test health/presign, fallback manual).
-- `netlify.toml` — Proxy `/api/*` a `https://mixtli-pro.onrender.com/api/:splat` (misma origin, sin CORS).
+## Pasos
+1) **Backend**
+   - Sube `backend/` a Render/Railway y configura las ENV de `.env.example`.
+   - Verifica `https://TU-API.onrender.com/api/health` responde 200.
 
-## Deploy
-1. Sube esto a un repo (rama `main`).
-2. Conecta a Netlify → Build command vacío, Publish directory `.` → Deploy.
-3. Abre `https://TU-SITIO.netlify.app`.
-4. En la página:
-   - **Probar /api/health** → debe responder 200.
-   - **Probar presign** → debe responder JSON.
-   - Elige archivo → **Subir**.
+2) **Frontend**
+   - Sube `frontend/` a GitHub y conéctalo a Netlify (publish `frontend`).
+   - El `netlify.toml` ya proxea `/api/*` → `https://mixtli-pro.onrender.com/api/:splat`. Cambia esa URL si tu backend es distinto.
+   - Verifica en tu dominio Netlify: `/api/health` y `/api/presign?filename=ping.txt&contentType=text/plain` responden 200/JSON.
 
-> Si tu API cambia, edita `netlify.toml` y vuelve a desplegar.
+3) **Prueba de subida**
+   - Abre el sitio Netlify, elige un archivo y sube. Debe dar **Subida completa ✓** y un `publicUrl`.
+
+4) **R2 CORS**
+   - Usa `r2_cors.json` como base para la política de tu bucket (ajusta dominios).
+
+Si algo no responde: revisa primero `/api/health` en Netlify (proxy) y en tu backend directo para ubicar si es proxy o servidor.
