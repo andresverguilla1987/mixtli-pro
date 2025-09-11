@@ -1,38 +1,57 @@
-# Mixtli — ZIP Corrector (CORS & Diagnóstico)
+# Mixtli Mini — Proxy Netlify + Render + R2 (V2 con descarga)
+Proyecto listo para:
+- Subir desde Netlify → presign en Render → PUT directo a R2.
+- Responder en `/api/complete` con **downloadUrl (GET presignado)** y, si aplicas, **publicUrl** (r2.dev).
 
-Este paquete te ayuda a **arreglar “no envía”** mostrando exactamente qué está mal y dándote los textos para copiar/pegar en Render y R2.
+## URLs ejemplo (ajusta si usas dominio propio)
+- Netlify: https://meek-alfajores-1c364d.netlify.app
+- Render (API): https://mixtli-pro.onrender.com
 
-## Contenido
-- `diagnostics.html` — Lee `/diagnostics` y te muestra:
-  - `publicBase`, `bucket`, `corsAllowList`
-  - Genera una **sugerencia de ALLOWED_ORIGINS** incluyendo tu origen actual
-  - Botón para **copiar** la lista
-- `r2-cors.json` — Plantilla CORS para el bucket R2 (incluye localhost + Netlify)
-- `upload-check.html` — Prueba de subida punta a punta con **logs** (presign y PUT)
+## Render — Variables
+```
+NODE_ENV=production
+PORT=10000
+# Opcional (por si llamas API directo desde el navegador)
+ALLOWED_ORIGIN=https://meek-alfajores-1c364d.netlify.app
+# R2
+R2_ACCOUNT_ID=xxxxxxxxxxxxxxxxxxxx
+R2_BUCKET=mixtli
+R2_REGION=auto
+R2_ACCESS_KEY_ID=xxxxxxxx
+R2_SECRET_ACCESS_KEY=xxxxxxxx
+# Solo si tienes bucket/objeto público para r2.dev:
+PUBLIC_BASE_URL=https://pub-xxxxxxxxxxxxxxxxxxxxxxxxxxxx.r2.dev
+```
+### Build/Start (Render)
+```
+npm i express cors dotenv @aws-sdk/client-s3 @aws-sdk/s3-request-presigner @aws-sdk/signature-v4-crt
+node server.js
+```
 
-## Cómo usar
-1) Sirve este folder por HTTP (no `file://`):
-   ```bash
-   npx http-server -p 8080
-   # o
-   python -m http.server 8080
-   ```
-   Abre `http://127.0.0.1:8080/diagnostics.html`
+## Netlify — Deploy
+- Sube el contenido del ZIP (trae `static/`, `_redirects`, `_headers`, `server.js` por si quieres reference).
+- Usa el **proxy** incluido en `_redirects`:
+```
+/api/*  https://mixtli-pro.onrender.com/:splat  200
+/*      /index.html   200
+```
+- La UI usa `window.API_BASE=""` → llama a `/api/*` y Netlify reenvía a Render (cero CORS).
 
-2) En `diagnostics.html`:
-   - Pon la URL de tu API (ej. `https://mixtli-pro.onrender.com`) y pulsa **Cargar**.
-   - Si tu origen actual no está en la lista sugerida, el corrector lo añade automáticamente.
-   - Copia la cadena de **ALLOWED_ORIGINS** y pégala en Render → Environment.
-   - Descarga `r2-cors.json` y súbelo en la configuración CORS del bucket R2.
+## R2 — CORS del bucket
+Usa `r2_cors.json` y cambia el origen a tu dominio Netlify:
+```json
+{
+  "CORSRules": [{
+    "AllowedOrigins": ["https://meek-alfajores-1c364d.netlify.app"],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag", "x-amz-request-id", "x-amz-version-id"],
+    "MaxAgeSeconds": 3600
+  }]
+}
+```
 
-3) Verifica con `upload-check.html`:
-   - Pone status/cuerpo del `/presign`
-   - Muestra el status del PUT a R2
-   - Si todo ok, te da el enlace público
+## Prueba rápida
+1) Abrir Netlify → subir archivo.
+2) Debe mostrar **downloadUrl** (GET presign) y, si configuraste PUBLIC_BASE_URL y tu bucket es público, **publicUrl** (r2.dev).
 
-## Tips
-- Después de cambiar variables en Render, usa **Manual Deploy → Clear build cache & deploy**.
-- En R2, si ya tenías CORS, **reemplázalo** con el JSON del paquete.
-- Si sigues viendo errores 415/413, ajusta en el backend:
-  - `ALLOWED_MIME_PREFIXES` (ej. `image/,application/pdf,video/`)
-  - `MAX_UPLOAD_MB` (ej. `100`)

@@ -1,106 +1,99 @@
-import express from "express";
-import crypto from "crypto";
-import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+// Mixtli Mini V2 — server.js (Express + R2 presign PUT/GET)
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import crypto from 'crypto';
 
-const {
-  PORT = process.env.PORT || 10000,
-  R2_ACCESS_KEY_ID,
-  R2_SECRET_ACCESS_KEY,
-  R2_BUCKET,
-  R2_ACCOUNT_ID,
-  PRESIGN_EXPIRES = 3600,
-  ALLOWED_ORIGINS = "http://localhost:5173,https://*.netlify.app",
-  MAX_UPLOAD_MB = 50,
-  ALLOWED_MIME_PREFIXES = "image/,application/pdf"
-} = process.env;
-
-const PUBLIC_BASE = (process.env.PUBLIC_BASE_URL || "").trim().replace(/\/$/, "");
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3RequestPresigner } from '@aws-sdk/s3-request-presigner';
+import { Hash } from '@aws-sdk/hash-node';
+import { formatUrl } from '@aws-sdk/util-format-url';
 
 const app = express();
-app.use(express.json({limit:"2mb"}));
+app.use(express.json({ limit: '5mb' }));
 
-const allowList = ALLOWED_ORIGINS.split(",").map(s => s.trim()).filter(Boolean);
-app.use((req,res,next)=>{
-  const origin = req.headers.origin || "";
-  const ok = allowList.some(pat => pat.includes("*")
-    ? new RegExp("^" + pat.replace(/[.+?^${}()|[\]\\]/g,"\\$&").replace("\*",".*") + "$").test(origin)
-    : pat === origin
-  );
-  if (ok) res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Vary","Origin");
-  res.setHeader("Access-Control-Allow-Methods","GET,POST,PUT,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers","Content-Type, Authorization");
-  if (req.method === "OPTIONS") return res.sendStatus(204);
-  next();
-});
+// CORS (solo aplica si llamas directo a Render desde el navegador)
+const allowed = (process.env.ALLOWED_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: function (origin, cb) {
+    if (!origin) return cb(null, true); // curl / Postman
+    if (allowed.length === 0 || allowed.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS: ' + origin));
+  },
+  credentials: false,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-// R2 client
-const s3 = new S3Client({
-  region: "auto",
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: { accessKeyId: R2_ACCESS_KEY_ID || "", secretAccessKey: R2_SECRET_ACCESS_KEY || "" }
-});
+// AWS S3 compatible (Cloudflare R2)
+const accountId = process.env.R2_ACCOUNT_ID;
+const bucket = process.env.R2_BUCKET;
+const region = process.env.R2_REGION || 'auto';
+const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+const pubBase = process.env.PUBLIC_BASE_URL; // opcional (r2.dev)
 
-function makeKey(name="file.bin"){
-  const ts = Date.now();
-  const rnd = crypto.randomBytes(3).toString("hex");
-  const base = (name||"file.bin").replace(/[^a-zA-Z0-9._-]/g,"_");
-  return `${ts}-${rnd}-${base}`;
+if (!accountId || !bucket || !accessKeyId || !secretAccessKey) {
+  console.warn('⚠️  Falta configuración R2 en variables de entorno.');
 }
 
-app.get("/health", (req,res)=> res.json({ok:true, time:new Date().toISOString()}));
-app.get("/version", (req,res)=> res.json({name:"mixtli", version:"autofix-1", node:process.version}));
-app.get("/diagnostics", (req,res)=>{
-  res.json({
-    publicBase: PUBLIC_BASE || null,
-    corsAllowList: allowList,
-    bucket: R2_BUCKET || null,
-    account: R2_ACCOUNT_ID ? R2_ACCOUNT_ID.slice(0,6)+"..." : null,
-    maxUploadMB: Number(MAX_UPLOAD_MB),
-    allowedMimePrefixes: ALLOWED_MIME_PREFIXES.split(",").map(s=>s.trim())
-  });
+const s3 = new S3Client({
+  region,
+  endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+  credentials: { accessKeyId, secretAccessKey },
 });
 
-app.post("/presign", async (req,res)=>{
-  try{
-    const { filename="file.bin", contentType="application/octet-stream", size=0 } = req.body || {};
-    const maxBytes = Number(MAX_UPLOAD_MB) * 1024 * 1024;
-    const allowedPrefixes = ALLOWED_MIME_PREFIXES.split(",").map(s=>s.trim()).filter(Boolean);
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, time: new Date().toISOString(), publicBaseUrl: pubBase || null });
+});
 
-    if (size && maxBytes && Number(size) > maxBytes){
-      return res.status(413).json({ error: `Archivo demasiado grande. Máximo ${MAX_UPLOAD_MB} MB` });
-    }
-    if (allowedPrefixes.length && !allowedPrefixes.some(p => contentType.startsWith(p))){
-      return res.status(415).json({ error: `Tipo no permitido (${contentType}). Permitidos: ${allowedPrefixes.join(", ")}` });
-    }
+// Presign PUT
+app.post('/api/presign', async (req, res) => {
+  try {
+    const { filename, contentType } = req.body || {};
+    if (!filename) return res.status(400).json({ error: 'filename requerido' });
+    const key = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}-${filename}`;
 
-    const Key = makeKey(filename);
-    const putCmd = new PutObjectCommand({ Bucket: R2_BUCKET, Key, ContentType: contentType });
-    const url = await getSignedUrl(s3, putCmd, { expiresIn: Number(PRESIGN_EXPIRES) });
-    const publicUrl = PUBLIC_BASE ? `${PUBLIC_BASE}/${encodeURIComponent(Key)}` : null;
+    const put = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ContentType: contentType || 'application/octet-stream',
+    });
 
-    res.json({ key: Key, url, method:"PUT", headers:{"Content-Type":contentType}, publicUrl, expiresIn:Number(PRESIGN_EXPIRES) });
-  }catch(err){
-    console.error("presign error:", err);
-    res.status(500).json({ error: String(err?.message || err) });
+    const presigner = new S3RequestPresigner({ ...s3.config, sha256: Hash.bind(null, 'sha256') });
+    const signed = await presigner.presign(put, { expiresIn: 60 * 10 }); // 10 min
+
+    const url = formatUrl(signed);
+    res.json({ url, key, expiresIn: 600 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'presign_failed', message: String(err) });
   }
 });
 
-app.get("/download/:key", async (req,res)=>{
-  try{
-    const Key = req.params.key;
-    const head = await s3.send(new HeadObjectCommand({Bucket:R2_BUCKET, Key}));
-    res.setHeader("Content-Type", head.ContentType || "application/octet-stream");
-    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-    const obj = await s3.send(new GetObjectCommand({ Bucket:R2_BUCKET, Key }));
-    obj.Body.pipe(res);
-  }catch(err){
-    res.status(404).json({ error:"Not found" });
+// Complete → devuelve GET presign y, si procede, r2.dev
+app.post('/api/complete', async (req, res) => {
+  try {
+    const { key } = req.body || {};
+    if (!key) return res.status(400).json({ error: 'key requerido' });
+
+    // presign GET por 10 min
+    const presigner = new S3RequestPresigner({ ...s3.config, sha256: Hash.bind(null, 'sha256') });
+    const get = new GetObjectCommand({ Bucket: bucket, Key: key });
+    const signedGet = await presigner.presign(get, { expiresIn: 60 * 10 });
+    const downloadUrl = formatUrl(signedGet);
+
+    const publicUrl = pubBase ? `${pubBase.replace(/\/$/, '')}/${encodeURIComponent(key)}` : null;
+
+    res.json({ status: 'ok', key, downloadUrl, publicUrl });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'complete_failed', message: String(e) });
   }
 });
 
-app.listen(PORT, ()=>{
-  console.log("PUBLIC_BASE_URL ->", PUBLIC_BASE || "(NOT SET)");
-  console.log("Mixtli API on :" + PORT);
+const port = process.env.PORT || 10000;
+app.listen(port, () => {
+  console.log(`PUBLIC_BASE_URL -> ${pubBase || '(no set)'}`);
+  console.log(`Mixtli API on :${port}`);
 });

@@ -1,35 +1,23 @@
-[
-  {
-    "AllowedOrigins": [
-      "*"
-    ],
-    "AllowedMethods": [
-      "GET",
-      "HEAD"
-    ],
-    "AllowedHeaders": [
-      "*"
-    ],
-    "MaxAgeSeconds": 3000
-  },
-  {
-    "AllowedOrigins": [
-      "https://tu-sitio.netlify.app",
-      "http://localhost:5173"
-    ],
-    "AllowedMethods": [
-      "PUT",
-      "GET",
-      "HEAD",
-      "OPTIONS"
-    ],
-    "AllowedHeaders": [
-      "*"
-    ],
-    "ExposeHeaders": [
-      "ETag",
-      "x-amz-request-id"
-    ],
-    "MaxAgeSeconds": 3000
-  }
-]
+{
+  "CORSRules": [
+    {
+      "AllowedOrigins": [
+        "https://meek-alfajores-1c364d.netlify.app"
+      ],
+      "AllowedMethods": [
+        "GET",
+        "PUT",
+        "HEAD"
+      ],
+      "AllowedHeaders": [
+        "*"
+      ],
+      "ExposeHeaders": [
+        "ETag",
+        "x-amz-request-id",
+        "x-amz-version-id"
+      ],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+}
