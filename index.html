@@ -31,7 +31,6 @@
     .file-row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .pill{padding:4px 10px;border-radius:999px;font-size:12px;border:1px solid #1f2937;background:#101826;color:#c9d5eb}
     .preview img{max-width:100%;border-radius:12px;border:1px solid #223047}
-    .avatar{width:32px;height:32px;border-radius:999px;background:#1f2937;display:flex;align-items:center;justify-content:center;font-weight:700}
     a{color:#93c5fd}
     .footer{margin-top:28px;color:#8aa0bd;font-size:13px;text-align:center}
     .badge{background:#0b1220;border:1px solid #1f2937;border-radius:10px;padding:6px 10px;margin-left:8px;font-size:12px}
@@ -44,15 +43,7 @@
       <div class="brand"><div class="logo"></div> Mixtli</div>
       <span class="badge" id="apiLabel">API: https://mixtli-pro.onrender.com</span>
       <div class="spacer"></div>
-      <div id="userBox" class="hidden">
-        <span id="userName" class="pill">—</span>
-        <span id="userAvatar" class="avatar">?</span>
-        <button id="btnLogout" class="btn ghost">Salir</button>
-      </div>
-      <div id="authBox">
-        <button id="btnLogin" class="btn secondary">Entrar</button>
-        <button id="btnSignup" class="btn">Crear cuenta</button>
-      </div>
+      <a class="btn ghost" href="#" id="btnSetApi">Cambiar API</a>
     </div>
 
     <div class="grid" style="margin-top:18px">
@@ -82,24 +73,6 @@
     </div>
   </div>
 
-  <!-- Modal Auth -->
-  <div id="modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center">
-    <div class="card" style="width:420px;max-width:90vw">
-      <h3 id="modalTitle" style="margin:0 0 8px">Entrar</h3>
-      <p class="muted" id="modalDesc">Usa tu correo y contraseña.</p>
-      <input id="email" class="input" placeholder="correo@dominio.com" />
-      <input id="password" class="input" placeholder="••••••••" type="password" style="margin-top:8px" />
-      <div style="display:flex;gap:10px;margin-top:12px">
-        <button id="modalOk" class="btn">Continuar</button>
-        <button id="modalCancel" class="btn ghost">Cancelar</button>
-      </div>
-      <p class="muted" style="margin-top:10px;font-size:12px">¿Olvidaste tu contraseña? Usa “restablecer” desde Firebase Auth.</p>
-    </div>
-  </div>
-
-  <!-- Firebase (compat para simplicidad) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="./main.js"></script>
 </body>
 </html>

@@ -1,20 +1,18 @@
-# Mixtli — Frontend FIX (con fallback de Firebase)
-Este build arregla el problema de botones “muertos” cuando abres el HTML sin configurar Firebase.
-
-## Qué cambia
-- `main.js` inicializa Firebase y si no hay llaves válidas, activa un **fallback** que muestra un alert claro en los modales.
-- Ya no se queda congelado: te guía para configurar.
+# Mixtli — Frontend sin login (No-Auth)
+Versión simplificada y profesional del sitio: **sin modal de autenticación**. Subir → presign → PUT → link público.
 
 ## Cómo usar
-1) **Configura Firebase** (recomendado)
-   - Crea proyecto → Authentication → habilita Email/Password.
-   - Copia `apiKey`, `authDomain`, `projectId`, `appId` y ponlos en `main.js`.
-   - (Opcional) agrega tu dominio a Authorized Domains en Firebase.
-2) **Sirve el sitio por HTTP**
-   - Local: `npx http-server -p 8080` y abre `http://127.0.0.1:8080/`
-   - Netlify: sube estos 3 archivos tal cual.
-3) **API**
-   - Por defecto usa `https://mixtli-pro.onrender.com`.
-   - Puedes pasar otra con `?api=https://tu-api.com`
+1) **Sírvelo por HTTP** (no `file://`):
+   ```bash
+   npx http-server -p 8080
+   # o
+   python -m http.server 8080
+   ```
+   Abre `http://127.0.0.1:8080/`
+   (o súbelo a Netlify).
+2) **API**
+   - Por defecto apunta a `https://mixtli-pro.onrender.com`.
+   - Puedes cambiarla con el botón “Cambiar API” (guarda en localStorage) o con `?api=https://tu-api.com`.
 
-Si todavía no pones llaves, podrás abrir el modal y verás un mensaje explicando qué falta en vez de que no pase nada.
+## Nota CORS
+Desde `file://` el navegador manda `Origin: null` y tu backend (por seguridad) no lo permite. Por eso **usa http/https** para evitar CORS.
