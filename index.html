@@ -21,7 +21,6 @@
       </nav>
     </header>
 
-    <!-- WELCOME -->
     <main class="view show" id="welcome">
       <section class="hero card">
         <h1>Bienvenido</h1>
@@ -32,7 +31,6 @@
       </section>
     </main>
 
-    <!-- AUTH (placeholder visual, no backend change) -->
     <main class="view" id="auth">
       <section class="auth card">
         <div class="pill">
@@ -58,11 +56,10 @@
       </section>
     </main>
 
-    <!-- TRANSFER -->
     <main class="view" id="transfer">
       <section class="card">
         <h2>Subir archivo</h2>
-        <p class="muted">Selecciona o arrastra un archivo. Se generará un presign automático y se subirá directo a R2.</p>
+        <p class="muted">Selecciona o arrastra un archivo. Se genera presign automático y se sube a R2.</p>
 
         <div id="drop" class="drop">
           Arrastra y suelta aquí o
@@ -103,10 +100,8 @@
     </footer>
   </div>
 
-  <script>
-    // Cambia esto si tu API vive en otro dominio:
-    window.API_BASE = "";
-  </script>
+  <!-- API base fija al dominio del usuario -->
+  <script>window.API_BASE = "https://mixtli-pro.onrender.com";</script>
   <script src="./app.js"></script>
 </body>
 </html>

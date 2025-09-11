@@ -2,7 +2,7 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
 
-  // Views / Tabs
+  // Tabs / Views
   const tabs = $$(".tab");
   tabs.forEach(t => t.addEventListener("click", () => {
     tabs.forEach(x => x.classList.remove("active"));
@@ -10,7 +10,6 @@
     $$(".view").forEach(v => v.classList.remove("show"));
     $("#" + t.dataset.view).classList.add("show");
   }));
-  // Button go-to
   $("[data-goto='transfer']").addEventListener("click", () => {
     $$(".tab").forEach(x => x.classList.remove("active"));
     document.querySelector('.tab[data-view="transfer"]').classList.add("active");
@@ -78,26 +77,21 @@
 
   async function getPresign(filename, contentType) {
     const API_BASE = window.API_BASE || "";
-    // Intento #1: GET con query
+    // Try GET with query (same-domain cookies allowed)
     let url = `${API_BASE}/api/presign?filename=${encodeURIComponent(filename)}&contentType=${encodeURIComponent(contentType)}`;
     try {
       const r = await fetch(url, { method: "GET", credentials: "include" });
       if (r.ok) return await r.json();
     } catch (_) {}
-    // Intento #2: POST con body JSON
-    try {
-      const r2 = await fetch(`${API_BASE}/api/presign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ filename, contentType })
-      });
-      if (r2.ok) return await r2.json();
-      const txt = await r2.text();
-      throw new Error(`Fallo presign (${r2.status}): ${txt}`);
-    } catch (err) {
-      throw err;
-    }
+    // Fallback: POST JSON
+    const r2 = await fetch(`${API_BASE}/api/presign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ filename, contentType })
+    });
+    if (r2.ok) return await r2.json();
+    throw new Error(`Fallo presign (${r2.status})`);
   }
 
   function putWithProgress(presign, file) {
@@ -116,14 +110,14 @@
       };
       xhr.onload = () => {
         const ok = xhr.status >= 200 && xhr.status < 300;
-        ok ? resolve(xhr) : reject(new Error(`PUT fallo (${xhr.status}): ${xhr.responseText || "Sin cuerpo"}`));
+        ok ? resolve(xhr) : reject(new Error(`PUT fallo (${xhr.status})`));
       };
       xhr.onerror = () => reject(new Error("Error de red/CORS en PUT"));
       xhr.send(file);
     });
   }
 
-  btnUpload.addEventListener("click", async () => {
+  $("#btnUpload").addEventListener("click", async () => {
     if (!file) return;
     uploadStatus.textContent = "Generando presign…";
     uploadStatus.style.color = "";
@@ -138,10 +132,7 @@
       uploadStatus.textContent = "Subida completa ✓";
       uploadStatus.style.color = "#7ee787";
       if (presign.publicUrl) setPublicUrl(presign.publicUrl);
-      else {
-        // fallback: si el backend también retorna key + base público conocido
-        if (presign.key && presign.publicBase) setPublicUrl(`${presign.publicBase.replace(/\/$/, "")}/${presign.key}`);
-      }
+      else if (presign.key && presign.publicBase) setPublicUrl(`${presign.publicBase.replace(/\/$/, "")}/${presign.key}`);
     } catch (err) {
       uploadStatus.textContent = err.message || String(err);
       uploadStatus.style.color = "#ff9797";
