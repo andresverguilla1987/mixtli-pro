@@ -1,15 +1,13 @@
-# Mixtli — Autofix
-Este ZIP trae todo:
-- Backend Node listo (raíz) con /health, /version, /diagnostics, /presign, /download/:key
-- Frontend (frontend/index.html) con drag&drop + preview
-- Ejemplo de variables de entorno:
+# Mixtli — Sitio Profesional (Frontend)
+Sitio estático con login/registro (Firebase Auth), subida y previsualización; conecta con tu API en Render.
 
-R2_BUCKET=mixtli
-R2_ACCOUNT_ID=8351c372def0e354a3196aff085f0ae
-R2_ACCESS_KEY_ID=...
-R2_SECRET_ACCESS_KEY=...
-PUBLIC_BASE_URL=https://pub-f411a341ba7f44a28234293891897c59.r2.dev
-ALLOWED_ORIGINS=http://localhost:5173,https://meek-alfajores-1c364d.netlify.app
-PRESIGN_EXPIRES=3600
-MAX_UPLOAD_MB=50
-ALLOWED_MIME_PREFIXES=image/,application/pdf
+## Cómo usar
+1) Crea un proyecto en Firebase y habilita **Authentication → Email/Password**.
+2) Sustituye en `index.html`:
+   - `apiKey`, `authDomain`, `projectId`, `appId` por los de tu proyecto.
+3) Sube **este folder** (los 2 archivos) a Netlify (o tu hosting estático).
+4) Abre el sitio y prueba:
+   - **Crear cuenta / Entrar**
+   - Subir archivo (usa tu API: `https://mixtli-pro.onrender.com` por defecto o `?api=<tu_api>`).
+
+> Si después quieres que el backend valide el token de Firebase, se añade verificación del Bearer token en el endpoint `/presign`.

@@ -1,127 +1,248 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Mixtli — Uploader (Netlify All-in-One)</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mixtli — Compartir Archivos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#0b0f14;--panel:#0f1621;--border:#1e2a3a;--text:#e6eef7;--muted:#8aa0b6;--accent:#2b8a3e}
-    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu}
-    .wrap{max-width:980px;margin:24px auto;padding:0 16px}
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px;margin:12px 0}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
-    .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:9px 12px;cursor:pointer;font-weight:700}
-    .btn.ghost{background:#0b121b;border:1px solid var(--border);color:#e6eef7}
-    input[type="text"]{width:100%;background:#0b121b;color:#e6eef7;border:1px solid var(--border);border-radius:10px;padding:10px}
-    .drop{border:2px dashed #2a3a52;padding:22px;border-radius:14px;text-align:center;color:#9eb1c8}
-    .progress{height:12px;background:#0b121b;border:1px solid var(--border);border-radius:999px;overflow:hidden}
-    .bar{height:100%;width:0%;background:var(--accent);transition:width .15s ease}
-    .logs{white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#0b121b;color:#c9d1d9;border:1px solid var(--border);border-radius:10px;padding:10px;max-height:240px;overflow:auto}
+    :root{color-scheme:dark}
+    *{box-sizing:border-box}
+    body{margin:0;background:#0a0f1a;color:#e6edf7;font-family:'Inter',system-ui,Arial}
+    .container{max-width:1024px;margin:0 auto;padding:24px}
+    .nav{display:flex;align-items:center;gap:16px}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700}
+    .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#60a5fa,#a78bfa)}
+    .spacer{flex:1}
+    .btn{background:#2563eb;border:0;color:#fff;padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600}
+    .btn.secondary{background:#111827;border:1px solid #1f2937}
+    .btn.ghost{background:transparent;border:1px solid #1f2937}
+    .card{background:#0f1624;border:1px solid #1b2333;border-radius:18px;padding:22px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}
+    .h1{font-size:28px;margin:0 0 10px}
+    .muted{color:#9fb0c9}
+    .input{width:100%;background:#0b1220;border:1px solid #223047;color:#e6edf7;border-radius:12px;padding:12px}
+    .drop{margin:14px 0;padding:32px;border:2px dashed #28344a;border-radius:16px;text-align:center;color:#b9c6dc}
+    .drop.drag{border-color:#60a5fa;color:#d5e3ff}
+    .list{display:grid;gap:12px;margin-top:12px}
+    .file-row{display:flex;gap:10px;align-items:center;background:#0b1220;border:1px solid #223047;border-radius:12px;padding:10px}
+    .file-row .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .pill{padding:4px 10px;border-radius:999px;font-size:12px;border:1px solid #1f2937;background:#101826;color:#c9d5eb}
+    .preview img{max-width:100%;border-radius:12px;border:1px solid #223047}
+    .avatar{width:32px;height:32px;border-radius:999px;background:#1f2937;display:flex;align-items:center;justify-content:center;font-weight:700}
+    a{color:#93c5fd}
+    .footer{margin-top:28px;color:#8aa0bd;font-size:13px;text-align:center}
+    .badge{background:#0b1220;border:1px solid #1f2937;border-radius:10px;padding:6px 10px;margin-left:8px;font-size:12px}
+    .hidden{display:none}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Mixtli — Uploader (Netlify All‑in‑One)</h1>
-    <p class="muted">Este proyecto incluye frontend + backend (Netlify Functions). No necesitas Render ni CORS.</p>
-
-    <div class="card">
-      <div class="row">
-        <a class="btn ghost" href="/api/health" target="_blank" rel="noopener">Abrir /api/health</a>
-        <a class="btn ghost" href="/api/presign?filename=ping.txt&contentType=text/plain" target="_blank" rel="noopener">Abrir /api/presign</a>
+  <div class="container">
+    <div class="nav">
+      <div class="brand"><div class="logo"></div> Mixtli</div>
+      <span class="badge" id="apiLabel">API: https://mixtli-pro.onrender.com</span>
+      <div class="spacer"></div>
+      <div id="userBox" class="hidden">
+        <span id="userName" class="pill">—</span>
+        <span id="userAvatar" class="avatar">?</span>
+        <button id="btnLogout" class="btn ghost">Salir</button>
+      </div>
+      <div id="authBox">
+        <button id="btnLogin" class="btn secondary">Entrar</button>
+        <button id="btnSignup" class="btn">Crear cuenta</button>
       </div>
     </div>
 
-    <div class="card">
-      <h3>Subida</h3>
-      <div id="drop" class="drop">Arrastra aquí o <label class="btn ghost">elige<input id="file" type="file" hidden/></label></div>
-      <div class="row">
-        <button class="btn" id="btnUpload" disabled>Subir</button>
-        <span id="status" class="muted"></span>
+    <div class="grid" style="margin-top:18px">
+      <div class="card">
+        <h1 class="h1">Sube y comparte en segundos</h1>
+        <p class="muted">Arrastra tu archivo o usa el selector. Recibirás un enlace público para compartir.</p>
+        <div class="drop" id="drop">Arrastra aquí un archivo o haz clic para seleccionar</div>
+        <input id="file" type="file" class="input" />
+        <div style="display:flex;gap:10px;margin-top:12px">
+          <button id="btnUpload" class="btn">Subir archivo</button>
+          <span id="status" class="pill">listo</span>
+        </div>
+
+        <div id="result" style="margin-top:16px"></div>
       </div>
-      <div class="progress" style="margin-top:8px;"><div id="bar" class="bar"></div></div>
-      <div class="row" style="color:#9eb1c8;font-size:12px;"><span id="pct">0%</span> · <span id="speed">0 MB/s</span> · <span id="eta">ETA --s</span></div>
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px">
+          <strong>Actividad</strong>
+          <span class="pill" id="origin"></span>
+        </div>
+        <div class="list" id="list"></div>
+      </div>
     </div>
 
-    <div class="card">
-      <h3>Resultado</h3>
-      <div class="row">
-        <input id="publicUrl" type="text" placeholder="..." readonly/>
-        <button class="btn ghost" id="open" disabled>Abrir</button>
-        <button class="btn ghost" id="copy" disabled>Copiar</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>Logs</h3>
-      <div class="logs" id="logs"></div>
+    <div class="footer">
+      © <span id="year"></span> Mixtli — Hecho para compartir sin complicaciones.
     </div>
   </div>
 
-<script>
-  const $=s=>document.querySelector(s);
-  const logs=$("#logs"); function log(...a){ try{ logs.textContent += a.map(x=>typeof x==='string'?x:JSON.stringify(x,null,2)).join(" ")+"\n"; logs.scrollTop=logs.scrollHeight; }catch{} }
+  <!-- Modal Auth -->
+  <div id="modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center">
+    <div class="card" style="width:420px;max-width:90vw">
+      <h3 id="modalTitle" style="margin:0 0 8px">Entrar</h3>
+      <p class="muted" id="modalDesc">Usa tu correo y contraseña.</p>
+      <input id="email" class="input" placeholder="correo@dominio.com" />
+      <input id="password" class="input" placeholder="••••••••" type="password" style="margin-top:8px" />
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button id="modalOk" class="btn">Continuar</button>
+        <button id="modalCancel" class="btn ghost">Cancelar</button>
+      </div>
+      <p class="muted" style="margin-top:10px;font-size:12px">¿Olvidaste tu contraseña? Usa “restablecer” desde Firebase Auth.</p>
+    </div>
+  </div>
 
-  const drop=$("#drop"), fileEl=$("#file"), btn=$("#btnUpload"), status=$("#status");
-  const bar=$("#bar"), pct=$("#pct"), speed=$("#speed"), eta=$("#eta");
-  const publicUrl=$("#publicUrl"), openBtn=$("#open"), copyBtn=$("#copy");
+  <!-- Firebase (compat para simplicidad) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
-  let file=null;
-  fileEl.onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(f){ file=f; btn.disabled=false; status.textContent="Archivo: "+f.name; } };
-  ["dragenter","dragover"].forEach(evt=>drop.addEventListener(evt, e=>{ e.preventDefault(); drop.style.opacity=".9"; }));
-  ["dragleave","drop"].forEach(evt=>drop.addEventListener(evt, e=>{ e.preventDefault(); drop.style.opacity="1"; }));
-  drop.addEventListener("drop", e=>{ const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f){ file=f; btn.disabled=false; status.textContent="Archivo: "+f.name; } });
+  <script>
+    // ====== CONFIG ======
+    const API_BASE = (new URLSearchParams(location.search).get('api') || "https://mixtli-pro.onrender.com").replace(/\/$/,"");
+    document.getElementById("apiLabel").textContent = "API: " + API_BASE;
 
-  function setResult(url){ publicUrl.value=url||""; openBtn.disabled=!url; copyBtn.disabled=!url; }
-  openBtn.onclick=()=>{ if(publicUrl.value) window.open(publicUrl.value,"_blank"); };
-  copyBtn.onclick=async()=>{ try{ await navigator.clipboard.writeText(publicUrl.value); }catch{} };
+    // 🔐 Firebase config (REEMPLAZA con tus valores de proyecto)
+    const firebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_PROYECTO.firebaseapp.com",
+      projectId: "TU_PROYECTO",
+      appId: "TU_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
 
-  function putWithProgress(presign, file){
-    return new Promise((resolve,reject)=>{
-      const xhr=new XMLHttpRequest();
-      xhr.open(presign.method||"PUT", presign.url, true);
-      const headers=presign.headers||{}; Object.keys(headers).forEach(k=>{ try{ xhr.setRequestHeader(k, headers[k]); }catch{} });
-      const start=Date.now();
-      xhr.upload.onprogress=(e)=>{
-        if(e.lengthComputable){
-          const p=Math.round((e.loaded/e.total)*100); bar.style.width=p+"%"; pct.textContent=p+"%";
-          const secs=(Date.now()-start)/1000; const sp=secs>0?(e.loaded/1024/1024)/secs:0; speed.textContent=sp.toFixed(2)+" MB/s";
-          const rem=e.total-e.loaded; const etaS=sp>0?(rem/1024/1024)/sp:0; eta.textContent="ETA "+(etaS>60?Math.round(etaS/60)+"m":Math.round(etaS)+"s");
-        }
-      };
-      xhr.onload=()=>{ const ok=xhr.status>=200&&xhr.status<300; ok?resolve():reject(new Error("PUT "+xhr.status)); };
-      xhr.onerror=()=>reject(new Error("Network/CORS PUT"));
-      xhr.send(file);
-    });
-  }
+    // ====== UI helpers ======
+    const $ = (id) => document.getElementById(id);
+    const statusEl = $("status");
+    const listEl = $("list");
+    const resultEl = $("result");
+    const modal = $("modal");
+    const emailEl = $("email");
+    const passEl = $("password");
+    let modalMode = "login"; // login | signup
+    $("year").textContent = new Date().getFullYear();
+    $("origin").textContent = window.location.origin;
 
-  async function getPresign(filename, contentType){
-    const getURL=`/api/presign?filename=${encodeURIComponent(filename)}&contentType=${encodeURIComponent(contentType)}`;
-    log("GET", getURL);
-    try{ const r=await fetch(getURL); if(r.ok) return await r.json(); log("GET presign status", r.status);}catch(e){ log("GET presign error", String(e)); }
-    const postURL="/api/presign";
-    log("POST", postURL);
-    const r2=await fetch(postURL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename,contentType})});
-    if(!r2.ok){ const t=await r2.text(); log("POST presign body", t); throw new Error("presign "+r2.status); }
-    return await r2.json();
-  }
-
-  $("#btnUpload").onclick=async()=>{
-    if(!file){ alert("Selecciona un archivo"); return; }
-    bar.style.width="0%"; pct.textContent="0%"; speed.textContent="0 MB/s"; eta.textContent="ETA --s";
-    status.textContent="Generando presign...";
-    try{
-      const presign=await getPresign(file.name, file.type||"application/octet-stream");
-      if(!presign||!presign.url) throw new Error("presign inválido");
-      status.textContent="Subiendo...";
-      await putWithProgress(presign, file);
-      status.textContent="Subida completa ✓";
-      setResult(presign.publicUrl || (presign.publicBase&&presign.key? presign.publicBase.replace(/\/$/,"")+"/"+presign.key: ""));
-    }catch(e){
-      status.textContent="Error: "+e.message;
-      log("upload error", e.message);
-      alert("Falló presign/PUT: "+e.message+"\nRevisa /api/health en esta misma app (arriba).");
+    function setStatus(t){ statusEl.textContent = t }
+    function toastOK(text, url){
+      const id = "f" + Math.random().toString(36).slice(2,8);
+      const row = document.createElement("div");
+      row.className = "file-row";
+      row.innerHTML = \`
+        <span class="name">\${text}</span>
+        <a class="pill" href="\${url}" target="_blank" rel="noopener">Abrir</a>
+        <button class="btn ghost" id="\${id}">Copiar</button>
+      \`;
+      listEl.prepend(row);
+      document.getElementById(id).onclick = async ()=>{ await navigator.clipboard.writeText(url); alert("URL copiada"); };
     }
-  };
-</script>
+    function showPreview(url){
+      resultEl.innerHTML = \`
+        <div style="margin:8px 0">
+          ✅ Enlace listo: <a href="\${url}" target="_blank" rel="noopener">\${url}</a>
+          <button id="copyNow" class="btn ghost" style="margin-left:8px">Copiar</button>
+        </div>
+        <div class="preview"><img src="\${url}" alt="preview"/></div>
+      \`;
+      $("copyNow").onclick = async ()=>{ await navigator.clipboard.writeText(url); alert("URL copiada"); };
+    }
+
+    // ====== Auth UI ======
+    function openModal(mode){
+      modalMode = mode;
+      $("modalTitle").textContent = mode === "login" ? "Entrar" : "Crear cuenta";
+      $("modalDesc").textContent = mode === "login" ? "Usa tu correo y contraseña." : "Regístrate con tu correo y una contraseña segura.";
+      modal.classList.remove("hidden");
+      emailEl.focus();
+    }
+    function closeModal(){ modal.classList.add("hidden") }
+
+    $("btnLogin").onclick = ()=> openModal("login");
+    $("btnSignup").onclick = ()=> openModal("signup");
+    $("modalCancel").onclick = closeModal;
+
+    $("modalOk").onclick = async ()=>{
+      const email = emailEl.value.trim();
+      const pass = passEl.value.trim();
+      try{
+        if(modalMode === "login") await auth.signInWithEmailAndPassword(email, pass);
+        else await auth.createUserWithEmailAndPassword(email, pass);
+        closeModal();
+      }catch(e){ alert(e.message) }
+    };
+
+    auth.onAuthStateChanged(async (user)=>{
+      if(user){
+        $("authBox").classList.add("hidden");
+        $("userBox").classList.remove("hidden");
+        $("userName").textContent = user.email;
+        $("userAvatar").textContent = (user.email[0] || "?").toUpperCase();
+      }else{
+        $("authBox").classList.remove("hidden");
+        $("userBox").classList.add("hidden");
+        $("userName").textContent = "—";
+        $("userAvatar").textContent = "?";
+      }
+    });
+    $("btnLogout").onclick = ()=> auth.signOut();
+
+    // ====== Upload ======
+    async function doPresign(file){
+      const token = (await auth.currentUser?.getIdToken?.()) || null;
+      const r = await fetch(API_BASE + "/presign", {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          ...(token ? {"Authorization":"Bearer " + token} : {})
+        },
+        body: JSON.stringify({ filename:file.name, contentType:file.type, size:file.size })
+      });
+      if(!r.ok){ throw new Error("Presign " + r.status + " " + await r.text()) }
+      return r.json();
+    }
+    async function upload(file, presign){
+      const r = await fetch(presign.url, { method:"PUT", headers:{"Content-Type":file.type}, body:file });
+      if(!r.ok){ throw new Error("PUT " + r.status + " " + r.statusText) }
+      return true;
+    }
+
+    const drop = $("drop");
+    drop.addEventListener("click", ()=> $("file").click());
+    ["dragenter","dragover"].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.add("drag") }));
+    ["dragleave","drop"].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove("drag") }));
+    drop.addEventListener("drop", async e=>{
+      const f = e.dataTransfer.files?.[0]; if(!f) return;
+      $("file").files = e.dataTransfer.files;
+      await startUpload(f);
+    });
+
+    $("btnUpload").onclick = async ()=>{
+      const f = $("file").files[0];
+      if(!f) return alert("Selecciona un archivo");
+      await startUpload(f);
+    };
+
+    async function startUpload(file){
+      resultEl.innerHTML = "";
+      setStatus("presign...");
+      try{
+        const presign = await doPresign(file);
+        setStatus("subiendo...");
+        await upload(file, presign);
+        const link = presign.publicUrl || "https://pub-f411a341ba7f44a28234293891897c59.r2.dev/" + encodeURIComponent(presign.key);
+        showPreview(link);
+        toastOK(file.name, link);
+        setStatus("listo ✅");
+      }catch(e){
+        setStatus("error ❌");
+        alert(e.message);
+      }
+    }
+  </script>
 </body>
 </html>
