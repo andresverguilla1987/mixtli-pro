@@ -1,4 +1,4 @@
-# Netlify proxy: /api/* -> tu backend. Quita CORS del navegador.
+# Proxy de Netlify: /api/* se reenvía a tu backend
 [build]
   publish = "."
 

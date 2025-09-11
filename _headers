@@ -1,8 +1,2 @@
-/**
-  Cache básico para assets
-*/
-:Authority: *
-/app.js:
-  Cache-Control: public, max-age=600
-/styles.css:
-  Cache-Control: public, max-age=86400
+/* 
+  Content-Security-Policy: default-src 'self'; connect-src 'self' https://mixtli-pro.onrender.com https://*.r2.cloudflarestorage.com https://*.r2.dev; img-src 'self' https://*.r2.dev data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; base-uri 'self'; frame-ancestors 'self'
