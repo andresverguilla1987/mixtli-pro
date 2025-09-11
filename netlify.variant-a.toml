@@ -1,0 +1,9 @@
+# Variant A: Backend expone /api/*
+[build]
+  publish = "."
+
+[[redirects]]
+  from = "/api/*"
+  to   = "https://mixtli-pro.onrender.com/api/:splat"
+  status = 200
+  force  = true

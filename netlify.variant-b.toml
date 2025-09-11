@@ -1,0 +1,15 @@
+# Variant B: Backend expone /health y /presign SIN /api
+[build]
+  publish = "."
+
+[[redirects]]
+  from = "/api/health"
+  to   = "https://mixtli-pro.onrender.com/health"
+  status = 200
+  force  = true
+
+[[redirects]]
+  from = "/api/presign"
+  to   = "https://mixtli-pro.onrender.com/presign"
+  status = 200
+  force  = true

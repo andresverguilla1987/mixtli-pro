@@ -1,0 +1,9 @@
+# Variant C: Reescribe /api/* -> raíz (quita el prefijo /api)
+[build]
+  publish = "."
+
+[[redirects]]
+  from = "/api/*"
+  to   = "https://mixtli-pro.onrender.com/:splat"
+  status = 200
+  force  = true
