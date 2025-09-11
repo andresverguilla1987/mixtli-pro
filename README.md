@@ -1,29 +1,50 @@
-# Mixtli — Demo Presign PUT + Preview
+# Mixtli — Design Lock v1 (presign automático)
 
-Pequeña página estática para probar tu **presign PUT** a Cloudflare R2 y visualizar el **publicUrl**.
+Interfaz **estable** (dark) con pestañas *Bienvenido* / *Entrar-Registrarme* / *Subir-Compartir*, respetando tu **Design Lock v1**. En *Subir-Compartir* el flujo es **automático**:
 
-## ¿Qué incluye?
-- `index.html`: UI minimal (dark) para pegar tu JSON de presign, elegir archivo y subir.
-- `app.js`: Lógica con `XMLHttpRequest` para barra de progreso y manejo de headers de presign.
-- `styles.css`: Estilos sencillos.
-- **Sin backend**: 100% estático, ideal para Netlify.
+1. Usuario elige o arrastra un archivo.
+2. El frontend pide un **presign** a `/api/presign` (GET con query, y si no, POST con JSON).
+3. Hace `PUT` directo a R2 con barra de progreso.
+4. Muestra el `publicUrl` para copiar/abrir y preview si es imagen.
 
-## Uso
-1. Despliega el contenido del ZIP en Netlify (o abre `index.html` localmente).
-2. Pega en el textarea el JSON de `presign` que te entrega tu API, p. ej.:
-   ```json
-   {
-     "key": "1757549600482-f48917-GP010345.JPG",
-     "url": "https://...r2.cloudflarestorage.com/1757549600482-f48917-GP010345.JPG?...",
-     "method": "PUT",
-     "headers": { "Content-Type": "image/jpeg" },
-     "publicUrl": "https://pub-xxxxxx.r2.dev/1757549600482-f48917-GP010345.JPG",
-     "expiresIn": 3600
-   }
-   ```
-3. Arrastra/elige un archivo y pulsa **Subir con PUT**.
-4. Si el `presign` traía `publicUrl`, se llenará solo. Si no, pégalo manualmente para abrirlo/compartirlo.
+## Archivos
+- `index.html` — UI fija (design lock).
+- `styles.css` — dark look estable.
+- `app.js` — lógica de presign automático + subida + compartir.
+- `README.md` — esta guía.
 
-## Notas
-- Si falla con CORS, ajusta tu **CORS del bucket R2** para permitir `PUT` desde tu dominio (Origin de Netlify) y headers `Content-Type` + `x-amz-*` que tu presign incluya.
-- Los botones **Abrir/Copiar** funcionan para cualquier tipo de archivo (si es imagen, verás preview).
+## Endpoint esperado
+El frontend intenta dos variantes (elige la que ya tengas en tu API):
+- `GET /api/presign?filename=...&contentType=...`
+- `POST /api/presign` con body JSON `{ filename, contentType }`
+
+**Respuesta esperada:**
+
+```json
+{
+  "key": "1757549600482-f48917-GP010345.JPG",
+  "url": "https://...r2.cloudflarestorage.com/1757549600482-f48917-GP010345.JPG?...",
+  "method": "PUT",
+  "headers": { "Content-Type": "image/jpeg" },
+  "publicUrl": "https://pub-xxxx.r2.dev/1757549600482-f48917-GP010345.JPG",
+  "expiresIn": 3600
+}
+```
+
+Si tu backend no incluye `publicUrl` pero sí `"publicBase"` y `"key"`, se arma como `publicBase + "/" + key`.
+
+## CORS en R2
+Permite desde tu dominio (Netlify/Pages):
+- Métodos: `PUT, GET, HEAD, OPTIONS`
+- Headers: `Content-Type` y los `x-amz-*` que uses
+
+## Deploy
+- **Netlify:** arrastra la carpeta o repo (no requiere build).
+- **GitHub Pages:** Settings → Pages → Source (branch) → root `/`.
+
+## Cambiar API base
+Si tu API vive en otro dominio, edita en `index.html`:
+
+```html
+<script>window.API_BASE = "https://tu-api.onrender.com";</script>
+```

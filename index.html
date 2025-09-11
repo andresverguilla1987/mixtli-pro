@@ -3,69 +3,110 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Mixtli — Demo Presign PUT + Preview</title>
+  <title>Mixtli — Subir y Compartir</title>
   <link rel="stylesheet" href="./styles.css"/>
+  <meta name="theme-color" content="#0b0f14"/>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <h1>Mixtli — Demo Presign PUT + Preview</h1>
-      <p class="sub">Pega tu JSON de <code>presign</code>, sube un archivo, y mira el <em>publicUrl</em>.</p>
+  <div class="page">
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">☁️</span>
+        <span class="name">Mixtli</span>
+      </div>
+      <nav class="tabs">
+        <button class="tab active" data-view="welcome">Bienvenido</button>
+        <button class="tab" data-view="auth">Entrar / Registrarme</button>
+        <button class="tab" data-view="transfer">Subir / Compartir</button>
+      </nav>
     </header>
 
-    <section class="card">
-      <h2>1) Pega tu JSON de <code>presign</code></h2>
-      <textarea id="presignJson" placeholder='{
-  "key": "123-abc-foto.jpg",
-  "url": "https://...r2.cloudflarestorage.com/123-abc-foto.jpg?...",
-  "method": "PUT",
-  "headers": { "Content-Type": "image/jpeg" },
-  "publicUrl": "https://pub-xxxxxxx.r2.dev/123-abc-foto.jpg",
-  "expiresIn": 3600
-}'></textarea>
-      <div class="row">
-        <button id="btnParse">Cargar presign</button>
-        <span id="presignStatus" class="muted"></span>
-      </div>
-    </section>
+    <!-- WELCOME -->
+    <main class="view show" id="welcome">
+      <section class="hero card">
+        <h1>Bienvenido</h1>
+        <p class="muted">Interfaz estable — <b>Design Lock v1</b>. Súper simple: sube y comparte.</p>
+        <div class="row">
+          <button class="primary" data-goto="transfer">Ir a Subir / Compartir</button>
+        </div>
+      </section>
+    </main>
 
-    <section class="card">
-      <h2>2) Selecciona archivo para subir</h2>
-      <div id="drop" class="drop">
-        Arrastra y suelta aquí o
-        <label class="btnLink">
-          elige un archivo
-          <input id="fileInput" type="file" accept="image/*,video/*,application/pdf,.zip,.rar,.7z,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx" hidden />
-        </label>
-      </div>
-      <div id="fileInfo" class="muted"></div>
-      <div id="progressWrap" class="progressWrap" hidden>
-        <div id="progressBar" class="progressBar"></div>
-      </div>
-      <div class="row">
-        <button id="btnUpload" disabled>Subir con PUT</button>
-        <span id="uploadStatus" class="muted"></span>
-      </div>
-    </section>
+    <!-- AUTH (placeholder visual, no backend change) -->
+    <main class="view" id="auth">
+      <section class="auth card">
+        <div class="pill">
+          <button class="pillbtn active" data-auth="login">Entrar</button>
+          <button class="pillbtn" data-auth="register">Registrarme</button>
+        </div>
+        <form class="authform" id="authForm" onsubmit="return false;">
+          <div class="grid2">
+            <label>
+              <span>Correo</span>
+              <input type="email" id="authEmail" placeholder="tucorreo@ejemplo.com" autocomplete="email"/>
+            </label>
+            <label>
+              <span>Contraseña</span>
+              <input type="password" id="authPass" placeholder="••••••••" autocomplete="current-password"/>
+            </label>
+          </div>
+          <div class="row">
+            <button class="primary" id="authSubmit">Continuar</button>
+            <span class="muted">Demostración visual — sin cambios de backend.</span>
+          </div>
+        </form>
+      </section>
+    </main>
 
-    <section class="card">
-      <h2>3) Preview / Comprobar</h2>
-      <div class="row">
-        <input id="publicUrl" type="url" placeholder="Pega aquí el publicUrl si no vino en el presign…" />
-        <button id="btnOpen" disabled>Abrir</button>
-        <button id="btnCopy" disabled>Copiar URL</button>
-      </div>
-      <div id="preview" class="preview" hidden>
-        <img id="imgPreview" alt="Preview" />
-      </div>
-      <p id="note" class="muted">Si el archivo no es imagen, el botón <b>Abrir</b> te lo mostrará/descargará en una pestaña nueva.</p>
-    </section>
+    <!-- TRANSFER -->
+    <main class="view" id="transfer">
+      <section class="card">
+        <h2>Subir archivo</h2>
+        <p class="muted">Selecciona o arrastra un archivo. Se generará un presign automático y se subirá directo a R2.</p>
 
-    <footer>
-      <p class="tiny">Hecho para pruebas rápidas. Si te sirve, se integra directo a tu UI.</p>
+        <div id="drop" class="drop">
+          Arrastra y suelta aquí o
+          <label class="btnLink">
+            elige un archivo
+            <input id="fileInput" type="file" hidden />
+          </label>
+        </div>
+
+        <div id="fileInfo" class="muted"></div>
+
+        <div id="progressWrap" class="progressWrap" hidden>
+          <div id="progressBar" class="progressBar"></div>
+        </div>
+
+        <div class="row">
+          <button class="primary" id="btnUpload" disabled>Subir</button>
+          <span id="uploadStatus" class="muted"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Compartir</h2>
+        <div class="row share">
+          <input id="publicUrl" type="url" placeholder="Aquí aparecerá el enlace público…" readonly />
+          <button id="btnCopy" disabled>Copiar enlace</button>
+          <button id="btnOpen" disabled>Abrir</button>
+        </div>
+        <div id="preview" class="preview" hidden>
+          <img id="imgPreview" alt="Preview"/>
+        </div>
+        <p class="muted tiny">Si no es imagen, igualmente podrás abrir/descargar el archivo desde el enlace público.</p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span class="muted tiny">Design Lock v1 · UI estable · 2025</span>
     </footer>
   </div>
 
+  <script>
+    // Cambia esto si tu API vive en otro dominio:
+    window.API_BASE = "";
+  </script>
   <script src="./app.js"></script>
 </body>
 </html>
