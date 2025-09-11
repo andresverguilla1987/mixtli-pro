@@ -1,152 +1,39 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mixtli — Subir y compartir</title>
-  <style>
-    :root { color-scheme: dark; }
-    body { margin:0; background:#0b0e14; color:#e6eefc; font-family: ui-sans-serif, system-ui, Arial; }
-    .wrap { max-width: 920px; margin: 30px auto; padding: 24px; }
-    .card { background:#0f131b; border:1px solid #1b2333; border-radius:18px; padding:22px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
-    h1 { margin:0 0 14px; font-size:24px; }
-    .muted { color:#9bb0d4; font-size:13px }
-    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px }
-    input[type=text]{ flex:1; min-width:260px; background:#0b0f17; border:1px solid #2a3347; color:#d8e1ff; padding:10px 12px; border-radius:12px }
-    button{ background:#4e8cff; color:#fff; border:0; padding:10px 14px; border-radius:12px; cursor:pointer }
-    button:disabled{ opacity:.5; cursor:not-allowed }
-    .drop{ margin:10px 0; padding:24px; border:2px dashed #2a3347; border-radius:16px; text-align:center; color:#bcd }
-    .drop.drag{ border-color:#6fa3ff; color:#dff }
-    .grid{ display:grid; grid-template-columns: 1fr; gap:12px }
-    .ok{ color:#a7ffb0 }
-    .err{ color:#ffb0b0 }
-    .log{ white-space: pre-wrap; background:#0b0f17; padding:12px; border-radius:12px; border:1px solid #2a3347; min-height:140px }
-    .pill{ display:inline-block; background:#111827; border:1px solid #1f2937; border-radius:999px; padding:4px 10px; font-size:12px; color:#bcd }
-    .preview img{ max-width:100%; border-radius:12px; border:1px solid #223047 }
-    .row-right{ margin-left:auto }
-  </style>
-</head>
-<body>
-<div class="wrap">
-  <div class="card">
-    <div class="row">
-      <h1 style="margin-right:10px">Mixtli — Subir y compartir</h1>
-      <span class="pill" id="origin"></span>
-      <span class="pill row-right" id="status">listo</span>
-    </div>
-
-    <div class="row">
-      <input id="apiBase" type="text" value="https://mixtli-pro.onrender.com" />
-      <input id="presignPath" type="text" value="/presign" />
-      <button id="save">Guardar</button>
-    </div>
-
-    <div class="drop" id="drop">
-      Arrastra aquí un archivo o usa el selector ↓
-    </div>
-
-    <div class="row">
-      <input id="file" type="file" />
-      <button id="btnUpload">Subir y generar enlace</button>
-    </div>
-
-    <div class="grid">
-      <div class="log" id="log"></div>
-      <div id="result"></div>
-    </div>
-
-    <p class="muted">Tip: puedes fijar la API con <code>?api=URL</code> y <code>?path=/presign</code> en la barra.</p>
-  </div>
-</div>
-
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mixtli — Subir y compartir</title>
+<style>:root{color-scheme:dark}body{margin:0;background:#0b0e14;color:#e6eefc;font-family:ui-sans-serif,system-ui,Arial}.wrap{max-width:920px;margin:30px auto;padding:24px}.card{background:#0f131b;border:1px solid #1b2333;border-radius:18px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.35)}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.log{white-space:pre-wrap;background:#0b0f17;padding:12px;border-radius:12px;border:1px solid #2a3347;min-height:140px}.drop{margin:10px 0;padding:24px;border:2px dashed #2a3347;border-radius:16px;text-align:center;color:#bcd}.drop.drag{border-color:#6fa3ff;color:#dff}.preview img{max-width:100%;border-radius:12px;border:1px solid #223047}.pill{display:inline-block;background:#111827;border:1px solid #1f2937;border-radius:999px;padding:4px 10px;font-size:12px;color:#bcd}</style>
+</head><body>
+<div class="wrap"><div class="card">
+  <div class="row"><h1>Mixtli — Subir y compartir</h1><span class="pill" id="status">listo</span></div>
+  <div class="row"><input id="api" style="flex:1" value="https://mixtli-pro.onrender.com"/><button id="save">Guardar API</button></div>
+  <div class="drop" id="drop">Arrastra un archivo aquí</div>
+  <div class="row"><input id="file" type="file"/><button id="go">Subir y generar enlace</button></div>
+  <div id="out" class="log"></div><div id="result"></div>
+</div></div>
 <script>
-const $ = (id)=>document.getElementById(id);
-$("origin").textContent = "origin: " + window.location.origin;
-
-function qp(name, def){ try{ const u=new URL(location.href); return u.searchParams.get(name)||def }catch{ return def } }
-$("apiBase").value = qp("api", $("apiBase").value);
-$("presignPath").value = qp("path", "/presign");
-
-function setStatus(t){ $("status").textContent = t }
-
-function log(...a){
-  const el = $("log");
-  el.textContent += a.map(x => typeof x === "string" ? x : JSON.stringify(x,null,2)).join(" ") + "\\n";
-  el.scrollTop = el.scrollHeight;
+const $=id=>document.getElementById(id);
+$("save").onclick=()=>log("API:",$("api").value);
+["dragenter","dragover"].forEach(e=>$("drop").addEventListener(e,ev=>{ev.preventDefault();$("drop").classList.add("drag")}));
+["dragleave","drop"].forEach(e=>$("drop").addEventListener(e,ev=>{ev.preventDefault();$("drop").classList.remove("drag")}));
+$("drop").addEventListener("drop",ev=>{ const f=ev.dataTransfer.files?.[0]; if(f) {$("file").files=ev.dataTransfer.files; go()} });
+$("go").onclick=go;
+function log(){ $("out").textContent += Array.from(arguments).map(x=>typeof x==="string"?x:JSON.stringify(x,null,2)).join(" ")+"\n" }
+async function go(){
+  $("out").textContent=""; $("result").innerHTML="";
+  const f=$("file").files[0]; if(!f) return alert("Selecciona un archivo");
+  const api=$("api").value.replace(/\/$/,"");
+  try{
+    const p=await fetch(api+"/presign",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:f.name,contentType:f.type,size:f.size})});
+    const pj=await p.json(); log("presign:",pj);
+    const put=await fetch(pj.url,{method:"PUT",headers:{"Content-Type":f.type},body:f}); log("put:",put.status,put.statusText);
+    const base="https://pub-f411a341ba7f44a28234293891897c59.r2.dev";
+    const link=pj.publicUrl || (pj.key ? base + "/" + encodeURIComponent(pj.key) : null);
+    if(!link) throw new Error("no hay link");
+    $("result").innerHTML = '<p>✅ <a href="'+link+'" target="_blank" rel="noopener">Abrir archivo</a></p><div class="preview"><img src="'+link+'"/></div>';
+    $("status").textContent="listo ✅";
+  }catch(e){ log("error:",e.message); $("status").textContent="error ❌"; }
 }
-
-$("save").onclick = ()=> log("Guardado", { api:$("apiBase").value, path:$("presignPath").value });
-
-async function doPresign(file){
-  const api = $("apiBase").value.replace(/\\/$/, "");
-  const path = $("presignPath").value.startsWith("/") ? $("presignPath").value : "/" + $("presignPath").value;
-  const url = api + path;
-  log("POST", url);
-  const r = await fetch(url, {
-    method:"POST", mode:"cors",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size })
-  });
-  const txt = await r.text();
-  log("Presign status:", r.status, r.statusText, txt.slice(0,300));
-  if(!r.ok) throw new Error("Presign " + r.status + " " + r.statusText + " " + txt);
-  try{ return JSON.parse(txt) }catch(e){ throw new Error("Respuesta no JSON: "+txt) }
-}
-
-async function uploadWithPresign(file, p){
-  const { url, method="PUT", headers={} } = p;
-  log("PUT", url.slice(0,120) + "...");
-  const r = await fetch(url, { method, headers, body:file });
-  const t = await r.text();
-  log("PUT status:", r.status, r.statusText, t.slice(0,200));
-  if(!r.ok) throw new Error("PUT "+r.status+" "+r.statusText+" "+t);
-  return true;
-}
-
-function showResult(link){
-  const result = $("result");
-  result.innerHTML = `
-    <div style="margin:12px 0">
-      ✅ Listo: <a href="${link}" target="_blank" rel="noopener noreferrer">${link}</a>
-      <button id="copyUrl" style="margin-left:8px">Copiar</button>
-    </div>
-    <div class="preview"><img src="${link}" alt="preview"/></div>
-  `;
-  $("copyUrl").onclick = async ()=>{ await navigator.clipboard.writeText(link); alert("URL copiada"); };
-}
-
-async function handleFile(file){
-  setStatus("presign...");
-  const p = await doPresign(file);
-  setStatus("subiendo...");
-  await uploadWithPresign(file, p);
-  const PUBLIC_BASE = "https://pub-f411a341ba7f44a28234293891897c59.r2.dev";
-  const link = p.publicUrl || (p.key ? `${PUBLIC_BASE}/${encodeURIComponent(p.key)}` : null);
-  if (!link) throw new Error("No se pudo construir el link público.");
-  showResult(link);
-  setStatus("listo ✅");
-}
-
-$("btnUpload").onclick = async ()=>{
-  $("log").textContent = "";
-  $("result").textContent = "";
-  const file = $("file").files[0];
-  if(!file) return alert("Selecciona un archivo.");
-  try{ await handleFile(file) }catch(e){ log("Error:", e.message); setStatus("error ❌") }
-};
-
-// drag & drop
-const drop = $("drop");
-["dragenter","dragover"].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.add("drag") }));
-["dragleave","drop"].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.remove("drag") }));
-drop.addEventListener("drop", async e=>{
-  const f = e.dataTransfer.files?.[0];
-  if (!f) return;
-  $("file").files = e.dataTransfer.files;
-  $("log").textContent = "";
-  $("result").textContent = "";
-  try{ await handleFile(f) }catch(err){ log("Error:", err.message); setStatus("error ❌") }
-});
 </script>
-</body>
-</html>
+</body></html>

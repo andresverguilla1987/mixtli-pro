@@ -1,11 +1,9 @@
-# Mixtli — Ultimate
-Backend Node (root) + Frontend (Netlify). R2 presign listo.
+# Mixtli — Autofix
+Este ZIP trae todo:
+- Backend Node listo (raíz) con /health, /version, /diagnostics, /presign, /download/:key
+- Frontend (frontend/index.html) con drag&drop + preview
+- Ejemplo de variables de entorno:
 
-## Render
-- Build: `npm install --omit=dev`
-- Start: `node server.js`
-- Env:
-```
 R2_BUCKET=mixtli
 R2_ACCOUNT_ID=8351c372def0e354a3196aff085f0ae
 R2_ACCESS_KEY_ID=...
@@ -15,9 +13,3 @@ ALLOWED_ORIGINS=http://localhost:5173,https://meek-alfajores-1c364d.netlify.app
 PRESIGN_EXPIRES=3600
 MAX_UPLOAD_MB=50
 ALLOWED_MIME_PREFIXES=image/,application/pdf
-```
-- Endpoints: `/health`, `/version`, `/presign`, `/download/:key`
-
-## Netlify
-- Publica `frontend/`.
-
