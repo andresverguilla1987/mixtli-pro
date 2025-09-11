@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mixtli — Uploader Standalone v2</title>
+<style>
+  :root{--bg:#0b0f14;--panel:#0f1621;--border:#1e2a3a;--text:#e6eef7;--muted:#8aa0b6;--accent:#2b8a3e;}
+  *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Helvetica,Arial;background:var(--bg);color:var(--text)}
+  .wrap{max-width:980px;margin:20px auto;padding:0 16px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:14px;margin:12px 0;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+  h1{margin:.2rem 0 1rem} .muted{color:var(--muted)} .tiny{font-size:12px}
+  input[type="url"],input[type="text"]{width:100%;background:#0b121b;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:9px 12px;cursor:pointer;font-weight:700}
+  .btn.ghost{background:#0b121b;border:1px solid var(--border);color:var(--text)}
+  .drop{border:2px dashed #2a3a52;padding:22px;border-radius:14px;text-align:center;color:#9eb1c8}
+  .progress{height:12px;background:#0b121b;border:1px solid var(--border);border-radius:999px;overflow:hidden}
+  .bar{height:100%;width:0%;background:var(--accent);transition:width .15s ease}
+  .logs{white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#0b121b;color:#c9d1d9;border:1px solid var(--border);border-radius:10px;padding:10px;max-height:260px;overflow:auto}
+  .preview img{max-width:100%;border-radius:12px;border:1px solid var(--border)}
+  .hidden{display:none}
+  textarea{width:100%;min-height:140px;background:#0b121b;color:#c9d1d9;border:1px solid var(--border);border-radius:10px;padding:10px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Mixtli — Uploader Standalone v2</h1>
+    <p class="muted">Archivo único, con test de presign y parseo flexible para el modo manual.</p>
+
+    <div class="card">
+      <h3>API Base</h3>
+      <input id="apiBase" type="url" placeholder="https://mixtli-pro.onrender.com (o vacío si usas proxy)" />
+      <div class="row">
+        <button class="btn" id="saveApi">Guardar</button>
+        <button class="btn ghost" id="testHealth">Probar /api/health</button>
+        <button class="btn ghost" id="testPresign">Probar presign</button>
+        <span id="apiMsg" class="muted tiny"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Subir archivo</h3>
+      <div id="drop" class="drop">Arrastra aquí o <label class="btn ghost">elige<input id="file" type="file" hidden/></label></div>
+      <div class="row">
+        <button class="btn" id="btnUpload" disabled>Subir</button>
+        <span id="status" class="muted"></span>
+      </div>
+      <div class="progress" style="margin-top:8px;"><div id="bar" class="bar"></div></div>
+      <div class="row tiny muted" id="meta"><span id="pct">0%</span> · <span id="speed">0 MB/s</span> · <span id="eta">ETA --s</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Resultado</h3>
+      <div class="row">
+        <input id="publicUrl" type="text" placeholder="Aquí aparecerá el enlace público..." readonly />
+        <button class="btn ghost" id="open" disabled>Abrir</button>
+        <button class="btn ghost" id="copy" disabled>Copiar</button>
+      </div>
+      <div class="preview" id="preview" class="hidden"><img id="img" /></div>
+    </div>
+
+    <div class="card">
+      <h3>Modo manual (fallback)</h3>
+      <p class="tiny muted">Pega el JSON real del presign (el que te da tu backend). Este parser acepta comillas ‘ ’ “ ” o simples y elimina comas sobrantes.</p>
+      <textarea id="manual" placeholder='{"url":"...","method":"PUT","headers":{"Content-Type":"image/jpeg"},"publicUrl":"...","key":"..."}'></textarea>
+      <div class="row">
+        <button class="btn ghost" id="btnManual">Subir con presign</button>
+        <span class="tiny muted">Necesitas seleccionar un archivo arriba.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Logs</h3>
+      <div id="logs" class="logs"></div>
+    </div>
+  </div>
+
+<script>
+  const $ = (s)=>document.querySelector(s);
+  const logs = $("#logs");
+  function log(...a){ try{ logs.textContent += a.map(x=>typeof x==='string'?x:JSON.stringify(x,null,2)).join(" ")+"\\n"; logs.scrollTop=logs.scrollHeight; }catch{} console.log(...a); }
+
+  const apiBaseInput=$("#apiBase"), apiMsg=$("#apiMsg");
+  const saveApi=$("#saveApi"), testHealth=$("#testHealth"), testPresign=$("#testPresign");
+  const fileEl=$("#file"), btnUpload=$("#btnUpload"), statusEl=$("#status");
+  const bar=$("#bar"), pct=$("#pct"), speed=$("#speed"), eta=$("#eta");
+  const publicUrl=$("#publicUrl"), openBtn=$("#open"), copyBtn=$("#copy");
+  const img=$("#img"), preview=$("#preview");
+  const manual=$("#manual");
+  const drop=$("#drop");
+
+  function getBase(){ return (localStorage.getItem("api_base")||"").trim(); }
+  function setBase(v){ localStorage.setItem("api_base", (v||"").trim()); apiMsg.textContent="Guardado"; setTimeout(()=>apiMsg.textContent="",1200); }
+  function apply(){ apiBaseInput.value=getBase(); }
+  apply(); if(!getBase()){ apiBaseInput.value="https://mixtli-pro.onrender.com"; }
+
+  saveApi.onclick=()=>setBase(apiBaseInput.value);
+
+  testHealth.onclick=async()=>{
+    const base=getBase()||apiBaseInput.value.trim();
+    const url=(base?base.replace(/\/$/,""):"")+"/api/health";
+    log("GET", url);
+    try{ const r=await fetch(url); const t=await r.text(); apiMsg.textContent = "Health "+r.status+": "+t; }
+    catch(e){ apiMsg.textContent="Health error: "+e; log("health error", e); alert("No responde /api/health"); }
+  };
+
+  testPresign.onclick=async()=>{
+    const base=getBase()||apiBaseInput.value.trim();
+    const url=(base?base.replace(/\/$/,""):"")+"/api/presign?filename=ping.txt&contentType=text/plain";
+    log("GET", url);
+    try{ const r=await fetch(url); const t=await r.text(); apiMsg.textContent = "Presign "+r.status; log("presign test", t); if(!r.ok) alert("Presign "+r.status+": "+t); }
+    catch(e){ apiMsg.textContent="Presign error: "+e; log("presign error", e); alert("No responde /api/presign"); }
+  };
+
+  let file=null;
+  fileEl.onchange=(e)=>{ file=e.target.files&&e.target.files[0]; btnUpload.disabled=!file; };
+  ["dragenter","dragover"].forEach(evt => drop.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); drop.style.opacity=".9"; }));
+  ["dragleave","drop"].forEach(evt => drop.addEventListener(evt, e=>{ e.preventDefault(); e.stopPropagation(); drop.style.opacity="1"; }));
+  drop.addEventListener("drop", e=>{ const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f){ file=f; btnUpload.disabled=false; } });
+
+  function setResult(url){
+    if(!url) return;
+    publicUrl.value=url; openBtn.disabled=false; copyBtn.disabled=false;
+    if(/\.(png|jpg|jpeg|gif|webp|avif)$/i.test(url)){ img.src=url+(url.includes("?")?"&":"?")+"t="+Date.now(); preview.classList.remove("hidden"); }
+  }
+  openBtn.onclick=()=>{ if(publicUrl.value) window.open(publicUrl.value,"_blank"); };
+  copyBtn.onclick=async()=>{ try{ await navigator.clipboard.writeText(publicUrl.value); }catch{} };
+
+  function parseJsonLoose(s){
+    let t = s.trim();
+    // normaliza comillas “ ” ‘ ’ a " o '
+    t = t.replace(/[“”]/g,'"').replace(/[‘’]/g,"'");
+    // si la mayoría son comillas simples, conviértelas a dobles
+    const singles = (t.match(/'/g)||[]).length; const doubles = (t.match(/"/g)||[]).length;
+    if (singles > doubles) t = t.replace(/'/g, '"');
+    // elimina comas sobrantes antes de }} o ]]
+    t = t.replace(/,\s*([}\]])/g, '$1');
+    return JSON.parse(t);
+  }
+
+  async function getPresign(base, filename, contentType){
+    const q=`/api/presign?filename=${encodeURIComponent(filename)}&contentType=${encodeURIComponent(contentType)}`;
+    const url=(base?base.replace(/\/$/,""):"")+q;
+    log("GET", url);
+    try{ const r=await fetch(url,{method:"GET"}); if(r.ok) return await r.json(); log("GET presign status", r.status); }catch(e){ log("GET presign error", e); }
+    const url2=(base?base.replace(/\/$/,""):"")+"/api/presign";
+    log("POST", url2);
+    const r2=await fetch(url2,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename,contentType})});
+    if(!r2.ok){ const t=await r2.text(); log("POST presign body", t); throw new Error("presign "+r2.status); }
+    return await r2.json();
+  }
+
+  function putWithProgress(presign, file){
+    return new Promise((resolve,reject)=>{
+      const xhr=new XMLHttpRequest();
+      xhr.open(presign.method||"PUT", presign.url, true);
+      const headers=presign.headers||{}; Object.keys(headers).forEach(k=>{ try{xhr.setRequestHeader(k, headers[k]);}catch{} });
+      let start=Date.now();
+      xhr.upload.onprogress=(e)=>{
+        if(e.lengthComputable){ const p=Math.round((e.loaded/e.total)*100); bar.style.width=p+"%"; pct.textContent=p+"%";
+          const secs=(Date.now()-start)/1000; const sp=secs>0?(e.loaded/1024/1024)/secs:0; speed.textContent=sp.toFixed(2)+" MB/s";
+          const rem=e.total-e.loaded; const etaS=sp>0?(rem/1024/1024)/sp:0; eta.textContent="ETA "+(etaS>60?Math.round(etaS/60)+"m":Math.round(etaS)+"s");
+        }
+      };
+      xhr.onload=()=>{ const ok=xhr.status>=200&&xhr.status<300; ok?resolve():reject(new Error("PUT "+xhr.status)); };
+      xhr.onerror=()=>reject(new Error("Network/CORS PUT"));
+      xhr.send(file);
+    });
+  }
+
+  $("#btnUpload").onclick=async()=>{
+    if(!file){ alert("Selecciona un archivo"); return; }
+    bar.style.width="0%"; pct.textContent="0%"; speed.textContent="0 MB/s"; eta.textContent="ETA --s";
+    statusEl.textContent="Generando presign...";
+    const base=getBase()||apiBaseInput.value.trim();
+    try{
+      const presign=await getPresign(base, file.name, file.type||"application/octet-stream");
+      if(!presign||!presign.url) throw new Error("presign inválido");
+      statusEl.textContent="Subiendo...";
+      await putWithProgress(presign, file);
+      statusEl.textContent="Subida completa ✓";
+      setResult(presign.publicUrl || (presign.publicBase&&presign.key? presign.publicBase.replace(/\/$/,"")+"/"+presign.key : ""));
+    }catch(err){
+      log("upload error", err);
+      alert("Error de red en PUT / presign: "+err.message+".\nTip: prueba Probar presign o el Modo manual.");
+    }
+  };
+
+  $("#btnManual").onclick=async()=>{
+    if(!file){ alert("Selecciona un archivo arriba"); return; }
+    try{
+      const raw = manual.value;
+      const p = parseJsonLoose(raw);
+      if(!p||!p.url||!p.method) throw new Error("JSON sin url/method");
+      statusEl.textContent="Subiendo (manual)..."; bar.style.width="0%";
+      await putWithProgress(p, file);
+      statusEl.textContent="Subida completa ✓ (manual)";
+      setResult(p.publicUrl || "");
+    }catch(e){
+      log("manual parse/error", e);
+      alert("Manual falló: "+e.message+"\nAsegúrate de pegar JSON completo.");
+    }
+  };
+</script>
+</body>
+</html>
