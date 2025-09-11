@@ -1,9 +1,17 @@
-# Proxy de Netlify: /api/* se reenvía a tu backend
 [build]
   publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner"]
 
 [[redirects]]
-  from = "/api/*"
-  to   = "https://mixtli-pro.onrender.com/api/:splat"
+  from = "/api/health"
+  to   = "/.netlify/functions/health"
   status = 200
-  force  = true
+
+[[redirects]]
+  from = "/api/presign"
+  to   = "/.netlify/functions/presign"
+  status = 200
