@@ -2,20 +2,23 @@ services:
   - type: web
     name: mixtli-pro
     env: node
-    plan: free
-    rootDir: backend
-    buildCommand: "npm ci --omit=dev"
+    plan: starter
+    region: oregon
+    buildCommand: "npm ci"
     startCommand: "node server.js"
+    autoDeploy: true
     envVars:
+      - key: PORT
+        value: "10000"
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_REGION
+        value: "auto"
       - key: R2_ACCESS_KEY_ID
         sync: false
       - key: R2_SECRET_ACCESS_KEY
         sync: false
-      - key: R2_BUCKET
-        sync: false
-      - key: R2_ACCOUNT_ID
-        sync: false
       - key: PUBLIC_BASE_URL
         sync: false
-      - key: ALLOWED_ORIGINS
-        value: "http://localhost:5173,https://*.netlify.app"
