@@ -20,8 +20,6 @@ services:
         value: "200mb"
       - key: KEY_PREFIX
         value: "uploads"
-      - key: RATE_LIMIT_PER_MIN
-        value: "100"
       - key: R2_ACCOUNT_ID
         sync: false
       - key: R2_BUCKET
