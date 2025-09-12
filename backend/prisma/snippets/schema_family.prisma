@@ -1,0 +1,58 @@
+// === Agrega esto a tu schema.prisma y corre `npx prisma migrate dev -n family_plan_albums` ===
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  familyId  String?
+  family    Family?  @relation(fields: [familyId], references: [id])
+  albums    Album[]
+  createdAt DateTime @default(now())
+}
+
+model Family {
+  id        String          @id @default(cuid())
+  name      String
+  ownerId   String
+  owner     User            @relation(fields: [ownerId], references: [id])
+  members   FamilyMember[]
+  invites   Invite[]
+  createdAt DateTime        @default(now())
+}
+
+model FamilyMember {
+  id        String   @id @default(cuid())
+  familyId  String
+  userId    String
+  role      String   // 'owner' | 'member'
+  status    String   // 'active' | 'pending' | 'removed'
+  joinedAt  DateTime @default(now())
+  family    Family   @relation(fields: [familyId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([familyId, userId])
+}
+
+model Invite {
+  id        String   @id @default(cuid())
+  familyId  String
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  acceptedAt DateTime?
+  family    Family   @relation(fields: [familyId], references: [id])
+}
+
+model Album {
+  id         String   @id @default(cuid())
+  ownerId    String
+  familyId   String?
+  name       String
+  slug       String
+  visibility String   // 'private' | 'family' | 'family_lock'
+  passHash   String?  // bcrypt hash si 'family_lock'
+  createdAt  DateTime @default(now())
+  owner      User     @relation(fields: [ownerId], references: [id])
+
+  @@unique([ownerId, slug])
+}
