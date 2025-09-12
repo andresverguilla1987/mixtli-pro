@@ -12,6 +12,14 @@ services:
         value: "10000"
       - key: ALLOWED_ORIGIN
         sync: false
+      - key: API_TOKEN
+        sync: false
+      - key: ALLOWED_MIME
+        value: "image/jpeg,image/png,image/webp,image/gif"
+      - key: MAX_BYTES
+        value: "200mb"
+      - key: KEY_PREFIX
+        value: "uploads"
       - key: R2_ACCOUNT_ID
         sync: false
       - key: R2_BUCKET
