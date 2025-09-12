@@ -1,4 +1,4 @@
-// server.js — Mixtli API (server-upload) HARDENED
+// server.js — Mixtli API (server-upload) with CacheControl
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -9,11 +9,11 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const app = express();
 
-// --- CORS allowlist (Netlify domains) ---
+// --- CORS allowlist ---
 const allowed = (process.env.ALLOWED_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
 app.use(cors({
   origin(origin, cb) {
-    if (!origin) return cb(null, true); // curl/Postman
+    if (!origin) return cb(null, true);
     if (!allowed.length || allowed.includes(origin)) return cb(null, true);
     return cb(new Error('CORS blocked: ' + origin));
   },
@@ -21,17 +21,17 @@ app.use(cors({
   allowedHeaders: ['Content-Type','Authorization','x-mixtli-token']
 }));
 
-// --- Config endurecida ---
+// --- Config ---
 const MAX_BYTES = process.env.MAX_BYTES || '200mb';
-const PREFIX = (process.env.KEY_PREFIX || 'uploads').replace(/\/+$/,''); // sin slash final
-const TOKEN = process.env.API_TOKEN || ''; // si está, exige header x-mixtli-token
+const PREFIX = (process.env.KEY_PREFIX || 'uploads').replace(/\/+$/,'');
+const TOKEN = process.env.API_TOKEN || '';
 const ALLOWED_MIME = (process.env.ALLOWED_MIME || 'image/jpeg,image/png,image/webp,image/gif').split(',').map(s=>s.trim()).filter(Boolean);
 
 // --- Body parsers ---
 app.use('/api/upload', express.raw({ type: '*/*', limit: MAX_BYTES }));
 app.use(express.json({ limit: '5mb' }));
 
-// --- Auth middleware simple ---
+// --- Auth (simple) ---
 function needAuth(req){
   const p = req.path;
   return (req.method === 'POST' && (p === '/api/upload' || p === '/upload')) ||
@@ -64,13 +64,27 @@ app.post(['/api/upload','/upload'], async (req, res) => {
     const rawName = (req.query.filename || 'archivo.bin').toString();
     const contentType = (req.query.contentType || 'application/octet-stream').toString();
     if (!ALLOWED_MIME.includes(contentType)) return res.status(415).json({ error:'unsupported_type', allowed: ALLOWED_MIME });
+
     const filename = sanitizeFilename(rawName);
     const key = `${PREFIX}/${Date.now()}-${crypto.randomBytes(6).toString('hex')}-${filename}`;
 
-    await s3.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key, Body: req.body, ContentType: contentType }));
+    // CacheControl fuerte para imágenes (1 año) y no-cache para otros tipos
+    const cacheControl = ALLOWED_MIME.includes(contentType)
+      ? 'public, max-age=31536000, immutable'
+      : 'no-cache';
+
+    await s3.send(new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET,
+      Key: key,
+      Body: req.body,
+      ContentType: contentType,
+      CacheControl: cacheControl
+    }));
+
     const downloadUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }), { expiresIn: 600 });
     const pubBase = process.env.PUBLIC_BASE_URL || null;
     const publicUrl = pubBase ? `${pubBase.replace(/\/$/,'')}/${encodeURIComponent(key)}` : null;
+
     res.json({ status:'ok', key, downloadUrl, publicUrl });
   }catch(e){
     console.error(e);
