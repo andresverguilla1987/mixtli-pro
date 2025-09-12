@@ -10,10 +10,8 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.624.0",
-    "@aws-sdk/hash-node": "^3.624.0",
-    "@aws-sdk/s3-request-presigner": "^3.624.0",
-    "@aws-sdk/util-format-url": "^3.624.0",
+    "@aws-sdk/client-s3": "^3.609.0",
+    "@aws-sdk/s3-request-presigner": "^3.609.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2"

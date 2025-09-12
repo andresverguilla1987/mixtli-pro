@@ -1,12 +1,10 @@
-// server.js — Mixtli API (server-upload)
+// server.js — Mixtli API (server-upload) — patched to avoid @aws-sdk/hash-node
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { S3RequestPresigner } from '@aws-sdk/s3-request-presigner';
-import { Hash } from '@aws-sdk/hash-node';
-import { formatUrl } from '@aws-sdk/util-format-url';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const app = express();
 
@@ -21,8 +19,8 @@ app.use(cors({
     if (!allowed.length || allowed.includes(origin)) return cb(null, true);
     return cb(new Error('CORS blocked: ' + origin));
   },
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET','POST'],
+  allowedHeaders: ['Content-Type','Authorization']
 }));
 
 // Body parsers
@@ -33,42 +31,22 @@ app.use(express.json({ limit: '5mb' }));
 const s3 = new S3Client({
   region: process.env.R2_REGION || 'auto',
   endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
-  }
+  credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY }
 });
 
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, mode: 'server-upload', time: new Date().toISOString() });
-});
+app.get('/api/health', (_req, res) => res.json({ ok: true, mode: 'server-upload', time: new Date().toISOString() }));
 
-// Upload via server (bypass browser CORS)
-app.post('/api/upload', async (req, res) => {
+app.post(['/api/upload','/upload'], async (req, res) => {
   try {
     const filename = (req.query.filename || 'archivo.bin').toString();
     const contentType = (req.query.contentType || 'application/octet-stream').toString();
     const key = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}-${filename}`;
 
-    await s3.send(new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET,
-      Key: key,
-      Body: req.body,
-      ContentType: contentType
-    }));
+    await s3.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key, Body: req.body, ContentType: contentType }));
 
-    // Presign GET for 10 minutes
-    const presigner = new S3RequestPresigner({ ...s3.config, sha256: Hash.bind(null, 'sha256') });
-    const signed = await presigner.presign(
-      new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }),
-      { expiresIn: 600 }
-    );
-    const downloadUrl = formatUrl(signed);
-
-    // Optional public base (r2.dev) for permanent link
+    const downloadUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }), { expiresIn: 600 });
     const pubBase = process.env.PUBLIC_BASE_URL || null;
     const publicUrl = pubBase ? `${pubBase.replace(/\/$/, '')}/${encodeURIComponent(key)}` : null;
-
     res.json({ status: 'ok', key, downloadUrl, publicUrl });
   } catch (e) {
     console.error(e);
@@ -76,18 +54,13 @@ app.post('/api/upload', async (req, res) => {
   }
 });
 
-// Optional: sign GET for existing key
 app.get('/api/signget', async (req, res) => {
   try {
     const key = (req.query.key || '').toString();
     const expires = Number(req.query.expires || 600);
     if (!key) return res.status(400).json({ error: 'key requerido' });
-    const presigner = new S3RequestPresigner({ ...s3.config, sha256: Hash.bind(null, 'sha256') });
-    const signed = await presigner.presign(
-      new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }),
-      { expiresIn: expires }
-    );
-    res.json({ url: formatUrl(signed), expiresIn: expires });
+    const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }), { expiresIn: expires });
+    res.json({ url, expiresIn: expires });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'sign_failed', message: String(e) });
