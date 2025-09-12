@@ -1,31 +1,22 @@
-# Mixtli API (server-upload) — Render + GitHub
+# Mixtli API — server-upload (Render + GitHub)
 
-Un solo flujo sólido de producción: el navegador envía el archivo a **/api/upload** (Render) y el servidor lo sube a **Cloudflare R2**. Sin dependencias de CORS del navegador.
+Flujo sólido de producción: el navegador envía a `/api/upload` (Render) y Render sube a Cloudflare R2. Sin CORS del navegador.
 
-## Rápido (Render conectado a GitHub)
-1. **Crea un repo en GitHub** (por ejemplo `mixtli-api`) y sube estos archivos.
-2. En **Render** → New → **Web Service** → Connect Repo → elige el repo.
-3. **Build Command:** `npm ci`  
-   **Start Command:** `node server.js`
-4. **Environment** (Add environment variables):
-   ```
-   PORT=10000
-   R2_ACCOUNT_ID=<tu id de cuenta>
-   R2_BUCKET=<tu bucket>
-   R2_REGION=auto
-   R2_ACCESS_KEY_ID=<tu key id>
-   R2_SECRET_ACCESS_KEY=<tu secret>
-   PUBLIC_BASE_URL=<opcional, r2.dev si público>
-   ```
-5. Deploy. El log debe mostrar: `Mixtli server-upload on :10000`
+## Deploy (GitHub → Render)
+1) Sube estos archivos a un repo de GitHub.
+2) Render → New → Blueprint → selecciona tu repo (usa `render.yaml`).
+3) Completa las env vars marcadas como `sync:false` y deploy.
 
-## Endpoints
-- `GET /api/health` → `{ ok:true, mode:'server-upload', time: ... }`
-- `POST /api/upload?filename=<name>&contentType=<mime>` → `{ status:'ok', key, downloadUrl, publicUrl? }`
+## Variables
+- PORT=10000
+- ALLOWED_ORIGIN=https://lovely-bienenstitch-6344a1.netlify.app,https://meek-alfajores-1c364d.netlify.app
+- R2_ACCOUNT_ID=...
+- R2_BUCKET=...
+- R2_REGION=auto
+- R2_ACCESS_KEY_ID=...
+- R2_SECRET_ACCESS_KEY=...
+- PUBLIC_BASE_URL=  # opcional (para r2.dev público)
 
-## Netlify (frontend)
-En tu sitio Netlify, usa `_redirects` para proxy:
-```
-/api/*  https://<TU-SERVICE>.onrender.com/:splat  200
-/*      /index.html   200
-```
+## Probar
+- GET /api/health → `{ ok:true, mode:'server-upload' }`
+- POST /api/upload?filename=name&contentType=mime → `{ status:'ok', key, downloadUrl, publicUrl? }`

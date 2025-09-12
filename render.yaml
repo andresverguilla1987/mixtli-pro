@@ -10,6 +10,8 @@ services:
     envVars:
       - key: PORT
         value: "10000"
+      - key: ALLOWED_ORIGIN
+        sync: false
       - key: R2_ACCOUNT_ID
         sync: false
       - key: R2_BUCKET

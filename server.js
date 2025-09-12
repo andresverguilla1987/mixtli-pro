@@ -1,3 +1,4 @@
+// server.js — Mixtli API (server-upload, production)
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -8,15 +9,34 @@ import { Hash } from '@aws-sdk/hash-node';
 import { formatUrl } from '@aws-sdk/util-format-url';
 
 const app = express();
+
+// Strict CORS allowlist (Netlify). Leave ALLOWED_ORIGIN empty to allow all.
+const allowed = (process.env.ALLOWED_ORIGIN || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin) return cb(null, true); // curl/Postman
+    if (!allowed.length || allowed.includes(origin)) return cb(null, true);
+    return cb(new Error('CORS blocked: ' + origin));
+  },
+  methods: ['GET','POST'],
+  allowedHeaders: ['Content-Type','Authorization']
+}));
+
+// Body parsers
 app.use('/api/upload', express.raw({ type: '*/*', limit: '200mb' }));
 app.use(express.json({ limit: '5mb' }));
 
-app.use(cors()); // Render sits behind Netlify proxy; tighten later if needed.
-
+// Cloudflare R2 (S3-compatible)
 const s3 = new S3Client({
   region: process.env.R2_REGION || 'auto',
   endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: { accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY }
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
+  }
 });
 
 app.get('/api/health', (_req, res) => {
@@ -37,12 +57,12 @@ app.post('/api/upload', async (req, res) => {
     }));
 
     const presigner = new S3RequestPresigner({ ...s3.config, sha256: Hash.bind(null, 'sha256') });
-    const signed = await presigner.presign(new GetObjectCommand({
-      Bucket: process.env.R2_BUCKET,
-      Key: key
-    }), { expiresIn: 600 });
-
+    const signed = await presigner.presign(
+      new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }),
+      { expiresIn: 600 } // 10 minutos
+    );
     const downloadUrl = formatUrl(signed);
+
     const pubBase = process.env.PUBLIC_BASE_URL || null;
     const publicUrl = pubBase ? `${pubBase.replace(/\/$/, '')}/${encodeURIComponent(key)}` : null;
 
