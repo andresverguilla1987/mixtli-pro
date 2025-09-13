@@ -1,48 +1,79 @@
+# Mixtli — Patch CORS + 50MB (Render)
 
-# Mixtli API — Upload 50MB (Express + Multer + Cloudflare R2)
+Este paquete añade **CORS correcto con preflight** y **límite de archivo 50 MB** para tu backend en Render, sin reescribir tu proyecto.
 
-Backend listo para Render. Acepta archivos de **hasta 50 MB**, maneja **CORS** y sube a **Cloudflare R2** (API S3).
+## Archivos
+- `cors-setup.js`: módulo con:
+  - `applyCors(app)` → configura CORS robusto y JSON parser.
+  - `createUploadMw()` → devuelve `multer` con límite de 50 MB.
+  - `applyErrorHandler(app)` → maneja errores (incluye CORS).
+- `.env.example`: ejemplo de `ALLOWED_ORIGINS`.
 
-## Deploy en Render
+---
 
-1. Crea un **Web Service** desde este ZIP (o desde GitHub).
-2. **Build Command**: `npm install --no-audit --no-fund`
-3. **Start Command**: `node server.js`
-4. **Environment** (Settings → Environment):
-   - `ALLOWED_ORIGINS=https://lovely-bienenstitch-6344a1.netlify.app`
-   - `MAX_UPLOAD_MB=50`
-   - `R2_ENDPOINT=https://<account>.r2.cloudflarestorage.com`
-   - `R2_BUCKET=<tu-bucket>`
-   - `R2_ACCESS_KEY_ID=<key>`
-   - `R2_SECRET_ACCESS_KEY=<secret>`
-   - `PUBLIC_BASE_URL=https://pub-xxxxxxxx.r2.dev` (opcional para link público)
-5. **Manual Deploy**.
+## Cómo integrar (paso a paso)
+1. **Copiar** `cors-setup.js` a la raíz de tu repo (junto a `server.js`).
+2. **Editar `server.js`** y añadir al comienzo:
+   ```js
+   import express from "express";
+   import { applyCors, createUploadMw, applyErrorHandler } from "./cors-setup.js";
 
-## Endpoints
+   const app = express();
+   applyCors(app);
+   ```
 
-- `GET /api/health` → `{ ok, version, maxMB }`
-- `POST /api/upload`  
-  FormData:
-  - `file` (campo de archivo)
-  - `folder` (opcional, por ejemplo `users/123`)
+3. **Health (opcional pero recomendado)** en `server.js`:
+   ```js
+   app.get("/api/health", (req, res) => {
+     res.json({
+       ok: true,
+       mode: "server-upload",
+       version: "zip-50mb",
+       time: new Date().toISOString(),
+     });
+   });
+   ```
 
-Respuesta `201`:
-```json
-{ "ok": true, "key": "users/123/archivo.jpg", "publicUrl": "https://..." }
-```
+4. **Endpoint de subida**: usa el middleware de 50 MB en tus rutas que reciben archivos.
+   ```js
+   const upload = createUploadMw();
+
+   app.post("/api/upload", upload.single("file"), async (req, res, next) => {
+     try {
+       // ... tu lógica existente (presign + subida a R2) ...
+       res.json({ ok: true });
+     } catch (err) {
+       next(err);
+     }
+   });
+   ```
+
+5. **Manejo de errores** al final de `server.js` (después de tus rutas):
+   ```js
+   applyErrorHandler(app);
+   ```
+
+6. **Variables de entorno (Render → Settings → Environment → Add)**:
+   ```
+   ALLOWED_ORIGINS=https://lovely-bienenstitch-6344a1.netlify.app
+   ```
+   > Puedes poner varios dominios separados por coma. **Sin comillas ni slash final.**
+
+7. **Redeploy manual** en Render. En los logs deberías ver:
+   ```
+   ALLOWED_ORIGINS = [ 'https://lovely-bienenstitch-6344a1.netlify.app' ]
+   ```
+
+8. **Pruebas**:
+   ```bash
+   curl -i https://mixtli-pro.onrender.com/api/health        -H "Origin: https://lovely-bienenstitch-6344a1.netlify.app"
+
+   curl -i -X OPTIONS https://mixtli-pro.onrender.com/api/upload        -H "Origin: https://lovely-bienenstitch-6344a1.netlify.app"        -H "Access-Control-Request-Method: POST"        -H "Access-Control-Request-Headers: content-type,x-mixtli-token"
+   ```
+
+---
 
 ## Notas
-
-- **CORS**: responde OPTIONS y permite `Content-Type,x-mixtli-token`.  
-- **No** seteamos manualmente `Content-Type` en el frontend cuando usamos `FormData`.
-- Si ves `413 Payload Too Large`, confirma que esta app (con Multer) es la que corre en Render.
-
-## Local
-
-```
-cp .env.example .env
-npm i
-node server.js
-```
-
-Abre `http://localhost:10000/api/health`.
+- Con esto desaparece el error: **“CORS not allowed: …netlify.app”**.
+- El tamaño máximo por archivo pasa a **50 MB** (ajústalo en `cors-setup.js` si quieres).
+- Si sigues viendo “Failed to fetch”, revisa en la pestaña *Network* que el **preflight OPTIONS** responda `204` con los headers `Access-Control-Allow-*` correctos.
