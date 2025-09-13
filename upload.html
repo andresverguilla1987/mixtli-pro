@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Mixtli — Test Presign → R2 PUT</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b0b0f; color:#eaeaf0; margin:0; padding:24px; }
+    .card { max-width: 720px; margin: 0 auto; background: #14141c; border: 1px solid #232334; border-radius: 16px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+    h1 { font-size: 20px; margin-top:0; }
+    label { display:block; margin: 12px 0 6px; color:#c8c8d0; }
+    input[type=file] { width: 100%; padding: 10px; background:#0f0f16; border:1px dashed #2a2a3a; border-radius: 10px; color:#9fa5b0; }
+    button { margin-top: 16px; padding: 12px 16px; border:0; border-radius: 12px; background:#3b82f6; color:white; cursor:pointer; font-weight:600; }
+    button:disabled { background:#2a2a3a; cursor:not-allowed; }
+    progress { width: 100%; height: 14px; margin-top: 12px; }
+    .row { display:flex; gap:12px; align-items:center; margin-top:10px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; word-break: break-all; }
+    .ok { color: #86efac; }
+    .err { color: #fca5a5; }
+    a { color:#93c5fd }
+  </style>
+  <script src="./config.js"></script>
+</head>
+<body>
+  <div class="card">
+    <h1>Mixtli — Subida directa a R2 (presign PUT)</h1>
+    <p>Selecciona un archivo (máx. 50&nbsp;MB). Primero se pide un <em>presigned URL</em> al backend, luego se hace <code>PUT</code> directo a R2.</p>
+
+    <label>Archivo</label>
+    <input id="file" type="file" />
+
+    <div class="row">
+      <button id="btn">Subir</button>
+      <span id="status"></span>
+    </div>
+
+    <progress id="bar" value="0" max="100" style="display:none;"></progress>
+
+    <div id="result" class="mono" style="margin-top:14px;"></div>
+  </div>
+
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+    const btn = $('#btn');
+    const bar = $('#bar');
+    const status = $('#status');
+    const result = $('#result');
+
+    function setStatus(text, ok=false, err=false) {
+      status.textContent = text;
+      status.className = ok ? 'ok' : err ? 'err' : '';
+    }
+
+    btn.addEventListener('click', async () => {
+      try {
+        const file = $('#file').files[0];
+        if (!file) return setStatus('Selecciona un archivo', false, true);
+
+        btn.disabled = true; setStatus('Pidiendo presign...');
+        result.textContent = '';
+        bar.style.display = 'none'; bar.value = 0;
+
+        const presign = await fetch(`${window.API_BASE}/api/presign`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ filename: file.name, type: file.type, size: file.size })
+        });
+
+        if (!presign.ok) {
+          const text = await presign.text();
+          setStatus('Error presign', false, true);
+          result.textContent = text;
+          btn.disabled = false;
+          return;
+        }
+        const { url, key, publicUrl } = await presign.json();
+
+        setStatus('Subiendo a R2...');
+        bar.style.display = 'block';
+
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', url, true);
+          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+          xhr.upload.onprogress = (evt) => {
+            if (evt.lengthComputable) bar.value = Math.round((evt.loaded / evt.total) * 100);
+          };
+          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error('R2 PUT ' + xhr.status + ': ' + xhr.responseText));
+          xhr.onerror = () => reject(new Error('R2 PUT network error'));
+          xhr.send(file);
+        });
+
+        setStatus('¡Listo!', true, false);
+        result.innerHTML = `
+          <div>key: <b>${key}</b></div>
+          <div>URL pública (si aplica): <a href="${publicUrl}" target="_blank" rel="noopener">${publicUrl}</a></div>
+        `;
+      } catch (e) {
+        console.error(e);
+        setStatus('Falló', false, true);
+        result.textContent = String(e);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
