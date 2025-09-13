@@ -1,139 +1,298 @@
-import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import crypto from 'crypto';
-import {
-  S3Client, PutObjectCommand, HeadObjectCommand, GetObjectCommand,
-  ListObjectsV2Command, DeleteObjectCommand, CopyObjectCommand
-} from '@aws-sdk/client-s3';
+import bodyParser from 'body-parser';
+import multer from 'multer';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command, CopyObjectCommand, GetObjectTaggingCommand, PutObjectTaggingCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import archiver from 'archiver';
+import { randomUUID } from 'crypto';
 
+// ---- Config ----
+const PORT = process.env.PORT || 10000;
+const BUCKET = process.env.R2_BUCKET;
+const ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
+const ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
+const SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
+const R2_ENDPOINT = process.env.R2_ENDPOINT || (ACCOUNT_ID ? `https://${ACCOUNT_ID}.r2.cloudflarestorage.com` : undefined);
+const FORCE_PATH_STYLE = process.env.R2_FORCE_PATH_STYLE === 'true' ? true : true; // true by default
+const PUBLIC_BASE = process.env.R2_PUBLIC_BASE || (ACCOUNT_ID && BUCKET ? `https://${BUCKET}.${ACCOUNT_ID}.r2.cloudflarestorage.com` : undefined);
+const PRESIGN_EXPIRES = parseInt(process.env.PRESIGN_EXPIRES || '3600', 10); // seconds
+const MAX_UPLOAD_MB = parseInt(process.env.MAX_UPLOAD_MB || '50', 10);
+
+// public toggle mode: "tag" (default) or "prefix"
+const PUBLIC_TOGGLE_MODE = (process.env.PUBLIC_TOGGLE_MODE || 'tag').toLowerCase();
+const PUBLIC_PREFIX = process.env.PUBLIC_PREFIX || '';        // used if mode=prefix (public objects live here)
+const PRIVATE_PREFIX = process.env.PRIVATE_PREFIX || '_private/'; // used if mode=prefix (non-public)
+const ZIP_MAX_KEYS = parseInt(process.env.ZIP_MAX_KEYS || '2000', 10);
+
+// CORS origins
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || 'http://127.0.0.1:8080,http://localhost:8080,http://localhost:5173')
+  .split(',').map(s=>s.trim()).filter(Boolean);
+
+console.log('[CORS] ALLOWED_ORIGINS (final) =', ALLOWED_ORIGINS);
+
+// ---- Clients ----
+const s3 = new S3Client({
+  region: 'auto',
+  endpoint: R2_ENDPOINT,
+  forcePathStyle: FORCE_PATH_STYLE,
+  credentials: { accessKeyId: ACCESS_KEY_ID, secretAccessKey: SECRET_ACCESS_KEY }
+});
+
+// ---- App ----
 const app = express();
 
-const normalize = s => (s||'').toLowerCase().replace(/\/$/, '').trim();
-const DEFAULT_ORIGINS = ['https://lovely-bienenstitch-6344a1.netlify.app'];
-const envOrigins = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || '')
-  .split(',').map(normalize).filter(Boolean);
-const ALLOWED = Array.from(new Set([...DEFAULT_ORIGINS.map(normalize), ...envOrigins]));
-const ALLOWED_SET = new Set(ALLOWED);
-console.log('[CORS] ALLOWED_ORIGINS (final) =', ALLOWED);
-app.use((req,res,next)=>{res.setHeader('Vary','Origin'); next();});
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true);
-    const o = normalize(origin);
-    if (ALLOWED_SET.has(o)) return cb(null, true);
-    return cb(new Error(`CORS not allowed: ${origin}`));
-  },
-  methods: ['GET','POST','PUT','DELETE','OPTIONS','HEAD'],
-  maxAge: 86400,
-}));
-app.options('*', cors());
-app.use(express.json({ limit: '1mb' }));
+// CORS custom handling with whitelist
+app.use((req, res, next) => {
+  const origin = req.headers.origin || '';
+  if(origin && ALLOWED_ORIGINS.includes(origin)){
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods','GET,HEAD,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || '*');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  if(req.method === 'OPTIONS'){
+    return res.status(204).end();
+  }
+  next();
+});
 
-app.get('/api/health', (req,res)=>res.json({ok:true,time:new Date().toISOString()}));
+app.use(bodyParser.json({ limit: '2mb' }));
+
+// ---- Helpers ----
+function normalizePrefix(prefix=''){
+  if(!prefix) return '';
+  return prefix.endsWith('/') ? prefix : prefix + '/';
+}
+function publicUrlFor(key){
+  if(!PUBLIC_BASE) return null;
+  const enc = key.split('/').map(encodeURIComponent).join('/');
+  return `${PUBLIC_BASE}/${enc}`;
+}
+function keyFromBody(filename, prefix){
+  const clean = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const pref = normalizePrefix(prefix);
+  return `${Date.now()}-${randomUUID().slice(0,12)}-${clean}`.replace(/^/, pref);
+}
+
+// Optional: check 'public' tag for object (true/false). Heavy if called for many keys.
+async function isPublicByTag(Key){
+  try{
+    const out = await s3.send(new GetObjectTaggingCommand({ Bucket: BUCKET, Key }));
+    const t = (out.TagSet || []).find(x=> x.Key === 'public');
+    return t && (t.Value === 'true' || t.Value === '1');
+  }catch(e){ return false; }
+}
+
+function tryParseInt(n, d=0){ const v = parseInt(n,10); return Number.isFinite(v)? v : d; }
+
+// ---- Routes ----
+app.get('/api/health', (req,res)=>{
+  res.json({ ok:true, time:new Date().toISOString() });
+});
+
 app.get('/api/debug', (req,res)=>{
   const origin = req.headers.origin || null;
-  const normalized = normalize(origin);
-  res.json({ origin, normalized, allowed: ALLOWED, match: origin ? ALLOWED_SET.has(normalized) : true });
+  res.json({
+    origin,
+    allowed: ALLOWED_ORIGINS,
+    match: !!(origin && ALLOWED_ORIGINS.includes(origin)),
+    request: { method: req.method, path: req.path, headers: {
+      host: req.headers.host || null,
+      'access-control-request-method': req.headers['access-control-request-method'] || null,
+      'access-control-request-headers': req.headers['access-control-request-headers'] || null
+    }}
+  });
 });
 
-function makeS3(){
-  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = process.env;
-  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) throw new Error('Faltan credenciales R2');
-  return new S3Client({
-    region: 'auto',
-    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials: { accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY },
-  });
-}
-const s3 = makeS3();
-
-const MAX_BYTES = 50 * 1024 * 1024;
-const ALLOWED_MIME_PREFIXES = (process.env.ALLOWED_MIME_PREFIXES || 'image/,application/pdf').split(',').map(s=>s.trim()).filter(Boolean);
-const bucket = process.env.R2_BUCKET;
-const publicBase = process.env.R2_PUBLIC_BASE || (bucket && process.env.R2_ACCOUNT_ID ? `https://${bucket}.${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : null);
-
-function extFromName(name=''){ const i = name.lastIndexOf('.'); return i>=0 ? name.slice(i) : ''; }
-function safeKey(filename='file.bin'){
-  const stamp = Date.now(); const rand = crypto.randomBytes(6).toString('hex'); const ext = extFromName(filename).toLowerCase().slice(0,10);
-  return `${stamp}-${rand}${ext}`;
-}
-function mimeAllowed(type=''){ return !!type && ALLOWED_MIME_PREFIXES.some(p => type===p || type.startsWith(p)); }
-
+// Presign PUT to R2
 app.post('/api/presign', async (req,res)=>{
   try{
-    const { filename, type, size } = req.body || {};
-    if (!bucket) return res.status(500).json({ error:'Falta R2_BUCKET' });
-    if (!(size>0)) return res.status(400).json({ error:'size requerido' });
-    if (size > MAX_BYTES) return res.status(413).json({ error:'Archivo excede 50 MB' });
-    if (!mimeAllowed(type)) return res.status(415).json({ error:'MIME no permitido', allowed: ALLOWED_MIME_PREFIXES });
-    const Key = safeKey(filename);
-    const command = new PutObjectCommand({ Bucket: bucket, Key, ContentType: type || 'application/octet-stream' });
-    const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-    const publicUrl = publicBase ? `${publicBase}/${Key}` : null;
-    res.json({ url, key: Key, bucket, publicUrl, expiresIn: 3600 });
-  }catch(e){ console.error('presign', e); res.status(500).json({ error:'presign failed', detail:String(e?.message||e) }); }
+    const { filename, type, size, prefix } = req.body || {};
+    if(!filename) return res.status(400).json({ error:'filename required' });
+    if(size && size > MAX_UPLOAD_MB*1024*1024) return res.status(400).json({ error:`Max ${MAX_UPLOAD_MB}MB` });
+    const Key = keyFromBody(filename, prefix);
+    const put = new PutObjectCommand({ Bucket: BUCKET, Key, ContentType: type || 'application/octet-stream' });
+    const url = await getSignedUrl(s3, put, { expiresIn: PRESIGN_EXPIRES });
+    const publicUrl = PUBLIC_BASE ? publicUrlFor(Key) : null;
+    res.json({ url, key: Key, bucket: BUCKET, publicUrl, expiresIn: PRESIGN_EXPIRES });
+  }catch(e){
+    console.error('presign error', e);
+    res.status(500).json({ error:String(e) });
+  }
 });
 
+// Complete upload (placeholder for hooks). Return a signed GET too.
 app.post('/api/complete', async (req,res)=>{
   try{
     const { key } = req.body || {};
-    if (!key) return res.status(400).json({ error:'key requerida' });
-    const head = await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
-    const size = head.ContentLength, type = head.ContentType;
-    const getUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: 900 });
-    res.json({ ok:true, key, size, type, getUrl });
-  }catch(e){ console.error('complete', e); res.status(500).json({ error:'complete failed', detail:String(e?.message||e) }); }
+    if(!key) return res.status(400).json({ error:'key required' });
+    const get = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+    const url = await getSignedUrl(s3, get, { expiresIn: PRESIGN_EXPIRES });
+    res.json({ ok:true, getUrl: url });
+  }catch(e){
+    console.error('complete error', e);
+    res.status(500).json({ error:String(e) });
+  }
 });
 
+// List assets with optional prefix & pagination
 app.get('/api/assets', async (req,res)=>{
   try{
-    const { prefix = '', token = null, limit = 20 } = req.query;
-    const out = await s3.send(new ListObjectsV2Command({
-      Bucket: bucket,
-      Prefix: prefix || undefined,
-      ContinuationToken: token || undefined,
-      MaxKeys: Math.max(1, Math.min(parseInt(limit || 20, 10), 100)),
-    }));
-    const items = (out.Contents || []).map(o => ({
-      key: o.Key, size: o.Size, lastModified: o.LastModified,
-      publicUrl: publicBase ? `${publicBase}/${o.Key}` : null,
-    }));
-    res.json({ items, isTruncated: !!out.IsTruncated, nextToken: out.NextContinuationToken || null, prefix: prefix || '' });
-  }catch(e){ console.error('assets', e); res.status(500).json({ error:'assets failed', detail:String(e?.message||e) }); }
+    const prefix = req.query.prefix ? normalizePrefix(req.query.prefix) : '';
+    const token = req.query.token || undefined;
+    const limit = tryParseInt(req.query.limit, 100);
+    const out = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix, ContinuationToken: token, MaxKeys: Math.min(limit, 1000) }));
+    const contents = out.Contents || [];
+    // For 'tag' mode, enrich with publicUrl if tag public=true; otherwise, compute publicUrl always if bucket is open.
+    const items = [];
+    for(const c of contents){
+      const key = c.Key;
+      let publicUrl = PUBLIC_BASE ? publicUrlFor(key) : null;
+      if(PUBLIC_TOGGLE_MODE === 'tag'){
+        const pub = await isPublicByTag(key);
+        if(!pub) publicUrl = null;
+      }else if(PUBLIC_TOGGLE_MODE === 'prefix'){
+        if(!key.startsWith(PUBLIC_PREFIX)) publicUrl = null;
+      }
+      items.push({
+        key,
+        size: c.Size,
+        lastModified: c.LastModified,
+        publicUrl
+      });
+    }
+    res.json({ items, nextToken: out.IsTruncated ? out.NextContinuationToken : null });
+  }catch(e){
+    console.error('assets error', e);
+    res.status(500).json({ error:String(e) });
+  }
 });
 
-app.post('/api/delete', async (req,res)=>{
+// Sign GET (temporary download/view URL)
+app.post('/api/sign-get', async (req,res)=>{
   try{
-    const { key } = req.body || {};
-    if (!key) return res.status(400).json({ error:'key requerida' });
-    await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-    res.json({ ok:true });
-  }catch(e){ console.error('delete', e); res.status(500).json({ error:'delete failed', detail:String(e?.message||e) }); }
+    const { key, download } = req.body || {};
+    if(!key) return res.status(400).json({ error:'key required' });
+    const get = new GetObjectCommand({ Bucket: BUCKET, Key: key, ...(download ? { ResponseContentDisposition: `attachment; filename="${encodeURIComponent(key.split('/').pop())}"` } : {}) });
+    const url = await getSignedUrl(s3, get, { expiresIn: PRESIGN_EXPIRES });
+    res.json({ url, expiresIn: PRESIGN_EXPIRES });
+  }catch(e){
+    console.error('sign-get error', e);
+    res.status(500).json({ error:String(e) });
+  }
 });
 
+// Rename (copy+delete)
 app.post('/api/rename', async (req,res)=>{
   try{
     const { fromKey, toKey } = req.body || {};
-    if (!fromKey || !toKey) return res.status(400).json({ error:'fromKey y toKey requeridos' });
-    await s3.send(new CopyObjectCommand({ Bucket: bucket, CopySource: `/${bucket}/${encodeURIComponent(fromKey)}`, Key: toKey }));
-    await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: fromKey }));
-    res.json({ ok:true, key: toKey });
-  }catch(e){ console.error('rename', e); res.status(500).json({ error:'rename failed', detail:String(e?.message||e) }); }
+    if(!fromKey || !toKey) return res.status(400).json({ error:'fromKey & toKey required' });
+    await s3.send(new CopyObjectCommand({ Bucket: BUCKET, CopySource: `/${BUCKET}/${encodeURIComponent(fromKey)}`, Key: toKey }));
+    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: fromKey }));
+    res.json({ ok:true });
+  }catch(e){
+    console.error('rename error', e);
+    res.status(500).json({ error:String(e) });
+  }
 });
 
-app.post('/api/sign-get', async (req,res)=>{
+// Delete
+app.post('/api/delete', async (req,res)=>{
   try{
-    const { key, expiresIn = 900 } = req.body || {};
-    if (!key) return res.status(400).json({ error:'key requerida' });
-    const ttl = Math.min(Math.max(60, Number(expiresIn)), 3600);
-    const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: ttl });
-    res.json({ url, expiresIn: ttl });
-  }catch(e){ console.error('sign-get', e); res.status(500).json({ error:'sign-get failed', detail:String(e?.message||e) }); }
+    const { key } = req.body || {};
+    if(!key) return res.status(400).json({ error:'key required' });
+    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+    res.json({ ok:true });
+  }catch(e){
+    console.error('delete error', e);
+    res.status(500).json({ error:String(e) });
+  }
 });
 
-app.use('/', express.static('public', { extensions: ['html'], maxAge: 0 }));
+// --- NEW: Public toggle ---
+// POST /api/public { keys: string[]; public: boolean }
+app.post('/api/public', async (req,res)=>{
+  try{
+    const { keys, public: isPublic } = req.body || {};
+    const list = Array.isArray(keys) ? keys : (req.body && req.body.key ? [req.body.key] : []);
+    if(list.length===0) return res.status(400).json({ error:'keys[] required' });
+    if(PUBLIC_TOGGLE_MODE === 'tag'){
+      for(const Key of list){
+        await s3.send(new PutObjectTaggingCommand({
+          Bucket: BUCKET, Key,
+          Tagging: { TagSet: [{ Key:'public', Value: isPublic ? 'true' : 'false' }] }
+        }));
+      }
+      return res.json({ ok:true, mode:'tag' });
+    } else if(PUBLIC_TOGGLE_MODE === 'prefix'){
+      // Move between PRIVATE_PREFIX and PUBLIC_PREFIX
+      for(const fromKey of list){
+        const base = fromKey.replace(/^.*\//, s=> s); // keep last segment after / for simple demo
+        let dest = fromKey;
+        if(isPublic){
+          // move to PUBLIC_PREFIX (strip PRIVATE_PREFIX if exists)
+          const stripped = fromKey.startsWith(PRIVATE_PREFIX) ? fromKey.slice(PRIVATE_PREFIX.length) : fromKey;
+          dest = `${PUBLIC_PREFIX}${stripped}`;
+        } else {
+          // move to PRIVATE_PREFIX
+          const stripped = fromKey.startsWith(PUBLIC_PREFIX) ? fromKey.slice(PUBLIC_PREFIX.length) : fromKey;
+          dest = `${PRIVATE_PREFIX}${stripped}`;
+        }
+        if(dest === fromKey) continue;
+        await s3.send(new CopyObjectCommand({ Bucket: BUCKET, CopySource: `/${BUCKET}/${encodeURIComponent(fromKey)}`, Key: dest }));
+        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: fromKey }));
+      }
+      return res.json({ ok:true, mode:'prefix' });
+    } else {
+      return res.status(400).json({ error:'Unsupported PUBLIC_TOGGLE_MODE' });
+    }
+  }catch(e){
+    console.error('public toggle error', e);
+    res.status(500).json({ error:String(e) });
+  }
+});
 
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, ()=> console.log(`Mixtli API on :${PORT}`));
+// --- NEW: ZIP album ---
+// GET /api/zip?prefix=album/
+app.get('/api/zip', async (req,res)=>{
+  try{
+    const prefix = req.query.prefix ? normalizePrefix(req.query.prefix) : '';
+    // list objects under prefix
+    let token;
+    const keys = [];
+    do{
+      const out = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix, ContinuationToken: token, MaxKeys: 1000 }));
+      (out.Contents || []).forEach(o => { if(o.Key && !o.Key.endsWith('/')) keys.push(o.Key); });
+      token = out.IsTruncated ? out.NextContinuationToken : undefined;
+      if(keys.length >= ZIP_MAX_KEYS) break;
+    } while(token);
+
+    if(keys.length === 0) return res.status(404).json({ error:'No files' });
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent((prefix || 'album').replace(/\/$/,'') || 'album')}.zip"`);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', err => { try{ res.status(500).end(String(err)); }catch{} });
+    archive.pipe(res);
+
+    for(const key of keys){
+      const rel = prefix ? key.substring(prefix.length) : key;
+      const obj = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+      archive.append(obj.Body, { name: rel || key });
+    }
+    await archive.finalize();
+  }catch(e){
+    console.error('zip error', e);
+    if(!res.headersSent){
+      res.status(500).json({ error:String(e) });
+    } else {
+      try{ res.end() }catch{}
+    }
+  }
+});
+
+// ---- Start ----
+app.listen(PORT, ()=>{
+  console.log(`Mixtli API on :${PORT}`);
+});
