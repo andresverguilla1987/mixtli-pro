@@ -1,29 +1,48 @@
 
-Mixtli PRO — Fix v2 (Render)
-=============================
+# Mixtli API — Upload 50MB (Express + Multer + Cloudflare R2)
 
-Cambios:
-- Acepta `.JPG` (mayúsculas) y `image/jpg`.
-- Si llega como `application/octet-stream`, detecta MIME real (file-type).
-- Bandera `SKIP_TYPE_CHECK=1` para omitir validación temporalmente.
-- `/api/health` devuelve `{ version: "fix-v2", skipTypeCheck: <bool> }`.
-- Endpoint de depuración `/api/debug/upload` (no sube, solo responde con `ext`, `mimetype`, `sniff`).
+Backend listo para Render. Acepta archivos de **hasta 50 MB**, maneja **CORS** y sube a **Cloudflare R2** (API S3).
 
-Despliegue en Render
---------------------
-1) Sube este repo a GitHub y conéctalo en Render (Web Service).
-2) Comandos:
-   - Build: `npm install --no-audit --no-fund`
-   - Start: `node server.js`
-3) Variables de entorno:
-   - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
-   - `PUBLIC_BASE_URL` (p.ej. https://pub-xxxxx.r2.dev)
-   - `ALLOWED_ORIGINS` (p.ej. https://lovely-bienenstitch-6344a1.netlify.app)
-   - Opcional: `R2_ENDPOINT`, `R2_REGION=auto`
-   - **Opcional**: `SKIP_TYPE_CHECK=1` (mientras pruebas)
+## Deploy en Render
 
-Pruebas
--------
-- Health: `GET /api/health`
-- Debug:  `POST /api/debug/upload` con `file=@...` → devuelve `ext/mimetype/sniff`
-- Upload: `POST /api/upload` con `file=@...` y opcional `folder=...`
+1. Crea un **Web Service** desde este ZIP (o desde GitHub).
+2. **Build Command**: `npm install --no-audit --no-fund`
+3. **Start Command**: `node server.js`
+4. **Environment** (Settings → Environment):
+   - `ALLOWED_ORIGINS=https://lovely-bienenstitch-6344a1.netlify.app`
+   - `MAX_UPLOAD_MB=50`
+   - `R2_ENDPOINT=https://<account>.r2.cloudflarestorage.com`
+   - `R2_BUCKET=<tu-bucket>`
+   - `R2_ACCESS_KEY_ID=<key>`
+   - `R2_SECRET_ACCESS_KEY=<secret>`
+   - `PUBLIC_BASE_URL=https://pub-xxxxxxxx.r2.dev` (opcional para link público)
+5. **Manual Deploy**.
+
+## Endpoints
+
+- `GET /api/health` → `{ ok, version, maxMB }`
+- `POST /api/upload`  
+  FormData:
+  - `file` (campo de archivo)
+  - `folder` (opcional, por ejemplo `users/123`)
+
+Respuesta `201`:
+```json
+{ "ok": true, "key": "users/123/archivo.jpg", "publicUrl": "https://..." }
+```
+
+## Notas
+
+- **CORS**: responde OPTIONS y permite `Content-Type,x-mixtli-token`.  
+- **No** seteamos manualmente `Content-Type` en el frontend cuando usamos `FormData`.
+- Si ves `413 Payload Too Large`, confirma que esta app (con Multer) es la que corre en Render.
+
+## Local
+
+```
+cp .env.example .env
+npm i
+node server.js
+```
+
+Abre `http://localhost:10000/api/health`.
