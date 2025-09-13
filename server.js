@@ -8,6 +8,8 @@ import { fileTypeFromBuffer } from 'file-type';
 import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
+const VERSION = 'fix-v2';
+
 const app = express();
 app.use(express.json());
 
@@ -44,16 +46,33 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100
 
 const ALLOWED_EXT = new Set(['jpg','jpeg','png','gif','webp','svg','bmp','avif','heic','heif','pdf','mp4','mov','mkv','txt','csv','zip']);
 const ALLOWED_MIME = new Set([
-  'image/jpeg','image/png','image/gif','image/webp','image/svg+xml','image/bmp','image/avif','image/heic','image/heif',
-  'application/pdf','video/mp4','video/quicktime','video/x-matroska','text/plain','text/csv','application/zip','application/x-zip-compressed'
+  'image/jpeg','image/jpg','image/png','image/gif','image/webp','image/svg+xml','image/bmp','image/avif','image/heic','image/heif',
+  'application/pdf','video/mp4','video/quicktime','video/x-matroska','text/plain','text/csv','application/zip','application/x-zip-compressed',
+  'application/octet-stream' // permitido si la extensión o el sniff dicen que es válido
 ]);
+
+const SKIP = process.env.SKIP_TYPE_CHECK === '1';
 
 function safeKey(k=''){
   return k.replace(/^\/+|\/+$/g,'').replace(/\s+/g,'_');
 }
 
 app.get('/api/health', (req,res)=>{
-  res.json({ ok:true, mode:'server-upload', time:new Date().toISOString() });
+  res.json({ ok:true, mode:'server-upload', version: VERSION, skipTypeCheck: SKIP, time:new Date().toISOString() });
+});
+
+// Debug endpoint: no sube, solo devuelve info del archivo
+app.post('/api/debug/upload', upload.single('file'), async (req,res)=>{
+  const f = req.file;
+  if (!f) return res.status(400).json({ ok:false, error:'no_file' });
+  const original = f.originalname || 'file';
+  const ext = (original.split('.').pop() || '').toLowerCase();
+  let contentType = f.mimetype || mime.lookup(ext) || 'application/octet-stream';
+  let sniff = null;
+  if (f.buffer) {
+    try { const t = await fileTypeFromBuffer(f.buffer); sniff = t?.mime || null; } catch {}
+  }
+  return res.json({ ok:true, original, ext, mimetype: f.mimetype, contentType, sniff });
 });
 
 app.post('/api/upload', upload.single('file'), async (req,res) => {
@@ -65,13 +84,21 @@ app.post('/api/upload', upload.single('file'), async (req,res) => {
     const ext = (original.split('.').pop() || '').toLowerCase();
     let contentType = f.mimetype || mime.lookup(ext) || 'application/octet-stream';
 
-    // Si viene como octet-stream, tratamos de oler tipo real
-    if (contentType === 'application/octet-stream' && f.buffer){
-      try { const t = await fileTypeFromBuffer(f.buffer); if (t?.mime) contentType = t.mime; } catch {}
+    // Sniff si viene octet-stream o sospechoso
+    let sniff = null;
+    if (f.buffer) {
+      try { const t = await fileTypeFromBuffer(f.buffer); if (t?.mime) sniff = t.mime; } catch {}
+    }
+    if (contentType === 'application/octet-stream' && sniff) {
+      contentType = sniff;
     }
 
-    if (!ALLOWED_EXT.has(ext) && !ALLOWED_MIME.has(contentType)){
-      return res.status(415).json({ ok:false, error:'unsupported_type', detail:{ ext, contentType } });
+    if (!SKIP) {
+      const extOk = ALLOWED_EXT.has(ext);
+      const mimeOk = ALLOWED_MIME.has(contentType) || (sniff && ALLOWED_MIME.has(sniff));
+      if (!extOk && !mimeOk) {
+        return res.status(415).json({ ok:false, error:'unsupported_type', detail:{ ext, contentType, sniff, note:'set SKIP_TYPE_CHECK=1 to bypass temporarily' } });
+      }
     }
 
     const folder = safeKey(req.body.folder || '');
@@ -121,4 +148,4 @@ app.get('/api/list', async (req,res)=>{
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, ()=> console.log('Mixtli server (fix) on :' + PORT));
+app.listen(PORT, ()=> console.log('Mixtli server (fix-v2) on :' + PORT));

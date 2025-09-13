@@ -1,14 +1,13 @@
 {
-  "name": "mixtli-pro-server-fix",
-  "version": "1.0.0",
+  "name": "mixtli-pro-server-fix-v2",
+  "version": "1.2.0",
   "type": "module",
   "engines": {
     "node": ">=18 <25"
   },
   "scripts": {
     "start": "node server.js",
-    "build": "echo 'no build'",
-    "predeploy": "npx prisma db push --skip-generate || echo 'skip prisma'"
+    "build": "echo 'no build'"
   },
   "dependencies": {
     "express": "^4.19.2",
