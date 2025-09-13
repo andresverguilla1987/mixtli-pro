@@ -1,23 +1,23 @@
-{
-  "CORSRules": [
-    {
-      "AllowedOrigins": [
-        "https://meek-alfajores-1c364d.netlify.app"
-      ],
-      "AllowedMethods": [
-        "GET",
-        "PUT",
-        "HEAD"
-      ],
-      "AllowedHeaders": [
-        "*"
-      ],
-      "ExposeHeaders": [
-        "ETag",
-        "x-amz-request-id",
-        "x-amz-version-id"
-      ],
-      "MaxAgeSeconds": 3600
-    }
-  ]
-}
+[
+  {
+    "AllowedOrigins": [
+      "https://lovely-bienenstitch-6344a1.netlify.app"
+    ],
+    "AllowedMethods": [
+      "GET",
+      "PUT",
+      "HEAD",
+      "POST",
+      "DELETE"
+    ],
+    "AllowedHeaders": [
+      "*"
+    ],
+    "ExposeHeaders": [
+      "ETag",
+      "x-amz-request-id",
+      "x-amz-version-id"
+    ],
+    "MaxAgeSeconds": 86400
+  }
+]

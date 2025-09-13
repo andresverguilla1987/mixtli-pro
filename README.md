@@ -1,79 +1,91 @@
-# Mixtli — Patch CORS + 50MB (Render)
+# Mixtli — CORS + Presign (R2) — Paquete mínimo
 
-Este paquete añade **CORS correcto con preflight** y **límite de archivo 50 MB** para tu backend en Render, sin reescribir tu proyecto.
-
-## Archivos
-- `cors-setup.js`: módulo con:
-  - `applyCors(app)` → configura CORS robusto y JSON parser.
-  - `createUploadMw()` → devuelve `multer` con límite de 50 MB.
-  - `applyErrorHandler(app)` → maneja errores (incluye CORS).
-- `.env.example`: ejemplo de `ALLOWED_ORIGINS`.
+Este paquete tiene:
+- `server.js` (Express) con **CORS estricto**, `OPTIONS 204`, `/api/health` y `/api/presign` (PUT a R2).
+- `public/upload.html` para probar el flujo **presign → PUT directo** a Cloudflare R2.
+- `r2_cors.json` ejemplo de política CORS para el bucket.
+- `.env.example` con variables necesarias.
 
 ---
 
-## Cómo integrar (paso a paso)
-1. **Copiar** `cors-setup.js` a la raíz de tu repo (junto a `server.js`).
-2. **Editar `server.js`** y añadir al comienzo:
-   ```js
-   import express from "express";
-   import { applyCors, createUploadMw, applyErrorHandler } from "./cors-setup.js";
+## 1) Render (backend)
 
-   const app = express();
-   applyCors(app);
-   ```
+1. Crea un servicio **Web Service** en Render apuntando a este repo/código.
+2. **Runtime**: Node 18+ (Render suele usar 22.x — OK).
+3. **Build Command**: `npm install --no-audit --no-fund`
+4. **Start Command**: `node server.js`
+5. En **Environment** agrega estas variables:
+   - `R2_ACCOUNT_ID`
+   - `R2_ACCESS_KEY_ID`
+   - `R2_SECRET_ACCESS_KEY`
+   - `R2_BUCKET`
+   - (opcional) `R2_PUBLIC_BASE` → `https://<bucket>.<account>.r2.cloudflarestorage.com`
+   - `ALLOWED_ORIGINS` → `https://lovely-bienenstitch-6344a1.netlify.app`
+   - `PORT` → `10000`
+6. Deploy.
 
-3. **Health (opcional pero recomendado)** en `server.js`:
-   ```js
-   app.get("/api/health", (req, res) => {
-     res.json({
-       ok: true,
-       mode: "server-upload",
-       version: "zip-50mb",
-       time: new Date().toISOString(),
-     });
-   });
-   ```
+### Pruebas rápidas
 
-4. **Endpoint de subida**: usa el middleware de 50 MB en tus rutas que reciben archivos.
-   ```js
-   const upload = createUploadMw();
+**Preflight al backend:**
+```bash
+curl -i -X OPTIONS https://<tu-render>.onrender.com/api/health \
+  -H "Origin: https://lovely-bienenstitch-6344a1.netlify.app" \
+  -H "Access-Control-Request-Method: GET"
+```
 
-   app.post("/api/upload", upload.single("file"), async (req, res, next) => {
-     try {
-       // ... tu lógica existente (presign + subida a R2) ...
-       res.json({ ok: true });
-     } catch (err) {
-       next(err);
-     }
-   });
-   ```
-
-5. **Manejo de errores** al final de `server.js` (después de tus rutas):
-   ```js
-   applyErrorHandler(app);
-   ```
-
-6. **Variables de entorno (Render → Settings → Environment → Add)**:
-   ```
-   ALLOWED_ORIGINS=https://lovely-bienenstitch-6344a1.netlify.app
-   ```
-   > Puedes poner varios dominios separados por coma. **Sin comillas ni slash final.**
-
-7. **Redeploy manual** en Render. En los logs deberías ver:
-   ```
-   ALLOWED_ORIGINS = [ 'https://lovely-bienenstitch-6344a1.netlify.app' ]
-   ```
-
-8. **Pruebas**:
-   ```bash
-   curl -i https://mixtli-pro.onrender.com/api/health        -H "Origin: https://lovely-bienenstitch-6344a1.netlify.app"
-
-   curl -i -X OPTIONS https://mixtli-pro.onrender.com/api/upload        -H "Origin: https://lovely-bienenstitch-6344a1.netlify.app"        -H "Access-Control-Request-Method: POST"        -H "Access-Control-Request-Headers: content-type,x-mixtli-token"
-   ```
+**Health:**
+```bash
+curl -i https://<tu-render>.onrender.com/api/health
+```
 
 ---
 
-## Notas
-- Con esto desaparece el error: **“CORS not allowed: …netlify.app”**.
-- El tamaño máximo por archivo pasa a **50 MB** (ajústalo en `cors-setup.js` si quieres).
-- Si sigues viendo “Failed to fetch”, revisa en la pestaña *Network* que el **preflight OPTIONS** responda `204` con los headers `Access-Control-Allow-*` correctos.
+## 2) Cloudflare R2 — CORS del bucket
+
+En **R2 → Bucket → CORS**, pega el contenido de `r2_cors.json`:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://lovely-bienenstitch-6344a1.netlify.app"],
+    "AllowedMethods": ["GET","PUT","HEAD","POST","DELETE"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag","x-amz-request-id","x-amz-version-id"],
+    "MaxAgeSeconds": 86400
+  }
+]
+```
+
+> Si quieres estricta, reemplaza `"*"` por una lista que incluya al menos `content-type`.
+
+---
+
+## 3) Netlify (frontend de prueba)
+
+- Sube la carpeta `public/` o integra `public/upload.html` dentro de tu sitio.
+- Asegúrate que `public/config.js` apunte al **backend en Render**:
+  ```js
+  window.API_BASE = "https://mixtli-pro.onrender.com";
+  ```
+
+---
+
+## 4) Subida desde `upload.html`
+
+1. Abre `https://<tu-netlify>/upload.html` (o la ruta donde lo coloques).
+2. Elige un archivo (máx. 50 MB).
+3. Click **Subir**:
+   - Pide `/api/presign` al backend.
+   - Hace `PUT` directo a R2 (solo header `Content-Type`).
+4. Verás la `key` y un `publicUrl` de referencia.
+
+---
+
+## 5) Checklist anti “Failed to fetch”
+
+- Domain exacto en **ALLOWED_ORIGINS** (backend) y en CORS del **bucket**.
+- No agregues headers extras en el `PUT` a R2 (solo `Content-Type`).
+- No uses `mode: "no-cors"`.
+- Siempre HTTPS en Netlify y Render.
+
+¡Listo!
