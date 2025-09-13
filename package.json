@@ -1,21 +1,23 @@
 {
-  "name": "mixtli-api",
-  "private": true,
+  "name": "mixtli-pro-server-fix",
+  "version": "1.0.0",
   "type": "module",
   "engines": {
-    "node": ">=18"
+    "node": ">=18 <25"
   },
   "scripts": {
-    "build": "echo no-build",
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "echo 'no build'",
+    "predeploy": "npx prisma db push --skip-generate || echo 'skip prisma'"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.609.0",
-    "@aws-sdk/s3-request-presigner": "^3.609.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "prom-client": "^14.2.0",
-    "swagger-ui-express": "^5.0.1"
+    "cors": "^2.8.5",
+    "multer": "^1.4.5-lts.1",
+    "mime-types": "^2.1.35",
+    "file-type": "^18.7.0",
+    "@aws-sdk/client-s3": "^3.637.0",
+    "@aws-sdk/s3-request-presigner": "^3.637.0",
+    "dotenv": "^16.4.5"
   }
 }
