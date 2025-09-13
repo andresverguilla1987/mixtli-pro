@@ -1,0 +1,22 @@
+{
+  "name": "mixtli-pro-server-fix-v2",
+  "version": "1.2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=18 <25"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo 'no build'"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "multer": "^1.4.5-lts.1",
+    "mime-types": "^2.1.35",
+    "file-type": "^18.7.0",
+    "@aws-sdk/client-s3": "^3.637.0",
+    "@aws-sdk/s3-request-presigner": "^3.637.0",
+    "dotenv": "^16.4.5"
+  }
+}
