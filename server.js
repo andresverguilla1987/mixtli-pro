@@ -6,35 +6,47 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const app = express();
-app.use(express.json({ limit: '1mb' }));
 
-// === CORS (whitelist estricto) ===
-const ALLOWED = (process.env.ALLOWED_ORIGINS || 'https://lovely-bienenstitch-6344a1.netlify.app')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean);
+// ===== CORS ROBUSTO (antes de body parser) =====
+const normalize = (s) => (s || '').toLowerCase().replace(/\/$/, '').trim();
+
+const ALLOWED_ORIGINS_ENV = process.env.ALLOWED_ORIGINS
+  || 'https://lovely-bienenstitch-6344a1.netlify.app';
+
+const ALLOWED = ALLOWED_ORIGINS_ENV.split(',').map(normalize).filter(Boolean);
+const ALLOWED_SET = new Set(ALLOWED);
+
+console.log('[CORS] ALLOWED_ORIGINS =', ALLOWED);
+
+app.use((req, res, next) => { res.setHeader('Vary', 'Origin'); next(); });
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // permite curl/healthchecks
-    if (ALLOWED.includes(origin)) return cb(null, true);
-    return cb(new Error('CORS: origin bloqueado: ' + origin));
+    if (!origin) return cb(null, true); // permite Postman/healthchecks
+    const o = normalize(origin);
+    if (ALLOWED_SET.has(o)) return cb(null, true);
+    const err = new Error(`CORS not allowed: ${origin}`);
+    console.error('[CORS] Rechazado:', { origin, normalized: o, ALLOWED });
+    return cb(err);
   },
   methods: ['GET','POST','PUT','DELETE','OPTIONS','HEAD'],
-  allowedHeaders: ['Content-Type','x-mixtli-token'], // agrega aquí si ocupas más
+  // allowedHeaders: omitimos para que refleje Access-Control-Request-Headers automáticamente
   credentials: false,
   maxAge: 86400,
 }));
 
-// Preflight 204 rápido
-app.options('*', (req, res) => res.status(204).end());
+// Importante: usar cors() en OPTIONS para que incluya los headers ACAO
+app.options('*', cors());
 
-// === Health ===
+// ===== Body parser =====
+app.use(express.json({ limit: '1mb' }));
+
+// ===== Health =====
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
 
-// === AWS S3 (R2) client ===
+// ===== AWS S3 (R2) =====
 function makeS3() {
   const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = process.env;
   if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
@@ -49,10 +61,8 @@ function makeS3() {
     },
   });
 }
-
 const s3 = makeS3();
 
-// === Util: generar key seguro y "plano" ===
 function extFromName(name='') {
   const i = name.lastIndexOf('.');
   return i >= 0 ? name.slice(i) : '';
@@ -60,14 +70,11 @@ function extFromName(name='') {
 function safeKey(filename='file.bin') {
   const stamp = Date.now();
   const rand = crypto.randomBytes(6).toString('hex');
-  const ext = extFromName(filename).toLowerCase().slice(0, 10); // evita extensiones locas
+  const ext = extFromName(filename).toLowerCase().slice(0, 10);
   return `${stamp}-${rand}${ext}`;
 }
-
-// === Límite 50 MB (no subimos al backend; solo validamos tamaño reportado) ===
 const MAX_BYTES = 50 * 1024 * 1024;
 
-// === Presign PUT ===
 app.post('/api/presign', async (req, res) => {
   try {
     const { filename, type, size } = req.body || {};
@@ -84,9 +91,8 @@ app.post('/api/presign', async (req, res) => {
     const ContentType = typeof type === 'string' && type ? type : 'application/octet-stream';
 
     const command = new PutObjectCommand({ Bucket, Key, ContentType });
-    const url = await getSignedUrl(s3, command, { expiresIn: 60 * 60 }); // 1h
+    const url = await getSignedUrl(s3, command, { expiresIn: 60 * 60 });
 
-    // URL pública (solo referencia; depende de permisos del bucket si no es presign GET)
     const publicBase = process.env.R2_PUBLIC_BASE || `https://${Bucket}.${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
     const publicUrl = `${publicBase}/${Key}`;
 
@@ -97,14 +103,7 @@ app.post('/api/presign', async (req, res) => {
   }
 });
 
-// === Estáticos opcionales para probar (upload.html) ===
-app.use('/', express.static('public', {
-  extensions: ['html'],
-  maxAge: 0,
-}));
+app.use('/', express.static('public', { extensions: ['html'], maxAge: 0 }));
 
-// === Inicio ===
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`Mixtli API on :${PORT}`);
-});
+app.listen(PORT, () => console.log(`Mixtli API on :${PORT}`));

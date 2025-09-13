@@ -1,7 +1,8 @@
 [
   {
     "AllowedOrigins": [
-      "https://lovely-bienenstitch-6344a1.netlify.app"
+      "https://lovely-bienenstitch-6344a1.netlify.app",
+      "http://localhost:5173"
     ],
     "AllowedMethods": [
       "GET",
