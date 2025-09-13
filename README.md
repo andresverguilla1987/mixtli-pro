@@ -1,41 +1,31 @@
-# Mixtli — CORS + Presign (R2) — v2 (robusto)
+# Mixtli Backend (final)
+Endpoints:
+- `POST /api/presign` → firma `PUT` para R2 (50 MB, MIME whitelist).
+- `POST /api/complete` → valida objeto subido y devuelve `getUrl` temporal.
+- `GET /api/health`, `GET /api/debug`.
 
-Cambios v2:
-- **CORS antes** de body parser.
-- **Normalización** de Origin (lowercase y sin `/` final).
-- `app.options('*', cors())` para que las respuestas de preflight incluyan headers ACAO.
-- Env `ALLOWED_ORIGINS` con múltiples dominios separados por coma (sin espacios ni comillas).
+## Render (dónde implementar)
+- **Build:** `npm install --no-audit --no-fund`
+- **Start:** `node server.js`
+- **ENV obligatorias:**
+  - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
+  - `ALLOWED_ORIGINS=https://TU-SITIO.netlify.app` (agrega otros si corresponde)
+  - `ALLOWED_MIME_PREFIXES=image/,application/pdf`
+  - `PORT=10000`
 
-## Render
-Build: `npm install --no-audit --no-fund`  
-Start: `node server.js`
-
-ENV requeridas:
-```
-R2_ACCOUNT_ID
-R2_ACCESS_KEY_ID
-R2_SECRET_ACCESS_KEY
-R2_BUCKET
-ALLOWED_ORIGINS=https://lovely-bienenstitch-6344a1.netlify.app,http://localhost:5173
-PORT=10000
-```
-*(opcional)* `R2_PUBLIC_BASE=https://<bucket>.<account>.r2.cloudflarestorage.com`
-
-## CORS R2
-Usa `r2_cors.json` en tu bucket.
-
-## Verificación rápida
-Preflight backend:
-```bash
-curl -i -X OPTIONS https://mixtli-pro.onrender.com/api/health \
-  -H "Origin: https://lovely-bienenstitch-6344a1.netlify.app" \
-  -H "Access-Control-Request-Method: GET"
+## CORS en R2 (Bucket)
+Ejemplo:
+```json
+[
+  {
+    "AllowedOrigins": ["https://TU-SITIO.netlify.app","http://localhost:5173"],
+    "AllowedMethods": ["GET","PUT","HEAD","POST","DELETE"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag","x-amz-request-id","x-amz-version-id"],
+    "MaxAgeSeconds": 86400
+  }
+]
 ```
 
-Preflight presigned (reemplaza URL):
-```bash
-curl -i -X OPTIONS "PRESIGNED_URL" \
-  -H "Origin: https://lovely-bienenstitch-6344a1.netlify.app" \
-  -H "Access-Control-Request-Method: PUT" \
-  -H "Access-Control-Request-Headers: content-type"
-```
+## Probar
+- `public/index.html` (opcional) puede llamar a `/api/presign` y hacer PUT.
