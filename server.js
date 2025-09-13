@@ -1,14 +1,17 @@
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+import multer from 'multer';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import Archiver from 'archiver';
 import sharp from 'sharp';
 import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand, DeleteObjectCommand, CopyObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const app = express();
-app.use(bodyParser.json({ limit: '10mb' }));
+app.use((req,res,next)=>{ console.log(`[REQ] ${req.method} ${req.url}`); next(); });
+app.use(bodyParser.json({ limit: '50mb' })); // align with desired cap
 
 function parseOrigins(str) { return (str||'').split(',').map(s=>s.trim()).filter(Boolean); }
 const ALLOWED_ORIGINS = parseOrigins(process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN);
@@ -39,13 +42,15 @@ app.use(cors({
   origin: (origin, cb)=>{
     if(!origin) return cb(null,true);
     const ok = ALLOWED_ORIGINS.includes(origin);
-    if(!ok) return cb(new Error('CORS not allowed: '+origin));
+    if(!ok) { console.log('[CORS] blocked', origin, 'allowed=', ALLOWED_ORIGINS); return cb(new Error('CORS not allowed: '+origin)); }
     cb(null,true);
   },
   credentials:true,
   methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','x-mixtli-pin']
+  allowedHeaders: ['Content-Type','x-mixtli-pin','x-mixtli-pass','x-amz-acl','x-amz-meta-*']
 }));
+// explicit OPTIONS 204 to avoid 405 anywhere
+app.options('*', cors(), (req,res)=>{ res.status(204).end() });
 
 function requirePin(req,res,next){
   if(!ADMIN_PIN) return next();
@@ -57,8 +62,23 @@ function requirePin(req,res,next){
 app.get('/api/health', (req,res)=> res.json({ ok:true, time:new Date().toISOString() }));
 app.get('/api/debug', (req,res)=>{
   const origin = req.headers.origin || null;
-  res.json({ origin, allowed: ALLOWED_ORIGINS, match: origin? ALLOWED_ORIGINS.includes(origin):true });
+  res.json({
+    origin,
+    allowed: ALLOWED_ORIGINS,
+    match: origin? ALLOWED_ORIGINS.includes(origin):true,
+    methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+    headers: ['Content-Type','x-mixtli-pin','x-mixtli-pass','x-amz-acl','x-amz-meta-*']
+  });
 });
+app.all('/api/diag', (req,res)=>{
+  res.json({
+    method: req.method,
+    path: req.path,
+    hasBody: !!req.body && Object.keys(req.body||{}).length>0,
+    headers: req.headers,
+  });
+});
+
 app.get('/api/config', (req,res)=>{
   res.json({
     zipMaxKeys: ZIP_MAX_KEYS,
@@ -68,12 +88,52 @@ app.get('/api/config', (req,res)=>{
   });
 });
 
-// Simple sign GET
+function safeName(filename){ return (filename||'file').replace(/[^\w\-\.]+/g,'_'); }
+
+// Sign GET for any key
 app.post('/api/sign-get', async (req,res)=>{
   const { key, expiresIn=3600 } = req.body||{};
   if(!key) return res.status(400).json({ error:'key requerido' });
   const url = await getSignedUrl(s3(), new GetObjectCommand({ Bucket:R2_BUCKET, Key:key }), { expiresIn });
-  res.json({ url });
+  res.json({ url, method:'GET' });
+});
+
+// Upload presign + complete
+app.post('/api/presign', requirePin, async (req,res)=>{
+  const { filename, type='application/octet-stream', prefix='' } = req.body||{};
+  const key = `${prefix||''}${safeName(filename)}`;
+  const url = await getSignedUrl(s3(), new PutObjectCommand({ Bucket:R2_BUCKET, Key:key, ContentType: type }), { expiresIn:3600 });
+  res.json({ url, key, method:'PUT', contentType:type });
+});
+app.post('/api/complete', requirePin, async (req,res)=>{
+  const { key } = req.body||{}; if(!key) return res.status(400).json({ error:'key' });
+  if(THUMBS_AUTO && isImg(key)){ try{ await generateThumb(key, 512) }catch(e){ console.log('[thumbs:auto] error', e?.message) } }
+  res.json({ ok:true, key });
+});
+
+// Direct upload fallback (<=50MB)
+const mem = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50*1024*1024 } });
+app.post('/api/upload-direct', requirePin, mem.single('file'), async (req,res)=>{
+  try{
+    const prefix = (req.body?.prefix||'').trim();
+    const key = `${prefix||''}${safeName(req.file.originalname)}`;
+    const put = new PutObjectCommand({ Bucket:R2_BUCKET, Key:key, Body:req.file.buffer, ContentType: req.file.mimetype||'application/octet-stream' });
+    await s3().send(put);
+    if(THUMBS_AUTO && isImg(key)){ try{ await generateThumb(key, 512) }catch(e){ console.log('[thumbs:auto] error', e?.message) } }
+    res.json({ ok:true, key, via:'direct' });
+  }catch(e){
+    res.status(500).json({ error: String(e?.message||e) });
+  }
+});
+
+// Thumbs signer
+app.get('/api/thumbs/sign-get', async (req,res)=>{
+  const key = req.query.key; if(!key) return res.status(400).json({ error:'key' });
+  const tKey = `${THUMBS_PREFIX}${key}.jpg`;
+  let target = key;
+  try{ await s3().send(new HeadObjectCommand({ Bucket:R2_BUCKET, Key: tKey })); target=tKey; }catch{}
+  const url = await getSignedUrl(s3(), new GetObjectCommand({ Bucket:R2_BUCKET, Key: target }), { expiresIn: 3600 });
+  res.json({ url, key: target });
 });
 
 // List assets
@@ -139,7 +199,7 @@ app.post('/api/album/rename', requirePin, async (req,res)=>{
     for(const o of (r.Contents||[])){
       const rel = o.Key.substring(fromPrefix.length);
       const toKey = `${toPrefix}${rel}`;
-      await s3().send(new CopyObjectCommand({ Bucket:R2_BUCKET, CopySource:`/${R2_BUCKET}/${encodeURIComponent(o.Key)}`, Key: toKey }));
+      await s3().send(new CopyObjectCommand({ Bucket:R2_BUCKET, CopySource:`/{R2_BUCKET}/{encodeURIComponent(o.Key)}`, Key: toKey }));
       await s3().send(new DeleteObjectCommand({ Bucket:R2_BUCKET, Key: o.Key }));
       moved++;
     }
@@ -159,14 +219,14 @@ app.post('/api/delete', requirePin, async (req,res)=>{
   const { key } = req.body||{}; if(!key) return res.status(400).json({ error:'key' });
   const base = key.split('/').pop();
   const trashKey = `${TRASH_PREFIX}${Date.now()}-${base}`;
-  await s3().send(new CopyObjectCommand({ Bucket:R2_BUCKET, CopySource:`/${R2_BUCKET}/${encodeURIComponent(key)}`, Key: trashKey }));
+  await s3().send(new CopyObjectCommand({ Bucket:R2_BUCKET, CopySource:`/{R2_BUCKET}/{encodeURIComponent(key)}`, Key: trashKey }));
   await s3().send(new DeleteObjectCommand({ Bucket:R2_BUCKET, Key: key }));
   res.json({ ok:true, trashKey });
 });
 app.post('/api/restore', requirePin, async (req,res)=>{
   const { trashKey, toKey } = req.body||{};
   if(!trashKey || !toKey) return res.status(400).json({ error:'trashKey y toKey' });
-  await s3().send(new CopyObjectCommand({ Bucket:R2_BUCKET, CopySource:`/${R2_BUCKET}/${encodeURIComponent(trashKey)}`, Key: toKey }));
+  await s3().send(new CopyObjectCommand({ Bucket:R2_BUCKET, CopySource:`/{R2_BUCKET}/{encodeURIComponent(trashKey)}`, Key: toKey }));
   await s3().send(new DeleteObjectCommand({ Bucket:R2_BUCKET, Key: trashKey }));
   res.json({ ok:true, key: toKey });
 });
@@ -190,19 +250,19 @@ app.post('/api/purge', requirePin, async (req,res)=>{
 app.post('/api/rename', requirePin, async (req,res)=>{
   const { fromKey, toKey } = req.body||{};
   if(!fromKey || !toKey) return res.status(400).json({ error:'fromKey y toKey' });
-  await s3().send(new CopyObjectCommand({ Bucket:R2_BUCKET, CopySource:`/${R2_BUCKET}/${encodeURIComponent(fromKey)}`, Key: toKey }));
+  await s3().send(new CopyObjectCommand({ Bucket:R2_BUCKET, CopySource:`/{R2_BUCKET}/{encodeURIComponent(fromKey)}`, Key: toKey }));
   await s3().send(new DeleteObjectCommand({ Bucket:R2_BUCKET, Key: fromKey }));
   res.json({ ok:true, key: toKey });
 });
 
-// ZIP with ?limit= (capped by ZIP_MAX_KEYS)
+// ZIP
 app.get('/api/zip', async (req,res)=>{
   const prefix = req.query.prefix; if(!prefix) return res.status(400).json({ error:'prefix' });
   const reqLimit = Math.max(1, Math.min(parseInt(req.query.limit||`${ZIP_MAX_KEYS}`,10)||ZIP_MAX_KEYS, ZIP_MAX_KEYS));
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent((prefix.replace(/[\/]+$/,'')||'album').split('/').pop())}.zip"`);
   const archive = Archiver('zip', { zlib:{ level:9 } });
-  archive.on('error', err => res.status(500).end(String(err)));
+  archive.on('error', err => { console.error('[zip] error', err?.message); try{res.status(500).end(String(err))}catch{}});
   archive.pipe(res);
   let token=undefined, count=0;
   do{
@@ -219,7 +279,7 @@ app.get('/api/zip', async (req,res)=>{
   archive.finalize();
 });
 
-// Meta get/set + search
+// Meta
 app.get('/api/meta/get', async (req,res)=>{
   const key = req.query.key; if(!key) return res.status(400).json({ error:'key' });
   const mKey = `${META_PREFIX}${key}.json`;
@@ -287,23 +347,62 @@ app.post('/api/thumbs/generate-prefix', requirePin, async (req,res)=>{
   res.json({ ok:true, generated:n });
 });
 
-// Upload presign + complete
-app.post('/api/presign', requirePin, async (req,res)=>{
-  const { filename, type='application/octet-stream', prefix='' } = req.body||{};
-  const safe = (filename||'file').replace(/[^\w\-\.]+/g,'_');
-  const key = `${prefix||''}${safe}`;
-  const url = await getSignedUrl(s3(), new PutObjectCommand({ Bucket:R2_BUCKET, Key:key, ContentType: type }), { expiresIn:3600 });
-  res.json({ url, key });
+// Shares
+function randSlug(n=8){ const a='abcdefghijklmnopqrstuvwxyz0123456789'; let s=''; for(let i=0;i<n;i++){ s+=a[Math.floor(Math.random()*a.length)] } return s; }
+app.post('/api/share/create', requirePin, async (req,res)=>{
+  const { prefix, password='' } = req.body||{};
+  if(!prefix || !prefix.endsWith('/')) return res.status(400).json({ error:'prefix con / requerido' });
+  const slug = randSlug(8);
+  const record = { prefix, createdAt: new Date().toISOString(), passwordHash: password? crypto.createHash('sha256').update(password).digest('hex') : null };
+  const key = `${SHARES_PREFIX}${slug}.json`;
+  await s3().send(new PutObjectCommand({ Bucket:R2_BUCKET, Key:key, Body: Buffer.from(JSON.stringify(record,null,2)), ContentType:'application/json' }));
+  res.json({ ok:true, slug, url: `/api/share/${slug}` });
 });
-app.post('/api/complete', requirePin, async (req,res)=>{
-  const { key } = req.body||{}; if(!key) return res.status(400).json({ error:'key' });
-  if(THUMBS_AUTO && isImg(key)){ try{ await generateThumb(key, 512) }catch{} }
-  res.json({ ok:true, key });
+app.delete('/api/share/:slug', requirePin, async (req,res)=>{
+  const slug=req.params.slug; const key=`${SHARES_PREFIX}${slug}.json`;
+  await s3().send(new DeleteObjectCommand({ Bucket:R2_BUCKET, Key: key }));
+  res.json({ ok:true });
+});
+app.get('/api/share/:slug', async (req,res)=>{
+  const slug=req.params.slug; const key=`${SHARES_PREFIX}${slug}.json`;
+  let rec;
+  try{
+    const obj = await s3().send(new GetObjectCommand({ Bucket:R2_BUCKET, Key:key }));
+    const buf = Buffer.from(await obj.Body.transformToByteArray()).toString('utf8');
+    rec = JSON.parse(buf);
+  }catch{ return res.status(404).json({ error:'share no encontrado' }) }
+  if(rec.passwordHash){
+    const pass = req.header('x-mixtli-pass') || '';
+    const hash = crypto.createHash('sha256').update(pass).digest('hex');
+    if(hash !== rec.passwordHash) return res.status(401).json({ error:'password requerido' });
+  }
+  const items=[]; let token=undefined;
+  do{
+    const r = await s3().send(new ListObjectsV2Command({ Bucket:R2_BUCKET, Prefix: rec.prefix, ContinuationToken: token, MaxKeys: 1000 }));
+    token = r.IsTruncated ? r.NextContinuationToken : null;
+    for(const o of (r.Contents||[])){
+      if(o.Key.endsWith('/')) continue;
+      let url=null, thumb=null;
+      if(o.Key.startsWith(PUBLIC_PREFIX) && R2_PUBLIC_BASE){
+        url = `${R2_PUBLIC_BASE}/${o.Key}`;
+        const tKey = `${THUMBS_PREFIX}${o.Key}.jpg`;
+        try{ await s3().send(new HeadObjectCommand({ Bucket:R2_BUCKET, Key: tKey })); thumb = `${R2_PUBLIC_BASE}/${tKey}` }catch{}
+      }else{
+        url = await getSignedUrl(s3(), new GetObjectCommand({ Bucket:R2_BUCKET, Key:o.Key }), { expiresIn: 3600 });
+        const tKey = `${THUMBS_PREFIX}${o.Key}.jpg`;
+        try{ await s3().send(new HeadObjectCommand({ Bucket:R2_BUCKET, Key: tKey }));
+          thumb = await getSignedUrl(s3(), new GetObjectCommand({ Bucket:R2_BUCKET, Key:tKey }), { expiresIn: 3600 });
+        }catch{}
+      }
+      items.push({ key:o.Key, size:o.Size||0, lastModified:o.LastModified||null, url, thumb });
+    }
+  }while(token);
+  res.json({ ok:true, slug, prefix: rec.prefix, items });
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, ()=>{
-  console.log('[Mixtli v5] ALLOWED_ORIGINS =', ALLOWED_ORIGINS);
-  console.log('[Mixtli v5] ZIP_MAX_KEYS =', ZIP_MAX_KEYS);
+  console.log(`[Mixtli v${process.env.npm_package_version||'6.1'}] ALLOWED_ORIGINS =`, ALLOWED_ORIGINS);
+  console.log(`[Mixtli v${process.env.npm_package_version||'6.1'}] ZIP_MAX_KEYS =`, ZIP_MAX_KEYS);
   console.log('Mixtli API on :'+PORT);
 });
