@@ -1,7 +1,7 @@
 import express from 'express';
 import morgan from 'morgan';
 import cors from 'cors';
-import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import mime from 'mime';
 import { randomUUID as cryptoRandomUUID } from 'crypto';
@@ -26,11 +26,13 @@ const corsFn = cors({
     if(allowed.includes(origin)) return cb(null, true);
     return cb(null, false);
   },
-  credentials: false
+  credentials: false,
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','Accept']
 });
 
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms'));
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '5mb' }));
 app.use(corsFn);
 app.options('*', corsFn);
 
@@ -38,7 +40,7 @@ app.options('*', corsFn);
 const s3 = new S3Client({
   region: REGION,
   endpoint: ENDPOINT,
-  forcePathStyle: !!ENDPOINT,      // R2 needs path-style
+  forcePathStyle: !!ENDPOINT,
   credentials: ACCESS_KEY_ID && SECRET_ACCESS_KEY ? {
     accessKeyId: ACCESS_KEY_ID,
     secretAccessKey: SECRET_ACCESS_KEY
@@ -51,8 +53,8 @@ function safeRandomId() {
 }
 
 function decodeKey(k=''){
-  try { return decodeURIComponent(k).replace(/^\/+/, ''); }
-  catch { return String(k).replace(/^\/+/, ''); }
+  try { return decodeURIComponent(k).replace(/^\/*/, ''); }
+  catch { return String(k).replace(/^\/*/, ''); }
 }
 
 async function streamObject(res, key){
@@ -94,9 +96,10 @@ app.get('/api/list', async (req, res) => {
 // ---- API: presign (PUT) ----
 app.post('/api/presign', async (req, res) => {
   if(!BUCKET) return res.status(500).json({ error: 'S3_BUCKET not set' });
-  const { filename, type, size, album } = req.body || {};
+  const { filename, type, size, album, prefix } = req.body || {};
   const safeName = String(filename || ('upload-'+safeRandomId())).replace(/[^A-Za-z0-9._-]+/g, '_');
-  const key = String(album ? album.replace(/\/+$/,'')+'/' : DEFAULT_PREFIX) + safeName;
+  const basePrefix = (typeof prefix === 'string') ? prefix : DEFAULT_PREFIX;
+  const key = String(album ? album.replace(/\/*$/,'')+'/' : basePrefix) + safeName;
   const contentType = String(type || mime.getType(safeName) || 'application/octet-stream');
   try {
     const cmd = new PutObjectCommand({
@@ -115,6 +118,20 @@ app.post('/api/presign', async (req, res) => {
 // ---- API: complete (no-op) ----
 app.post('/api/complete', async (req, res) => {
   res.json({ ok: true, received: req.body || {} });
+});
+
+// ---- API: delete object ----
+app.delete('/api/object', async (req, res) => {
+  if(!BUCKET) return res.status(500).json({ error: 'S3_BUCKET not set' });
+  const key = decodeKey(String(req.query.key || (req.body && req.body.key) || ''));
+  if(!key) return res.status(400).json({ error: 'missing key' });
+  try {
+    const cmd = new DeleteObjectCommand({ Bucket: BUCKET, Key: key });
+    await s3.send(cmd);
+    res.json({ ok: true, deleted: key });
+  } catch (e) {
+    res.status(500).json({ error: 'delete_failed', key, details: e?.message });
+  }
 });
 
 // ---- Preview: binary by path ----
