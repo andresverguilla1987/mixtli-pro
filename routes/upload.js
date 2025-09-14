@@ -1,8 +1,9 @@
-const express = require('express');
-const router = express.Router();
-const multer = require('multer');
+import { Router } from 'express';
+import multer from 'multer';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+
+const router = Router();
 const upload = multer({ limits: { fileSize: 50 * 1024 * 1024 } }); // 50 MB
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 const s3 = new S3Client({
   region: 'auto',
@@ -28,9 +29,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     }));
     res.json({ ok: true, key });
   } catch (e) {
-    console.error('upload error', e);
     res.status(500).json({ error: 'upload failed', detail: String(e?.message || e) });
   }
 });
 
-module.exports = router;
+export default router;

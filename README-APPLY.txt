@@ -1,15 +1,26 @@
-BACKEND PATCH — /api/upload (fallback) 
-=====================================
-Añade una ruta para subir archivos vía backend (sin CORS a R2).
+Mixtli v1.11.0 — BACKEND FINAL (Render)
+====================================
+Rutas incluidas:
+- `GET /api/health`
+- `POST /api/presign` → URL firmado PUT hacia R2
+- `GET /api/search` → listado simple desde R2 (sin DB)
+- `POST /api/files/bulk` → delete/no-op move/copy (sin DB)
+- `POST /api/files/rename` → nota (sin DB)
+- `POST /api/files/transform` → rotar imagen con Sharp
+- `POST /api/upload` → fallback de subida via backend (50 MB)
 
-1) Copia `routes/upload.js` a tu backend.
-2) En `server.js` agrega:
-   const uploadRoute = require('./routes/upload');
-   app.use('/api', uploadRoute);
-3) Instala dependencias:
-   npm i multer @aws-sdk/client-s3
-4) Variables de entorno: R2_ENDPOINT, R2_BUCKET, R2_KEY, R2_SECRET (igual que /api/presign).
-5) Límite actual: 50 MB por archivo (ajústalo en `multer` si ocupas).
+Variables de entorno (Render):
+- PORT=3000
+- R2_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com
+- R2_BUCKET=mixtli
+- R2_KEY=...
+- R2_SECRET=...
+- ALLOWED_ORIGINS=https://lovely-bienenstitch-6344a1.netlify.app
 
-Uso: POST /api/upload (form-data) con campo `file`.
-Respuesta: { ok: true, key }
+Comandos Render:
+- Build: `npm install --no-audit --no-fund`
+- Start: `node server.js`
+
+Nota CORS:
+- Si tu dominio de Netlify cambia, actualiza ALLOWED_ORIGINS y la CORS policy del bucket R2.
+Generado: 2025-09-14T22:08:51.102265Z
