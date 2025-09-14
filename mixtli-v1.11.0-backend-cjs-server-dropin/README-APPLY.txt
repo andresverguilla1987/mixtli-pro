@@ -1,0 +1,1 @@
+Copia server.js y routes/* y redeploy. Recuerda ALLOWED_ORIGINS.
