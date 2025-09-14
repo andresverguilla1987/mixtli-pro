@@ -4,7 +4,7 @@ import cors from 'cors';
 import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import mime from 'mime';
-import { randomUUID } from 'uuid';
+import { randomUUID as cryptoRandomUUID } from 'crypto';
 
 const app = express();
 
@@ -45,6 +45,11 @@ const s3 = new S3Client({
   } : undefined
 });
 
+function safeRandomId() {
+  try { return cryptoRandomUUID(); } 
+  catch { return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8); }
+}
+
 function decodeKey(k=''){
   try { return decodeURIComponent(k).replace(/^\/+/, ''); }
   catch { return String(k).replace(/^\/+/, ''); }
@@ -72,7 +77,7 @@ app.get('/api/list', async (req, res) => {
     const cmd = new ListObjectsV2Command({ Bucket: BUCKET, MaxKeys: limit, Prefix: prefix || undefined });
     const out = await s3.send(cmd);
     const items = (out.Contents || [])
-      .filter(obj => !obj.Key.endsWith('/')) // ignore folders
+      .filter(obj => !obj.Key.endsWith('/'))
       .sort((a,b) => (b.LastModified?.getTime()||0) - (a.LastModified?.getTime()||0))
       .map(obj => ({
         key: obj.Key,
@@ -90,7 +95,7 @@ app.get('/api/list', async (req, res) => {
 app.post('/api/presign', async (req, res) => {
   if(!BUCKET) return res.status(500).json({ error: 'S3_BUCKET not set' });
   const { filename, type, size, album } = req.body || {};
-  const safeName = String(filename || ('upload-'+randomUUID())).replace(/[^A-Za-z0-9._-]+/g, '_');
+  const safeName = String(filename || ('upload-'+safeRandomId())).replace(/[^A-Za-z0-9._-]+/g, '_');
   const key = String(album ? album.replace(/\/+$/,'')+'/' : DEFAULT_PREFIX) + safeName;
   const contentType = String(type || mime.getType(safeName) || 'application/octet-stream');
   try {
@@ -109,7 +114,6 @@ app.post('/api/presign', async (req, res) => {
 
 // ---- API: complete (no-op) ----
 app.post('/api/complete', async (req, res) => {
-  // no-op (placeholder for DB/indexing)
   res.json({ ok: true, received: req.body || {} });
 });
 
