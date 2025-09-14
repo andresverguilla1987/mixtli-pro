@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: mixtli-preview-backend
+    name: mixtli-full-backend
     env: node
     plan: free
     buildCommand: "npm install"
@@ -11,7 +11,7 @@ services:
       - key: AWS_REGION
         value: auto
       - key: S3_ENDPOINT
-        value: https://<your-account-id>.r2.cloudflarestorage.com
+        value: 
       - key: AWS_ACCESS_KEY_ID
         value: your-access-key
       - key: AWS_SECRET_ACCESS_KEY
@@ -20,3 +20,5 @@ services:
         value: https://lovely-bienenstitch-6344a1.netlify.app,https://meek-alfajores-1c364d.netlify.app
       - key: SIGNED_URL_TTL
         value: "3600"
+      - key: DEFAULT_PREFIX
+        value: public/

@@ -1,58 +1,39 @@
-# Mixtli — Preview Backend (Render-ready)
+# Mixtli — Full Backend (Render-ready)
 
-Backend mínimo para **Render** que habilita *previews* de archivos desde R2/S3:
+Backend completo para **Render** con endpoints de **lista y subida**, más rutas de **preview**:
 
-- `GET /files/<path>` → devuelve **binario** (ideal para miniaturas en el frontend)
-- `GET /api/raw?key=...` → devuelve **binario** por `key` (query)
-- `GET /api/get?key=...` → devuelve **JSON** con `{"url": "<signed URL>"}` (el frontend v1.2+ lo sigue solo)
+## Endpoints
+- `GET /api/list?limit=160&prefix=public/` → lista objetos S3 (ordenados por fecha desc).  
+  Respuesta: `{ items: [{ key, size, type, lastModified }] }`
+- `POST /api/presign` → genera URL firmada **PUT** para subir.
+  Body JSON: `{ filename, type, size, album }`  
+  Respuesta: `{ key, url, signedUrl, expiresIn }`
+- `POST /api/complete` → no-op (para compatibilidad).
+- `GET /files/<path>` → **binario** para previews.
+- `GET /api/raw?key=...` → **binario** por `key` (query).
+- `GET /api/get?key=...` → **JSON** con `{"url": "<signed URL>"}`.
 
-> **Ventaja:** Si usas estas rutas desde **Netlify** con proxy (_redirects_), evitas CORS en previews.
-
----
+> Compatible con los frontends v1.2/v1.3 que te pasé (álbums, miniaturas, subida).
 
 ## Deploy en Render
-
-1. **Nuevo Web Service** → *Node*  
-   - Repo: puedes subir este ZIP como repo o cargarlo directo.
-2. **Build Command**: `npm install`
-3. **Start Command**: `npm start`
-4. **Environment** (Variables):
-   - `S3_BUCKET` = (tu bucket)
-   - `AWS_REGION` = `auto` (R2) o la región S3
-   - `S3_ENDPOINT` = `https://<account>.r2.cloudflarestorage.com` (para R2). *Déjalo vacío si usas AWS S3.*
+1. Web Service (Node).
+2. Build: `npm install`  
+   Start: `npm start`
+3. Variables:
+   - `S3_BUCKET` (obligatoria)
+   - `AWS_REGION` (`auto` para R2 o tu región)
+   - `S3_ENDPOINT` (solo si usas R2, ej. `https://<account>.r2.cloudflarestorage.com`)
    - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
    - `ALLOWED_ORIGINS` = `https://lovely-bienenstitch-6344a1.netlify.app,https://meek-alfajores-1c364d.netlify.app`
-   - *(opcional)* `SIGNED_URL_TTL` (segundos, por defecto 3600)
-   - *(Render pone `PORT` solo)*
-5. Deploy. Verás en logs: `Mixtli Preview listening on 10000`.
-
-### Probar
-- `GET /files/public/IMG.jpg` → debe mostrar la imagen.  
-- `GET /api/raw?key=public/IMG.jpg` → igual, binario.  
-- `GET /api/get?key=public/IMG.jpg` → `{"url": "..."}`.
-
-> Si `/files/...` funciona, el frontend puede usar esa ruta y **no depende de CORS del bucket**.
-
----
-
-## Integración con tu frontend (Netlify)
-
-En tu `_redirects` del frontend, agrega (ya lo tienes en los ZIPs que te pasé):
-
-```
-/api/*  https://mixtli-pro.onrender.com/api/:splat   200!
-/files/*  https://mixtli-pro.onrender.com/files/:splat 200!
-```
-
-Así, el navegador llama a `/api/*` y `/files/*` **en tu mismo dominio** (Netlify), y Netlify reenvía a Render.
-
----
+   - *(opcionales)* `SIGNED_URL_TTL=3600`, `DEFAULT_PREFIX=public/`
 
 ## Notas
-
-- Este backend **no** implementa `list/presign/complete`. Mantén esos endpoints en tu servicio principal tal como los tienes. Este servicio es **complementario para previews** (o puedes copiar el código a tu `server.js` existente).
-- Si ya tienes un `server.js` en Render, copia el bloque de rutas de este repo y **monta**:
-  - `app.get('/files/*', ...)`
-  - `app.get('/api/raw', ...)`
-  - `app.get('/api/get', ...)`
+- `/api/presign` firma el `Content-Type`. El cliente enviará el mismo valor en el PUT.
+- Si quieres carpetas/álbums, envía `album` en `presign` (ej. `"album":"eventos/2024"`).
+- Con `_redirects` en Netlify:
+```
+/api/*    https://mixtli-pro.onrender.com/api/:splat   200!
+/files/*  https://mixtli-pro.onrender.com/files/:splat 200!
+```
+- Si separas servicios (main + preview), apunta `/api/*` al **main** y `/files/*` al **preview**.
 
