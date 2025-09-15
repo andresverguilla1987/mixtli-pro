@@ -1,35 +1,39 @@
 // server-snippets/presign-route.js
-import express from "express";
-import multer from "multer";
-import { presignUpload } from "../utils/s3.js";
+import { Router } from "express";
+import { presignUpload, presignGet, listAll } from "../utils/s3.js";
 
-const uploadNone = multer().none();
-const router = express.Router();
+const router = Router();
 
-// local body parsers for safety (in case app doesn't mount them globally)
-router.use(express.json({ limit: "2mb" }));
-router.use(express.urlencoded({ extended: true }));
-
-// CORS preflight (OPTIONAL: if your global CORS already handles this, you can remove it)
-router.options("/api/presign", (_, res) => res.sendStatus(204));
-
-router.post("/api/presign", uploadNone, async (req, res) => {
+// POST /api/presign  -> body: { key|filename|name, contentType|type|mimetype, mode: "put"|"get"}
+router.post("/api/presign", async (req, res) => {
   try {
-    // Support JSON, urlencoded, and multipart(FormData) field names
-    const body = req.body || {};
-    const key = body.key || body.filename || body.name;
-    const contentType = body.contentType || body.type || body.mimetype || "application/octet-stream";
-    const expiresSeconds = body.expires || body.expiresIn || 900;
+    const b = req.body || {};
+    const key = b.key || b.filename || b.name;
+    const contentType = b.contentType || b.type || b.mimetype || "application/octet-stream";
+    const mode = (b.mode || "put").toLowerCase();
 
-    if (!key) {
-      return res.status(400).json({ error: "missing key (or filename/name)" });
+    if (!key) return res.status(400).json({ ok: false, error: "key/filename/name is required" });
+
+    if (mode === "get") {
+      const out = await presignGet({ key });
+      return res.json({ ok: true, ...out });
     }
-
-    const result = await presignUpload({ key, contentType, expiresSeconds: Number(expiresSeconds) || 900 });
-    return res.json({ ok: true, ...result });
+    const out = await presignUpload({ key, contentType });
+    return res.json({ ok: true, ...out });
   } catch (err) {
-    const status = 500;
-    return res.status(status).json({ ok: false, error: err?.message || String(err) });
+    res.status(500).json({ ok: false, error: err?.message || String(err) });
+  }
+});
+
+// GET /api/list?prefix=&limit=
+router.get("/api/list", async (req, res) => {
+  try {
+    const prefix = req.query.prefix || "";
+    const limit = Math.min(parseInt(req.query.limit || "1000", 10), 2000);
+    const items = await listAll({ prefix, limit });
+    res.json({ ok: true, items });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err?.message || String(err) });
   }
 });
 

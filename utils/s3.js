@@ -1,79 +1,65 @@
 // utils/s3.js
-// Compatible with Node 18+ (ESM). Uses AWS SDK v3.
-import { S3Client, HeadBucketCommand, ListObjectsV2Command, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+// Node 18+ / 22, AWS SDK v3
+import { S3Client, ListObjectsV2Command, HeadBucketCommand, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-// ---- env helpers -----------------------------------------------------------
-function boolFromEnv(value, fallback=false) {
-  if (value === undefined || value === null) return fallback;
-  const v = String(value).trim().toLowerCase();
-  return v in { "1":1, "true":1, "yes":1, "on":1 };
-}
-
-const CONFIG = {
-  bucket: process.env.S3_BUCKET,
-  region: process.env.S3_REGION || "us-east-1",
-  endpoint: process.env.S3_ENDPOINT || null,
-  accessKeyId: process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY,
-  forcePathStyle: boolFromEnv(process.env.S3_FORCE_PATH_STYLE, false),
-};
-
-let _s3 = null;
-
 /**
- * buildS3(): creates (or returns cached) S3Client and config.
- * Exported because some callers import it directly.
+ * Build a configured S3 client for AWS S3, Cloudflare R2 or MinIO.
+ * Env:
+ *  - S3_REGION
+ *  - S3_ENDPOINT (empty for AWS S3; URL for R2/MinIO)
+ *  - S3_ACCESS_KEY_ID
+ *  - S3_SECRET_ACCESS_KEY
+ *  - S3_FORCE_PATH_STYLE ("true"|"false")
  */
 export function buildS3() {
-  if (_s3) return { s3: _s3, config: CONFIG };
-  const clientConfig = {
-    region: CONFIG.region,
-    credentials: (CONFIG.accessKeyId && CONFIG.secretAccessKey) ? {
-      accessKeyId: CONFIG.accessKeyId,
-      secretAccessKey: CONFIG.secretAccessKey,
-    } : undefined,
-    forcePathStyle: CONFIG.forcePathStyle,
+  const forcePath = String(process.env.S3_FORCE_PATH_STYLE || "false").toLowerCase() === "true";
+  const endpointRaw = process.env.S3_ENDPOINT?.trim();
+  const endpoint = endpointRaw ? new URL(endpointRaw).toString() : undefined;
+
+  const cfg = {
+    region: process.env.S3_REGION || "us-east-1",
+    credentials: {
+      accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
+    },
+    forcePathStyle: forcePath,
   };
-  if (CONFIG.endpoint) {
-    clientConfig.endpoint = CONFIG.endpoint;
-  }
-  _s3 = new S3Client(clientConfig);
-  return { s3: _s3, config: CONFIG };
+  if (endpoint) cfg["endpoint"] = endpoint;
+
+  return new S3Client(cfg);
 }
 
-function getClient() {
-  return buildS3().s3;
-}
+const s3 = buildS3();
+const BUCKET = process.env.S3_BUCKET;
 
-function getBucket() {
-  const { config } = buildS3();
-  if (!config.bucket) {
-    throw new Error("S3_BUCKET is not set.");
-  }
-  return config.bucket;
-}
-
-// ---- helpers ---------------------------------------------------------------
-
+/** Safe head-bucket for health checks */
 export async function headBucketSafe() {
-  const s3 = getClient();
-  const Bucket = getBucket();
   try {
-    await s3.send(new HeadBucketCommand({ Bucket }));
-    return { ok: true };
+    const out = await s3.send(new HeadBucketCommand({ Bucket: BUCKET }));
+    return { ok: true, statusCode: out["$metadata"]?.httpStatusCode || 200 };
   } catch (err) {
-    return { ok: false, error: err?.name || String(err), details: (err?.$metadata ? err.$metadata : undefined) };
+    return {
+      ok: false,
+      name: err?.name,
+      message: err?.message,
+      statusCode: err?.$metadata?.httpStatusCode || 500,
+    };
   }
 }
 
-export async function listAll(prefix = "", maxKeys = 1000) {
-  const s3 = getClient();
-  const Bucket = getBucket();
+/** List all objects (optionally prefix + limit) */
+export async function listAll({ prefix = "", limit = 1000 } = {}) {
+  let isTruncated = true;
   let ContinuationToken = undefined;
   const items = [];
-  do {
-    const out = await s3.send(new ListObjectsV2Command({ Bucket, Prefix: prefix || undefined, MaxKeys: maxKeys, ContinuationToken }));
+  while (isTruncated && items.length < limit) {
+    const out = await s3.send(new ListObjectsV2Command({
+      Bucket: BUCKET,
+      Prefix: prefix || undefined,
+      ContinuationToken,
+      MaxKeys: Math.min(1000, limit - items.length),
+    }));
     (out.Contents || []).forEach(obj => {
       items.push({
         key: obj.Key,
@@ -82,57 +68,42 @@ export async function listAll(prefix = "", maxKeys = 1000) {
         etag: obj.ETag,
       });
     });
-    ContinuationToken = out.IsTruncated ? out.NextContinuationToken : undefined;
-  } while (ContinuationToken);
+    isTruncated = !!out.IsTruncated;
+    ContinuationToken = out.NextContinuationToken;
+  }
   return items;
 }
 
 /**
- * Returns a presigned URL for PUT upload.
- * @param {Object} p
- * @param {string} p.key - object key
- * @param {string} p.contentType - mime type
- * @param {number} [p.expiresSeconds=900]
+ * Presign a PUT for uploads.
+ * Accepts: key (required), contentType (optional)
  */
-export async function presignUpload({ key, contentType, expiresSeconds = 900 }) {
-  if (!key) throw new Error("key is required");
-  const s3 = getClient();
-  const Bucket = getBucket();
-  const Command = new PutObjectCommand({
-    Bucket,
+export async function presignUpload({ key, contentType, expiresSeconds = 900 } = {}) {
+  if (!key) throw new Error("key required");
+  const cmd = new PutObjectCommand({
+    Bucket: BUCKET,
     Key: key,
     ContentType: contentType || "application/octet-stream",
   });
-  const url = await getSignedUrl(s3, Command, { expiresIn: expiresSeconds });
-  return {
-    url,
-    method: "PUT",
-    key,
-    bucket: Bucket,
-    headers: { "Content-Type": contentType || "application/octet-stream" },
-  };
+  const url = await getSignedUrl(s3, cmd, { expiresIn: expiresSeconds });
+  return { url, bucket: BUCKET, key };
 }
 
-/**
- * Returns a presigned URL for GET download.
- * @param {Object} p
- * @param {string} p.key
- * @param {number} [p.expiresSeconds=900]
- */
-export async function presignGet({ key, expiresSeconds = 900 }) {
-  if (!key) throw new Error("key is required");
-  const s3 = getClient();
-  const Bucket = getBucket();
-  const Command = new GetObjectCommand({ Bucket, Key: key });
-  const url = await getSignedUrl(s3, Command, { expiresIn: expiresSeconds });
-  return { url, method: "GET", key, bucket: Bucket };
+/** Presign a GET for downloads */
+export async function presignGet({ key, expiresSeconds = 900 } = {}) {
+  if (!key) throw new Error("key required");
+  const cmd = new GetObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+  });
+  const url = await getSignedUrl(s3, cmd, { expiresIn: expiresSeconds });
+  return { url, bucket: BUCKET, key };
 }
 
-// default export (optional for consumers that prefer default import)
 export default {
   buildS3,
-  headBucketSafe,
   listAll,
   presignUpload,
   presignGet,
+  headBucketSafe,
 };

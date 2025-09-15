@@ -1,32 +1,50 @@
-// In server.js (top-level)
+Paste these changes into server.js
+
+1) Imports (top of file)
+--------------------------------------------------
+import express from "express";
 import cors from "cors";
 import presignRouter from "./server-snippets/presign-route.js";
 import { parseAllowedOrigins } from "./server-snippets/allowed-origins.js";
 import { headBucketSafe } from "./utils/s3.js";
 
+2) App + CORS (after creating app)
+--------------------------------------------------
 const app = express();
 app.use(express.json());
-app.use(express.urlencoded({extended:true}));
+app.use(express.urlencoded({ extended: true }));
 
-// CORS (read ALLOWED_ORIGINS as JSON or CSV)
 const origins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
 app.use(cors({
-  origin: function (origin, cb) {
-    if (!origin) return cb(null, true); // allow curl / server-to-server
+  origin(origin, cb) {
+    if (!origin) return cb(null, true);
     const ok = origins.length === 0 || origins.includes(origin);
     cb(ok ? null : new Error("Not allowed by CORS"));
   },
   credentials: true,
 }));
 
-// Health
+3) Health endpoints
+--------------------------------------------------
 app.get("/salud", (_, res) => res.json({ ok: true, version: process.env.npm_package_version || null }));
 app.get("/api/health", async (_, res) => {
   const head = await headBucketSafe();
   res.json({ ok: head.ok, s3: head });
 });
 
-// Presign
-app.use(presignRouter);
+4) Routes
+--------------------------------------------------
+app.use(presignRouter); // exposes POST /api/presign and GET /api/list
 
-// ... the rest of your routes
+5) ENV (Render → Environment)
+--------------------------------------------------
+S3_BUCKET=mixtli-pro-bucket
+S3_REGION=us-east-1
+S3_ENDPOINT=                 # empty for AWS S3; URL for R2/MinIO
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+S3_FORCE_PATH_STYLE=false    # AWS S3=false, R2/MinIO=true
+
+ALLOWED_ORIGINS=["https://lovely-bienenstitch-6344a1.netlify.app","https://meek-alfajores-1c364d.netlify.app"]
+# or CSV:
+# ALLOWED_ORIGINS=https://lovely-bienenstitch-6344a1.netlify.app,https://meek-alfajores-1c364d.netlify.app
