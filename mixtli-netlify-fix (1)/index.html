@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mixtli — Deploy OK</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, sans-serif; background:#0b0f14; color:#e6eef6; margin:0; }
+    header { padding:20px 24px; border-bottom:1px solid #203040; display:flex; gap:16px; align-items:center; }
+    a { color:#96e0ff; text-decoration:none; }
+    .pill { background:#14202a; padding:8px 12px; border-radius:999px; display:inline-block; }
+    main { padding:32px 24px; max-width:960px; margin:auto; }
+    code { background:#0f1720; padding:6px 8px; border-radius:6px; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
+    .card { background:#0f1720; border:1px solid #1c2a3a; padding:16px; border-radius:12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Mixtli</strong>
+    <a class="pill" href="/">Inicio</a>
+    <a class="pill" href="/portada/">Portada</a>
+    <a class="pill" href="/biblioteca/">Biblioteca</a>
+  </header>
+  <main>
+    <h1>Mixtli — Deploy de prueba</h1>
+    <p>Este deploy está listo. Usa los accesos de arriba para <strong>/portada</strong> y <strong>/biblioteca</strong>.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>Proxy API</h3>
+        <p>Comprueba que el proxy funcione:</p>
+        <ul>
+          <li><a href="/api/list?limit=1">/api/list?limit=1</a></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Archivos</h3>
+        <p>Ruta directa a archivos (proxy a Render):</p>
+        <ul>
+          <li><a href="/files/health">/files/health</a></li>
+        </ul>
+      </div>
+    </div>
+    <p>Si /portada o /biblioteca daban 404, ahora <em>resuelven por carpeta</em> y además dejamos el fallback SPA por si migras a una sola página.</p>
+  </main>
+</body>
+</html>

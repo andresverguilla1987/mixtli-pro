@@ -1,0 +1,3 @@
+/api/*   https://mixtli-pro.onrender.com/api/:splat   200
+/files/* https://mixtli-pro.onrender.com/files/:splat 200
+/*       /index.html 200
