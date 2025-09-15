@@ -1,0 +1,32 @@
+// In server.js (top-level)
+import cors from "cors";
+import presignRouter from "./server-snippets/presign-route.js";
+import { parseAllowedOrigins } from "./server-snippets/allowed-origins.js";
+import { headBucketSafe } from "./utils/s3.js";
+
+const app = express();
+app.use(express.json());
+app.use(express.urlencoded({extended:true}));
+
+// CORS (read ALLOWED_ORIGINS as JSON or CSV)
+const origins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
+app.use(cors({
+  origin: function (origin, cb) {
+    if (!origin) return cb(null, true); // allow curl / server-to-server
+    const ok = origins.length === 0 || origins.includes(origin);
+    cb(ok ? null : new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+}));
+
+// Health
+app.get("/salud", (_, res) => res.json({ ok: true, version: process.env.npm_package_version || null }));
+app.get("/api/health", async (_, res) => {
+  const head = await headBucketSafe();
+  res.json({ ok: head.ok, s3: head });
+});
+
+// Presign
+app.use(presignRouter);
+
+// ... the rest of your routes
