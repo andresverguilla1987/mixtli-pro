@@ -1,109 +1,84 @@
 // utils/s3.js
-// Node 18+ / 22, AWS SDK v3
-import { S3Client, ListObjectsV2Command, HeadBucketCommand, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, ListObjectsV2Command, HeadBucketCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-/**
- * Build a configured S3 client for AWS S3, Cloudflare R2 or MinIO.
- * Env:
- *  - S3_REGION
- *  - S3_ENDPOINT (empty for AWS S3; URL for R2/MinIO)
- *  - S3_ACCESS_KEY_ID
- *  - S3_SECRET_ACCESS_KEY
- *  - S3_FORCE_PATH_STYLE ("true"|"false")
- */
+function boolFromEnv(v, def=false) {
+  if (v === undefined || v === null || v === "") return def;
+  const s = String(v).trim().toLowerCase();
+  if (["1","true","yes","y","on"].includes(s)) return true;
+  if (["0","false","no","n","off"].includes(s)) return false;
+  return def;
+}
+
 export function buildS3() {
-  const forcePath = String(process.env.S3_FORCE_PATH_STYLE || "false").toLowerCase() === "true";
-  const endpointRaw = process.env.S3_ENDPOINT?.trim();
-  const endpoint = endpointRaw ? new URL(endpointRaw).toString() : undefined;
+  const endpoint = process.env.S3_ENDPOINT || undefined;
+  const region = process.env.S3_REGION || "us-east-1";
+  const forcePathStyle = boolFromEnv(process.env.S3_FORCE_PATH_STYLE, !!endpoint);
 
-  const cfg = {
-    region: process.env.S3_REGION || "us-east-1",
-    credentials: {
-      accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
-      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
-    },
-    forcePathStyle: forcePath,
-  };
-  if (endpoint) cfg["endpoint"] = endpoint;
+  const accessKeyId = process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
 
-  return new S3Client(cfg);
+  const credentials = (accessKeyId && secretAccessKey) ? { accessKeyId, secretAccessKey } : undefined;
+
+  const cfg = { region, forcePathStyle };
+  if (endpoint) cfg.endpoint = endpoint;
+  if (credentials) cfg.credentials = credentials;
+
+  const client = new S3Client(cfg);
+  return { client, cfg };
 }
 
-const s3 = buildS3();
-const BUCKET = process.env.S3_BUCKET;
-
-/** Safe head-bucket for health checks */
-export async function headBucketSafe() {
+export async function headBucketSafe({ client, bucket }) {
   try {
-    const out = await s3.send(new HeadBucketCommand({ Bucket: BUCKET }));
-    return { ok: true, statusCode: out["$metadata"]?.httpStatusCode || 200 };
+    await client.send(new HeadBucketCommand({ Bucket: bucket }));
+    return { ok: true };
   } catch (err) {
-    return {
-      ok: false,
-      name: err?.name,
-      message: err?.message,
-      statusCode: err?.$metadata?.httpStatusCode || 500,
-    };
+    return { ok: false, code: err?.name || err?.Code || "HeadBucketError", detail: String(err) };
   }
 }
 
-/** List all objects (optionally prefix + limit) */
-export async function listAll({ prefix = "", limit = 1000 } = {}) {
-  let isTruncated = true;
+export async function listAll({ client, bucket, prefix="", limit=200 }) {
+  let items = [];
   let ContinuationToken = undefined;
-  const items = [];
-  while (isTruncated && items.length < limit) {
-    const out = await s3.send(new ListObjectsV2Command({
-      Bucket: BUCKET,
-      Prefix: prefix || undefined,
-      ContinuationToken,
-      MaxKeys: Math.min(1000, limit - items.length),
-    }));
-    (out.Contents || []).forEach(obj => {
-      items.push({
-        key: obj.Key,
-        size: obj.Size,
-        lastModified: obj.LastModified,
-        etag: obj.ETag,
-      });
-    });
-    isTruncated = !!out.IsTruncated;
-    ContinuationToken = out.NextContinuationToken;
+  try {
+    while (items.length < limit) {
+      const resp = await client.send(new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix || undefined,
+        ContinuationToken,
+        MaxKeys: Math.min(1000, limit - items.length)
+      }));
+      const contents = resp?.Contents || [];
+      for (const c of contents) {
+        items.push({
+          key: c.Key,
+          size: Number(c.Size || 0),
+          lastModified: c.LastModified ? new Date(c.LastModified).toISOString() : null,
+          type: null
+        });
+        if (items.length >= limit) break;
+      }
+      if (!resp.IsTruncated) break;
+      ContinuationToken = resp.NextContinuationToken;
+    }
+    return { ok: true, items };
+  } catch (err) {
+    return { ok: false, code: err?.name || err?.Code || "ListObjectsError", detail: String(err) };
   }
-  return items;
 }
 
-/**
- * Presign a PUT for uploads.
- * Accepts: key (required), contentType (optional)
- */
-export async function presignUpload({ key, contentType, expiresSeconds = 900 } = {}) {
-  if (!key) throw new Error("key required");
-  const cmd = new PutObjectCommand({
-    Bucket: BUCKET,
+export async function presignUpload({ client, bucket, key, contentType, expiresSeconds=900 }) {
+  const command = new PutObjectCommand({
+    Bucket: bucket,
     Key: key,
-    ContentType: contentType || "application/octet-stream",
+    ContentType: contentType || "application/octet-stream"
   });
-  const url = await getSignedUrl(s3, cmd, { expiresIn: expiresSeconds });
-  return { url, bucket: BUCKET, key };
+  const url = await getSignedUrl(client, command, { expiresIn: expiresSeconds });
+  return { url, method: "PUT", headers: { "Content-Type": contentType || "application/octet-stream" } };
 }
 
-/** Presign a GET for downloads */
-export async function presignGet({ key, expiresSeconds = 900 } = {}) {
-  if (!key) throw new Error("key required");
-  const cmd = new GetObjectCommand({
-    Bucket: BUCKET,
-    Key: key,
-  });
-  const url = await getSignedUrl(s3, cmd, { expiresIn: expiresSeconds });
-  return { url, bucket: BUCKET, key };
+export async function presignGet({ client, bucket, key, expiresSeconds=3600 }) {
+  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+  const url = await getSignedUrl(client, command, { expiresIn: expiresSeconds });
+  return { url };
 }
-
-export default {
-  buildS3,
-  listAll,
-  presignUpload,
-  presignGet,
-  headBucketSafe,
-};
