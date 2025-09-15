@@ -1,0 +1,31 @@
+
+diff --git a/server.js b/server.js
+--- a/server.js
++++ b/server.js
+@@ -1,6 +1,7 @@
+ // ... imports arriba ...
+
+ // === /api/presign (ANTES)
+-// app.post("/api/presign", ... ) { /* versión anterior */ }
++// Reemplaza tu handler por este bloque:
+ app.post("/api/presign", express.json(), async (req, res) => {
+   try {
+     const { key, contentType, type, size, contentLength } = req.body || {};
+@@ -20,6 +21,22 @@
+   }
+ });
+
++// === /api/list (robusto)
++app.get("/api/list", async (req, res) => {
++  try {
++    const limit = Math.min(parseInt(req.query.limit ?? "100", 10), 1000);
++    const prefix = req.query.prefix ?? "";
++    const items = await listAll(prefix, limit);
++    return res.json({ items });
++  } catch (err) {
++    console.error("[list] error:", err);
++    return res.status(500).json({ error: "list_failed", detail: err?.message || "unknown" });
++  }
++});
++
+ // ... resto de tu server.js ...
