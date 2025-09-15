@@ -1,35 +1,51 @@
-# Mixtli Env Patch (R2/S3) — Drop-in
-Agrega un **resolver de variables** y una ruta de depuración para que el backend detecte `S3_BUCKET` (o alias) y deje de fallar.
+# Mixtli CORS Patch — ALLOWED_ORIGINS robusto (ESM + CJS)
+
+Este parche evita el crash `SyntaxError: ... is not valid JSON` cuando `ALLOWED_ORIGINS`
+está mal formateada en Render. Incluye un **parser robusto** y un **middleware CORS** listo.
 
 ## Archivos
-- `env-resolver.js`
-- `routes-debug.js`
-- `server.example.js`
-- `README.md`
+- `cors-safe.js`  → ESM (`import {...} from './cors-safe.js'`)
+- `cors-safe.cjs` → CommonJS (`const {...} = require('./cors-safe.cjs')`)
 
-## Integración rápida
-1) Copia `env-resolver.js` y `routes-debug.js` al root del backend (junto a tu `server.js`).  
-2) En tu `server.js` añade al inicio:
+## Cómo usar (elige ESM o CJS según tu proyecto)
+
+### Si tu proyecto es ESM (package.json con `"type":"module"`)
+En tu `server.js`:
 ```js
-const { getEnv, logEnvSafe, assertEnv, buildS3Client } = require('./env-resolver');
-const { attachDebug } = require('./routes-debug');
-const ENV = getEnv(); logEnvSafe(ENV); assertEnv(ENV);
-const s3 = buildS3Client(ENV);
-const BUCKET = ENV.S3_BUCKET;
-attachDebug(app, ENV); // si ya tienes app
+import express from 'express';
+import { getAllowedOrigins, corsMiddleware } from './cors-safe.js';
+
+const app = express();
+const ALLOWED = getAllowedOrigins(); // lee y corrige ALLOWED_ORIGINS del entorno
+app.use(corsMiddleware(ALLOWED, {
+  methods: 'GET,POST,PUT,OPTIONS',
+  headers: 'Content-Type,x-mixtli-token'
+}));
 ```
-3) Usa `BUCKET` en tus comandos S3.  
-4) Variables en Render:
+
+### Si tu proyecto es CommonJS
+```js
+const express = require('express');
+const { getAllowedOrigins, corsMiddleware } = require('./cors-safe.cjs');
+
+const app = express();
+const ALLOWED = getAllowedOrigins();
+app.use(corsMiddleware(ALLOWED, {
+  methods: 'GET,POST,PUT,OPTIONS',
+  headers: 'Content-Type,x-mixtli-token'
+}));
 ```
-S3_ENDPOINT=https://8351c372dedf0e354a3196aff085f0ae.r2.cloudflarestorage.com
-S3_BUCKET=mixtli
-S3_REGION=auto
-S3_FORCE_PATH_STYLE=true
-S3_ACCESS_KEY_ID=<Access Key ID>
-S3_SECRET_ACCESS_KEY=<Secret>
-R2_BUCKET=mixtli
-BUCKET=mixtli
-DEBUG_ENV=true
+
+## Valor correcto en Render
+En **Render → Environment**, el valor debe ser JSON **válido** (sin el nombre delante):
 ```
-5) Manual Deploy → **Clear build cache & deploy**.  
-6) Prueba `GET /debug/env` (temporal) y tu flujo Postman.
+["https://lovely-bienenstitch-6344a1.netlify.app","https://meek-alfajores-1c364d.netlify.app"]
+```
+> Si alguien lo pone así por error:
+> `ALLOWED_ORIGINS=["https://...","https://..."]`,
+> este parche **no se cae**: lo corregirá y seguirá funcionando.
+
+## Paso final
+- Subir estos archivos al root del backend (junto a `server.js`).
+- **Manual Deploy → Clear build cache & deploy** en Render.
+- Probar `GET /salud` y tu flujo Postman.
