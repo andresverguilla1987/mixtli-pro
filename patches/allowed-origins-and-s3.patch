@@ -1,0 +1,28 @@
+*** mixtli patch: allowed-origins-and-s3 ***
+
+1) Replace your utils/s3.js with the one in this archive.
+   - Supports R2 (path-style = true) and AWS S3 (path-style = false)
+   - Accepts credentials in S3_* or AWS_* env names
+   - Fails early with clear errors if credentials are missing/incomplete
+
+2) In server.js, replace ALLOWED_ORIGINS parsing with src-snippets/server.allowed-origins.snippet.js
+   - Accepts JSON array: ["https://a.com","https://b.com"]
+   - Or single string:   "https://a.com"
+   - Or CSV string:      https://a.com,https://b.com
+   - Defaults to ["http://localhost:5173"]
+
+3) Environment (Render → Environment):
+   ALLOWED_ORIGINS=["https://lovely-bienenstitch-6344a1.netlify.app","https://meek-alfajores-1c364d.netlify.app","http://localhost:5173"]
+   S3_BUCKET=mixtli-pro-bucket
+   # For R2:
+   S3_ENDPOINT=https://<your-account-id>.r2.cloudflarestorage.com
+   S3_REGION=auto
+   S3_FORCE_PATH_STYLE=true
+   # For AWS S3:
+   # S3_ENDPOINT=
+   # S3_REGION=us-east-1
+   # S3_FORCE_PATH_STYLE=false
+
+   # Credentials (either pair works):
+   S3_ACCESS_KEY_ID=xxxxx        # or AWS_ACCESS_KEY_ID=xxxxx
+   S3_SECRET_ACCESS_KEY=yyyyy    # or AWS_SECRET_ACCESS_KEY=yyyyy

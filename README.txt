@@ -1,21 +1,30 @@
-Mixtli Backend Patch (v1.11.0)
-------------------------------
-Incluye:
-- /salud (200)
-- /diag (diagnóstico de env + acceso a bucket)
-- /api/list
-- /api/presign (usa createPresignedPost)
-- /files/:encodedKey (stream)
+Mixtli fix: ALLOWED_ORIGINS + S3/R2
+===================================
 
-Cómo usar en Render:
-1) Sube estos archivos a tu repo del backend (reemplaza server.js y agrega utils/s3.js).
-2) Variables de entorno en Render → Environment:
-   - AWS_ACCESS_KEY_ID
-   - AWS_SECRET_ACCESS_KEY
-   - AWS_REGION (auto para R2; ej. us-east-1 para AWS S3)
-   - S3_BUCKET
-   - S3_ENDPOINT (solo R2)
-   - S3_FORCE_PATH_STYLE (true para R2, false para AWS S3)
-   - ALLOWED_ORIGINS (JSON array o coma-separado)
-3) Redeploy.
-4) Verifica /diag.
+Qué corrige
+-----------
+- Error al parsear ALLOWED_ORIGINS cuando no estaba en JSON válido.
+- Error de AWS SDK: "Resolved credential object is not valid" debido a credenciales ausentes o mal leídas.
+- Compatibilidad con Cloudflare R2 (path-style=true) y AWS S3 (path-style=false).
+
+Archivos
+--------
+- utils/s3.js
+- src-snippets/server.allowed-origins.snippet.js
+- patches/allowed-origins-and-s3.patch
+- env/.env.example.append
+
+Cómo aplicar
+------------
+1) Sustituye `utils/s3.js` por el de este ZIP.
+2) Abre tu `server.js` y usa el contenido de `src-snippets/server.allowed-origins.snippet.js`
+   para definir `ALLOWED_ORIGINS` y el callback de CORS.
+3) En Render → **Environment**, pega lo de `env/.env.example.append` y ajusta valores reales.
+4) Redeploy.
+
+Notas
+-----
+- Para R2: `S3_FORCE_PATH_STYLE=true` y `S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com`
+- Para AWS S3: `S3_FORCE_PATH_STYLE=false` y no pongas endpoint (o el de S3 nativo).
+
+Generado: 2025-09-15T03:20:59.668287Z
