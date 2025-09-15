@@ -1,22 +1,21 @@
-Mixtli — CORS + Presign DIAGNOSTIC
+Mixtli Backend Patch (v1.11.0)
+------------------------------
+Incluye:
+- /salud (200)
+- /diag (diagnóstico de env + acceso a bucket)
+- /api/list
+- /api/presign (usa createPresignedPost)
+- /files/:encodedKey (stream)
 
-1) Servir el front (no usar file://):
-   npx serve -p 5173
-   Abrir http://localhost:5173
-
-2) Probar tu API real:
-   - En el input "API Base", pon tu URL (p.ej. https://mixtli-pro.onrender.com)
-   - En "Ruta presign", pon /presign o /api/uploads/presign (la que exista)
-   - Da clic en "Probar preflight (OPTIONS)".
-     Debe mostrar Access-Control-Allow-Origin y Allow-Methods.
-   - Si el preflight da 0 o vacío, el navegador lo bloqueó por CORS.
-
-3) Validación por curl (preflight simulado):
-   curl -i -X OPTIONS https://mixtli-pro.onrender.com/presign      -H "Origin: http://localhost:5173"      -H "Access-Control-Request-Method: POST"      -H "Access-Control-Request-Headers: content-type"
-
-   Esperado: 204 y cabeceras Access-Control-Allow-*. Si no aparecen, ajusta CORS en el API.
-
-4) Si con curl ves las cabeceras pero el front falla, revisa la consola -> pestaña Network -> OPTIONS y POST.
-
-5) Si usas Cloudflare R2, pon una sola CORS policy en el bucket con PUT/GET/HEAD y AllowedOrigins = tu Netlify + http://localhost:5173
-
+Cómo usar en Render:
+1) Sube estos archivos a tu repo del backend (reemplaza server.js y agrega utils/s3.js).
+2) Variables de entorno en Render → Environment:
+   - AWS_ACCESS_KEY_ID
+   - AWS_SECRET_ACCESS_KEY
+   - AWS_REGION (auto para R2; ej. us-east-1 para AWS S3)
+   - S3_BUCKET
+   - S3_ENDPOINT (solo R2)
+   - S3_FORCE_PATH_STYLE (true para R2, false para AWS S3)
+   - ALLOWED_ORIGINS (JSON array o coma-separado)
+3) Redeploy.
+4) Verifica /diag.
