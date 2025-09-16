@@ -1,51 +1,25 @@
-# Mixtli CORS Patch — ALLOWED_ORIGINS robusto (ESM + CJS)
+# Mixtli Env Bootstrap
 
-Este parche evita el crash `SyntaxError: ... is not valid JSON` cuando `ALLOWED_ORIGINS`
-está mal formateada en Render. Incluye un **parser robusto** y un **middleware CORS** listo.
+**Objetivo:** evitar el error `ConfigError: S3_BUCKET no está definido` sin modificar tu `server.js`.
 
-## Archivos
-- `cors-safe.js`  → ESM (`import {...} from './cors-safe.js'`)
-- `cors-safe.cjs` → CommonJS (`const {...} = require('./cors-safe.cjs')`)
-
-## Cómo usar (elige ESM o CJS según tu proyecto)
-
-### Si tu proyecto es ESM (package.json con `"type":"module"`)
-En tu `server.js`:
-```js
-import express from 'express';
-import { getAllowedOrigins, corsMiddleware } from './cors-safe.js';
-
-const app = express();
-const ALLOWED = getAllowedOrigins(); // lee y corrige ALLOWED_ORIGINS del entorno
-app.use(corsMiddleware(ALLOWED, {
-  methods: 'GET,POST,PUT,OPTIONS',
-  headers: 'Content-Type,x-mixtli-token'
-}));
+## Uso
+1) Copia `env-bootstrap.js` al **root** de tu backend (junto a `server.js`).
+2) En Render → Settings → **Start Command**, cambia a:
 ```
-
-### Si tu proyecto es CommonJS
-```js
-const express = require('express');
-const { getAllowedOrigins, corsMiddleware } = require('./cors-safe.cjs');
-
-const app = express();
-const ALLOWED = getAllowedOrigins();
-app.use(corsMiddleware(ALLOWED, {
-  methods: 'GET,POST,PUT,OPTIONS',
-  headers: 'Content-Type,x-mixtli-token'
-}));
+node env-bootstrap.js
 ```
+3) Manual Deploy → **Clear build cache & deploy**.
 
-## Valor correcto en Render
-En **Render → Environment**, el valor debe ser JSON **válido** (sin el nombre delante):
-```
-["https://lovely-bienenstitch-6344a1.netlify.app","https://meek-alfajores-1c364d.netlify.app"]
-```
-> Si alguien lo pone así por error:
-> `ALLOWED_ORIGINS=["https://...","https://..."]`,
-> este parche **no se cae**: lo corregirá y seguirá funcionando.
+### Qué hace
+- Si `S3_BUCKET` está vacío, lo toma de `R2_BUCKET` o `BUCKET`. Si no existen, usa `'mixtli'` como último recurso.
+- Normaliza `S3_ENDPOINT` (quita `/<bucket>` si lo tiene).
+- Setea `S3_FORCE_PATH_STYLE=true` si faltaba.
+- Sanea `ALLOWED_ORIGINS` para que no truene `JSON.parse` accidental.
 
-## Paso final
-- Subir estos archivos al root del backend (junto a `server.js`).
-- **Manual Deploy → Clear build cache & deploy** en Render.
-- Probar `GET /salud` y tu flujo Postman.
+> Recomendación: define igualmente en Render las variables correctas:
+> - `S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
+> - `S3_BUCKET=mixtli`
+> - `S3_REGION=auto`
+> - `S3_FORCE_PATH_STYLE=true`
+> - `S3_ACCESS_KEY_ID=<key>`
+> - `S3_SECRET_ACCESS_KEY=<secret>`
