@@ -1,13 +1,10 @@
-// server.js — Mixtli API (Option 3 Patch v2, simplified)
-// ESM style. Node 18+
-// - Uses getSignedUrl + PutObjectCommand (no @aws-sdk/protocol-http / @smithy/hash-node)
-// - Fallback BUCKET = S3_BUCKET || R2_BUCKET || BUCKET
-// - Path-style for R2
-// - Robust ALLOWED_ORIGINS parsing
-// - Endpoints: /salud, /api/presign (PUT), /api/list, /_envcheck
+// server.js — Mixtli API FINAL
+// ESM ("type":"module"). Node 18+
+// Endpoints: /salud, /api/presign (PUT/GET), /api/list, /api/object (DELETE), /_envcheck
+// R2 (S3 compatible) with path-style & robust CORS.
 
 import express from 'express';
-import { S3Client, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // ---------------- Env helpers ----------------
@@ -65,7 +62,7 @@ const s3 = new S3Client({
 
 // ---------------- App ----------------
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '5mb' }));
 
 // CORS básico usando la lista permitida
 app.use((req, res, next) => {
@@ -74,7 +71,7 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,x-mixtli-token');
   if (req.method === 'OPTIONS') return res.status(204).end();
   next();
@@ -95,21 +92,25 @@ app.get('/_envcheck', (_req, res) => {
   });
 });
 
-// -------- Presign (PUT) --------
+// -------- Presign (PUT/GET) --------
 app.post('/api/presign', async (req, res) => {
   try {
-    const { key, contentType = 'application/octet-stream', method = 'PUT' } = req.body || {};
+    const { key, contentType = 'application/octet-stream', method = 'PUT', expiresIn = 300 } = req.body || {};
     if (!key || typeof key !== 'string') return res.status(400).json({ error: 'BadRequest', message: 'key requerido' });
-    if (method !== 'PUT') return res.status(400).json({ error: 'BadRequest', message: 'solo soportado: PUT' });
 
-    const command = new PutObjectCommand({
-      Bucket: ENV.BUCKET,
-      Key: key,
-      ContentType: contentType
-    });
+    if (method === 'PUT') {
+      const cmd = new PutObjectCommand({ Bucket: ENV.BUCKET, Key: key, ContentType: contentType });
+      const url = await getSignedUrl(s3, cmd, { expiresIn });
+      return res.json({ url, key, method: 'PUT' });
+    }
 
-    const url = await getSignedUrl(s3, command, { expiresIn: 60 * 5 }); // 5 minutos
-    res.json({ url, key });
+    if (method === 'GET') {
+      const cmd = new GetObjectCommand({ Bucket: ENV.BUCKET, Key: key });
+      const url = await getSignedUrl(s3, cmd, { expiresIn });
+      return res.json({ url, key, method: 'GET' });
+    }
+
+    return res.status(400).json({ error: 'BadRequest', message: 'método soportado: PUT o GET' });
   } catch (e) {
     console.error('presign error:', e);
     res.status(500).json({ error: 'ServerError', message: e.message });
@@ -131,5 +132,18 @@ app.get('/api/list', async (req, res) => {
   }
 });
 
+// -------- Delete --------
+app.delete('/api/object', async (req, res) => {
+  try {
+    const key = (req.query.key || '').toString();
+    if (!key) return res.status(400).json({ error: 'BadRequest', message: 'key requerido' });
+    await s3.send(new DeleteObjectCommand({ Bucket: ENV.BUCKET, Key: key }));
+    res.json({ ok: true, key });
+  } catch (e) {
+    console.error('delete error:', e);
+    res.status(500).json({ error: 'ServerError', message: e.message });
+  }
+});
+
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Mixtli API v1.11.0 on :${PORT}`));
+app.listen(PORT, () => console.log(`Mixtli API FINAL on :${PORT}`));
