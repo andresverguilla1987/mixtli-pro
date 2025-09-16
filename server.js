@@ -1,17 +1,14 @@
-// server.js — Mixtli API (Option 3 Patch)
+// server.js — Mixtli API (Option 3 Patch v2, simplified)
 // ESM style. Node 18+
-// - Fallback BUCKET = S3_BUCKET || R2_BUCKET || BUCKET (env)
+// - Uses getSignedUrl + PutObjectCommand (no @aws-sdk/protocol-http / @smithy/hash-node)
+// - Fallback BUCKET = S3_BUCKET || R2_BUCKET || BUCKET
 // - Path-style for R2
-// - Robust ALLOWED_ORIGINS parsing (no crash)
+// - Robust ALLOWED_ORIGINS parsing
 // - Endpoints: /salud, /api/presign (PUT), /api/list, /_envcheck
-// - Logs: "Mixtli API v1.11.0 on :PORT"
 
 import express from 'express';
-import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { S3RequestPresigner } from '@aws-sdk/s3-request-presigner';
-import { HttpRequest } from '@aws-sdk/protocol-http';
-import { Hash } from '@smithy/hash-node';
-import { formatUrl } from '@aws-sdk/util-format-url';
+import { S3Client, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // ---------------- Env helpers ----------------
 const pick = (...names) => {
@@ -24,7 +21,6 @@ const pick = (...names) => {
 
 const parseOrigins = (raw) => {
   if (!raw) return [];
-  // tolera formato "ALLOWED_ORIGINS=[...]" pegado por error
   const eq = raw.indexOf('=');
   if (raw.startsWith('ALLOWED_ORIGINS') && eq !== -1) raw = raw.slice(eq + 1);
   raw = raw.trim();
@@ -43,7 +39,7 @@ const ENV = {
   FORCE_PATH: (pick('S3_FORCE_PATH_STYLE') || 'true').toLowerCase() !== 'false',
   KEY: pick('S3_ACCESS_KEY_ID', 'AWS_ACCESS_KEY_ID'),
   SECRET: pick('S3_SECRET_ACCESS_KEY', 'AWS_SECRET_ACCESS_KEY'),
-  BUCKET: pick('S3_BUCKET', 'R2_BUCKET', 'BUCKET'), // <-- Fallback clave
+  BUCKET: pick('S3_BUCKET', 'R2_BUCKET', 'BUCKET'),
   ALLOWED_ORIGINS: parseOrigins(pick('ALLOWED_ORIGINS'))
 };
 
@@ -106,22 +102,13 @@ app.post('/api/presign', async (req, res) => {
     if (!key || typeof key !== 'string') return res.status(400).json({ error: 'BadRequest', message: 'key requerido' });
     if (method !== 'PUT') return res.status(400).json({ error: 'BadRequest', message: 'solo soportado: PUT' });
 
-    // Presigner
-    const presigner = new S3RequestPresigner({ ...s3.config, sha256: Hash.bind(null, 'sha256') });
-
-    // Path-style: /{bucket}/{key}
-    const host = ENV.ENDPOINT.replace(/^https?:\/\//, '');
-    const reqToSign = new HttpRequest({
-      ...s3.config,
-      protocol: 'https:',
-      method: 'PUT',
-      path: `/${ENV.BUCKET}/${encodeURIComponent(key)}`,
-      headers: { 'content-type': contentType },
-      hostname: host
+    const command = new PutObjectCommand({
+      Bucket: ENV.BUCKET,
+      Key: key,
+      ContentType: contentType
     });
 
-    const signed = await presigner.presign(reqToSign, { expiresIn: 60 * 5 }); // 5 minutos
-    const url = formatUrl(signed);
+    const url = await getSignedUrl(s3, command, { expiresIn: 60 * 5 }); // 5 minutos
     res.json({ url, key });
   } catch (e) {
     console.error('presign error:', e);

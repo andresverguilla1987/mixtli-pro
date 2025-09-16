@@ -1,14 +1,17 @@
-# Mixtli — Opción 3 (server.js parchado)
+# Mixtli — Opción 3 Patch v2 (simplificado)
 
-Este `server.js` ya trae:
-- Fallback del bucket: `S3_BUCKET || R2_BUCKET || BUCKET`
-- Path-style para R2
-- Parseo robusto de `ALLOWED_ORIGINS`
-- Rutas: `/salud`, `/api/presign` (PUT), `/api/list`, `/_envcheck`
+Este `server.js` evita dependencias adicionales usando `getSignedUrl` + `PutObjectCommand`.
+Solo requiere:
+- `@aws-sdk/client-s3`
+- `@aws-sdk/s3-request-presigner`
 
-## Cómo usar
-1) **Reemplaza** tu `server.js` por este archivo.
-2) Asegúrate de tener estas envs en Render:
+## Pasos
+1) Reemplaza tu `server.js` con este archivo.
+2) Asegúrate que en `package.json` estén estas dependencias (o instálalas):
+   ```bash
+   npm i @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
+   ```
+3) En Render → Environment:
 ```
 S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
 S3_BUCKET=mixtli
@@ -18,14 +21,7 @@ S3_ACCESS_KEY_ID=<key>
 S3_SECRET_ACCESS_KEY=<secret>
 ALLOWED_ORIGINS=["https://tu-netlify"]
 ```
-3) **Start Command**: `node server.js`
-4) **Manual Deploy → Clear build cache & deploy**.
+4) Start Command: `node server.js`
+5) Manual Deploy → Clear build cache & deploy.
 
-## Probar
-- `GET /salud` → 200
-- `POST /api/presign` con body:
-```
-{ "key":"postman/test.txt", "contentType":"text/plain", "method":"PUT" }
-```
-- `PUT` a la URL firmada → 200/201/204
-- `GET /api/list?prefix=postman/` → lista el objeto
+Prueba con tu colección Postman: Salud → Presign (PUT) → Upload → List.
