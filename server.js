@@ -1,10 +1,13 @@
-// server.js — Mixtli API PRO (v4)
+// server.js — Mixtli API PRO (v5)
 // ESM ("type":"module"). Node 18+
 // Features:
 // - API token (x-mixtli-token) via env API_TOKEN
 // - Presign PUT/GET with optional filename + expiresIn
 // - List with pagination (limit, token)
 // - Delete object
+// - Move/Rename object (CopyObject + DeleteObject)
+// - HEAD/metadata endpoint
+// - Optional ROOT_PREFIX guard (limita prefijos autorizados)
 // - Robust CORS (ALLOWED_ORIGINS JSON)
 // - Allowed MIME filtering (ALLOWED_MIME CSV)
 // - Path-style S3 (R2) support
@@ -15,9 +18,18 @@
 // ALLOWED_ORIGINS='["https://<tu-netlify>.app"]'
 // API_TOKEN=<secreto opcional>
 // ALLOWED_MIME='image/jpeg,image/png,text/plain,application/pdf'
+// ROOT_PREFIX=clientes/acme/   (opcional)
 
 import express from 'express';
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+  CopyObjectCommand,
+  HeadObjectCommand
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // ---------------- Env helpers ----------------
@@ -52,7 +64,8 @@ const ENV = {
   BUCKET: pick('S3_BUCKET', 'R2_BUCKET', 'BUCKET'),
   ALLOWED_ORIGINS: parseOrigins(pick('ALLOWED_ORIGINS')),
   API_TOKEN: pick('API_TOKEN'),
-  ALLOWED_MIME: (pick('ALLOWED_MIME') || 'image/jpeg,image/png,text/plain,application/pdf').split(',').map(s=>s.trim()).filter(Boolean)
+  ALLOWED_MIME: (pick('ALLOWED_MIME') || 'image/jpeg,image/png,text/plain,application/pdf').split(',').map(s=>s.trim()).filter(Boolean),
+  ROOT_PREFIX: pick('ROOT_PREFIX')
 };
 
 // Normaliza endpoint si vino con /<bucket>
@@ -67,6 +80,9 @@ if (!ENV.BUCKET)  throw new Error('ConfigError: S3_BUCKET/R2_BUCKET/BUCKET no es
 if (!ENV.KEY)     throw new Error('ConfigError: S3_ACCESS_KEY_ID no está definido');
 if (!ENV.SECRET)  throw new Error('ConfigError: S3_SECRET_ACCESS_KEY no está definido');
 
+// Helpers
+const within = (k) => !ENV.ROOT_PREFIX || (k || '').startsWith(ENV.ROOT_PREFIX);
+
 // ---------------- S3 client ----------------
 const s3 = new S3Client({
   region: ENV.REGION,
@@ -77,7 +93,7 @@ const s3 = new S3Client({
 
 // ---------------- App ----------------
 const app = express();
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '20mb' }));
 
 // CORS
 app.use((req, res, next) => {
@@ -113,7 +129,8 @@ app.get('/_envcheck', (_req, res) => {
     KEY_ID_present: !!ENV.KEY,
     ALLOWED_ORIGINS: ENV.ALLOWED_ORIGINS,
     ALLOWED_MIME: ENV.ALLOWED_MIME,
-    AUTH: !!ENV.API_TOKEN
+    AUTH: !!ENV.API_TOKEN,
+    ROOT_PREFIX: ENV.ROOT_PREFIX || null
   });
 });
 
@@ -122,6 +139,7 @@ app.post('/api/presign', async (req, res) => {
   try {
     const { key, contentType = 'application/octet-stream', method = 'PUT', expiresIn = 300, filename } = req.body || {};
     if (!key || typeof key !== 'string') return res.status(400).json({ error: 'BadRequest', message: 'key requerido' });
+    if (!within(key)) return res.status(403).json({ error:'Forbidden', message:'key fuera de ROOT_PREFIX' });
 
     if (method === 'PUT') {
       // Validar mime
@@ -154,6 +172,8 @@ app.post('/api/presign', async (req, res) => {
 app.get('/api/list', async (req, res) => {
   try {
     const prefix = (req.query.prefix || '').toString();
+    if (!within(prefix)) return res.status(403).json({ error:'Forbidden', message:'prefix fuera de ROOT_PREFIX' });
+
     const MaxKeys = Math.min(parseInt(req.query.limit || '50', 10), 1000);
     const ContinuationToken = req.query.token ? decodeURIComponent(req.query.token.toString()) : undefined;
 
@@ -173,6 +193,8 @@ app.delete('/api/object', async (req, res) => {
   try {
     const key = (req.query.key || '').toString();
     if (!key) return res.status(400).json({ error: 'BadRequest', message: 'key requerido' });
+    if (!within(key)) return res.status(403).json({ error:'Forbidden', message:'key fuera de ROOT_PREFIX' });
+
     await s3.send(new DeleteObjectCommand({ Bucket: ENV.BUCKET, Key: key }));
     res.json({ ok: true, key });
   } catch (e) {
@@ -181,5 +203,45 @@ app.delete('/api/object', async (req, res) => {
   }
 });
 
+// -------- Move / Rename --------
+app.post('/api/move', async (req, res) => {
+  try {
+    const { from, to } = req.body || {};
+    if (!from || !to) return res.status(400).json({ error:'BadRequest', message:'from/to requeridos' });
+    if (!within(from) || !within(to)) return res.status(403).json({ error:'Forbidden', message:'fuera de ROOT_PREFIX' });
+
+    await s3.send(new CopyObjectCommand({
+      Bucket: ENV.BUCKET,
+      CopySource: `/${ENV.BUCKET}/${encodeURIComponent(from)}`.replace(/%2F/g,'/'),
+      Key: to
+    }));
+    await s3.send(new DeleteObjectCommand({ Bucket: ENV.BUCKET, Key: from }));
+    res.json({ ok:true, from, to });
+  } catch (e) {
+    console.error('move error:', e);
+    res.status(500).json({ error:'ServerError', message:e.message });
+  }
+});
+
+// -------- HEAD / metadata --------
+app.get('/api/head', async (req, res) => {
+  try {
+    const key = (req.query.key || '').toString();
+    if (!key) return res.status(400).json({ error:'BadRequest', message:'key requerido' });
+    if (!within(key)) return res.status(403).json({ error:'Forbidden', message:'key fuera de ROOT_PREFIX' });
+
+    const out = await s3.send(new HeadObjectCommand({ Bucket: ENV.BUCKET, Key: key }));
+    res.json({
+      key,
+      size: out.ContentLength,
+      contentType: out.ContentType,
+      lastModified: out.LastModified
+    });
+  } catch (e) {
+    console.error('head error:', e);
+    res.status(500).json({ error:'ServerError', message:e.message });
+  }
+});
+
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Mixtli API PRO v4 on :${PORT}`));
+app.listen(PORT, () => console.log(`Mixtli API PRO v5 on :${PORT}`));
