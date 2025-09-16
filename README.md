@@ -1,25 +1,31 @@
-# Mixtli Env Bootstrap
+# Mixtli — Opción 3 (server.js parchado)
 
-**Objetivo:** evitar el error `ConfigError: S3_BUCKET no está definido` sin modificar tu `server.js`.
+Este `server.js` ya trae:
+- Fallback del bucket: `S3_BUCKET || R2_BUCKET || BUCKET`
+- Path-style para R2
+- Parseo robusto de `ALLOWED_ORIGINS`
+- Rutas: `/salud`, `/api/presign` (PUT), `/api/list`, `/_envcheck`
 
-## Uso
-1) Copia `env-bootstrap.js` al **root** de tu backend (junto a `server.js`).
-2) En Render → Settings → **Start Command**, cambia a:
+## Cómo usar
+1) **Reemplaza** tu `server.js` por este archivo.
+2) Asegúrate de tener estas envs en Render:
 ```
-node env-bootstrap.js
+S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+S3_BUCKET=mixtli
+S3_REGION=auto
+S3_FORCE_PATH_STYLE=true
+S3_ACCESS_KEY_ID=<key>
+S3_SECRET_ACCESS_KEY=<secret>
+ALLOWED_ORIGINS=["https://tu-netlify"]
 ```
-3) Manual Deploy → **Clear build cache & deploy**.
+3) **Start Command**: `node server.js`
+4) **Manual Deploy → Clear build cache & deploy**.
 
-### Qué hace
-- Si `S3_BUCKET` está vacío, lo toma de `R2_BUCKET` o `BUCKET`. Si no existen, usa `'mixtli'` como último recurso.
-- Normaliza `S3_ENDPOINT` (quita `/<bucket>` si lo tiene).
-- Setea `S3_FORCE_PATH_STYLE=true` si faltaba.
-- Sanea `ALLOWED_ORIGINS` para que no truene `JSON.parse` accidental.
-
-> Recomendación: define igualmente en Render las variables correctas:
-> - `S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
-> - `S3_BUCKET=mixtli`
-> - `S3_REGION=auto`
-> - `S3_FORCE_PATH_STYLE=true`
-> - `S3_ACCESS_KEY_ID=<key>`
-> - `S3_SECRET_ACCESS_KEY=<secret>`
+## Probar
+- `GET /salud` → 200
+- `POST /api/presign` con body:
+```
+{ "key":"postman/test.txt", "contentType":"text/plain", "method":"PUT" }
+```
+- `PUT` a la URL firmada → 200/201/204
+- `GET /api/list?prefix=postman/` → lista el objeto

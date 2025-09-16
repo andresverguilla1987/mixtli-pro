@@ -1,104 +1,148 @@
-import express from "express";
-import morgan from "morgan";
-import cors from "cors";
-import { buildS3, listAll, presignUpload, presignGet, headBucketSafe } from "./utils/s3.js";
+// server.js — Mixtli API (Option 3 Patch)
+// ESM style. Node 18+
+// - Fallback BUCKET = S3_BUCKET || R2_BUCKET || BUCKET (env)
+// - Path-style for R2
+// - Robust ALLOWED_ORIGINS parsing (no crash)
+// - Endpoints: /salud, /api/presign (PUT), /api/list, /_envcheck
+// - Logs: "Mixtli API v1.11.0 on :PORT"
 
+import express from 'express';
+import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3RequestPresigner } from '@aws-sdk/s3-request-presigner';
+import { HttpRequest } from '@aws-sdk/protocol-http';
+import { Hash } from '@smithy/hash-node';
+import { formatUrl } from '@aws-sdk/util-format-url';
+
+// ---------------- Env helpers ----------------
+const pick = (...names) => {
+  for (const n of names) {
+    const v = process.env[n];
+    if (typeof v === 'string' && v.trim() !== '') return v.trim();
+  }
+  return '';
+};
+
+const parseOrigins = (raw) => {
+  if (!raw) return [];
+  // tolera formato "ALLOWED_ORIGINS=[...]" pegado por error
+  const eq = raw.indexOf('=');
+  if (raw.startsWith('ALLOWED_ORIGINS') && eq !== -1) raw = raw.slice(eq + 1);
+  raw = raw.trim();
+  try { const j = JSON.parse(raw); return Array.isArray(j) ? j : []; } catch {}
+  return raw
+    .replace(/^[\[\s]*/, '')
+    .replace(/[\]\s]*$/, '')
+    .split(/[\s,]+/)
+    .map(s => s.trim().replace(/^"+|"+$/g,''))
+    .filter(Boolean);
+};
+
+const ENV = {
+  ENDPOINT: pick('S3_ENDPOINT'),
+  REGION: pick('S3_REGION') || 'auto',
+  FORCE_PATH: (pick('S3_FORCE_PATH_STYLE') || 'true').toLowerCase() !== 'false',
+  KEY: pick('S3_ACCESS_KEY_ID', 'AWS_ACCESS_KEY_ID'),
+  SECRET: pick('S3_SECRET_ACCESS_KEY', 'AWS_SECRET_ACCESS_KEY'),
+  BUCKET: pick('S3_BUCKET', 'R2_BUCKET', 'BUCKET'), // <-- Fallback clave
+  ALLOWED_ORIGINS: parseOrigins(pick('ALLOWED_ORIGINS'))
+};
+
+// Normaliza endpoint: quita "/<bucket>" si alguien lo pegó así
+if (ENV.ENDPOINT && ENV.BUCKET && /\/[^/]+\/?$/.test(ENV.ENDPOINT)) {
+  const tail = ENV.ENDPOINT.substring(ENV.ENDPOINT.lastIndexOf('/')+1).replace(/\/$/, '');
+  if (tail === ENV.BUCKET) ENV.ENDPOINT = ENV.ENDPOINT.replace(/\/+[^/]+\/?$/, '');
+}
+
+// Validaciones claras (sin secretos)
+if (!ENV.ENDPOINT) throw new Error('ConfigError: S3_ENDPOINT no está definido');
+if (!ENV.BUCKET)  throw new Error('ConfigError: S3_BUCKET/R2_BUCKET/BUCKET no está definido');
+if (!ENV.KEY)     throw new Error('ConfigError: S3_ACCESS_KEY_ID no está definido');
+if (!ENV.SECRET)  throw new Error('ConfigError: S3_SECRET_ACCESS_KEY no está definido');
+
+// ---------------- S3 client (R2 compatible) ----------------
+const s3 = new S3Client({
+  region: ENV.REGION,
+  endpoint: ENV.ENDPOINT,
+  forcePathStyle: ENV.FORCE_PATH,
+  credentials: { accessKeyId: ENV.KEY, secretAccessKey: ENV.SECRET }
+});
+
+// ---------------- App ----------------
 const app = express();
-app.use(express.json({ limit: "2mb" }));
-app.use(morgan("tiny"));
+app.use(express.json({ limit: '2mb' }));
 
-const allowed = process.env.ALLOWED_ORIGINS
-  ? JSON.parse(process.env.ALLOWED_ORIGINS)
-  : ["*"];
-
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || allowed.includes("*") || allowed.includes(origin)) return cb(null, true);
-    return cb(null, false);
-  },
-  credentials: true
-}));
-
-app.get("/", (_, res) => {
-  res.status(200).send("Mixtli API v1.11.0");
+// CORS básico usando la lista permitida
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && ENV.ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,x-mixtli-token');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  next();
 });
 
-app.get("/salud", (_, res) => res.status(200).json({ ok: true }));
+app.get('/', (_req, res) => res.status(200).send('OK'));
+app.get('/salud', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
-app.get("/diag", async (req, res) => {
-  const env = {
-    haveBucket: !!process.env.S3_BUCKET,
-    haveAccessKeyId: !!process.env.AWS_ACCESS_KEY_ID,
-    haveSecretAccessKey: !!process.env.AWS_SECRET_ACCESS_KEY,
-    region: process.env.AWS_REGION || "",
-    endpoint: process.env.S3_ENDPOINT || "",
-    forcePathStyle: String(process.env.S3_FORCE_PATH_STYLE || ""),
-    prefix: process.env.S3_PREFIX || "",
-  };
-  const { client, bucket } = buildS3();
-  const bucketAccess = await headBucketSafe(client, bucket);
-  res.json({ env, bucket, bucketAccess });
+// Env check sin secretos
+app.get('/_envcheck', (_req, res) => {
+  res.json({
+    S3_ENDPOINT_present: !!ENV.ENDPOINT,
+    S3_BUCKET: ENV.BUCKET,
+    S3_REGION: ENV.REGION,
+    S3_FORCE_PATH_STYLE: ENV.FORCE_PATH,
+    KEY_ID_present: !!ENV.KEY,
+    ALLOWED_ORIGINS: ENV.ALLOWED_ORIGINS
+  });
 });
 
-// List objects
-app.get("/api/list", async (req, res) => {
+// -------- Presign (PUT) --------
+app.post('/api/presign', async (req, res) => {
   try {
-    const limit = Math.max(1, Math.min(2000, parseInt(req.query.limit || "160", 10)));
-    const prefix = process.env.S3_PREFIX || "";
-    const { client, bucket } = buildS3();
-    if (!bucket) return res.status(500).json({ error: "ConfigError", message: "S3_BUCKET no está definido" });
-    const items = await listAll({ client, bucket, prefix, maxKeys: limit });
-    res.json({ items });
-  } catch (err) {
-    console.error("[list] ERROR", err);
-    res.status(500).json({
-      error: err?.name || "ListError",
-      message: err?.message || "Fallo listando objetos",
+    const { key, contentType = 'application/octet-stream', method = 'PUT' } = req.body || {};
+    if (!key || typeof key !== 'string') return res.status(400).json({ error: 'BadRequest', message: 'key requerido' });
+    if (method !== 'PUT') return res.status(400).json({ error: 'BadRequest', message: 'solo soportado: PUT' });
+
+    // Presigner
+    const presigner = new S3RequestPresigner({ ...s3.config, sha256: Hash.bind(null, 'sha256') });
+
+    // Path-style: /{bucket}/{key}
+    const host = ENV.ENDPOINT.replace(/^https?:\/\//, '');
+    const reqToSign = new HttpRequest({
+      ...s3.config,
+      protocol: 'https:',
+      method: 'PUT',
+      path: `/${ENV.BUCKET}/${encodeURIComponent(key)}`,
+      headers: { 'content-type': contentType },
+      hostname: host
     });
+
+    const signed = await presigner.presign(reqToSign, { expiresIn: 60 * 5 }); // 5 minutos
+    const url = formatUrl(signed);
+    res.json({ url, key });
+  } catch (e) {
+    console.error('presign error:', e);
+    res.status(500).json({ error: 'ServerError', message: e.message });
   }
 });
 
-// Presign upload
-app.post("/api/presign", async (req, res) => {
+// -------- List --------
+app.get('/api/list', async (req, res) => {
   try {
-    const { key } = req.body;
-    if (!key || typeof key !== "string") {
-      return res.status(400).json({ error: "BadRequest", message: "Parámetro 'key' requerido" });
-    }
-    const { client, bucket } = buildS3();
-    if (!bucket) return res.status(500).json({ error: "ConfigError", message: "S3_BUCKET no está definido" });
-
-    const fullKey = (process.env.S3_PREFIX || "") + key.replace(/^\/+/, "");
-    const out = await presignUpload({ client, bucket, key: fullKey, maxMb: 500 });
-    res.json(out);
-  } catch (err) {
-    // Señal clara cuando credenciales están vacías/invalidas
-    const code = (err?.name === "CredentialsProviderError" || /credential/i.test(err?.message||"")) ? 500 : 500;
-    console.error("[presign] ERROR", err);
-    res.status(code).json({
-      error: "PresignError",
-      message: err?.message || "Fallo generando presign",
-      hint: "Revisa AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / S3_BUCKET / S3_ENDPOINT / S3_FORCE_PATH_STYLE",
-    });
+    const prefix = (req.query.prefix || '').toString();
+    const out = await s3.send(new ListObjectsV2Command({ Bucket: ENV.BUCKET, Prefix: prefix || undefined }));
+    const objects = (out.Contents || []).map(o => ({
+      key: o.Key, size: o.Size, lastModified: o.LastModified
+    }));
+    res.json(objects);
+  } catch (e) {
+    console.error('list error:', e);
+    res.status(500).json({ error: 'ServerError', message: e.message });
   }
 });
 
-// Presign GET (proxy)
-app.get("/files/:key", async (req, res) => {
-  try {
-    const decoded = decodeURIComponent(req.params.key);
-    const fullKey = (process.env.S3_PREFIX || "") + decoded;
-    const { client, bucket } = buildS3();
-    if (!bucket) return res.status(500).send("S3_BUCKET no definido");
-    const url = await presignGet({ client, bucket, key: fullKey, expires: 3600 });
-    res.redirect(302, url);
-  } catch (err) {
-    console.error("[files] ERROR", err);
-    res.status(404).send("No encontrado");
-  }
-});
-
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 10000;
-app.listen(PORT, () => {
-  console.log(`Mixtli API v1.11.0 on :${PORT}`);
-});
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`Mixtli API v1.11.0 on :${PORT}`));
