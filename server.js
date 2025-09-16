@@ -1,7 +1,20 @@
-// server.js — Mixtli API FINAL
+// server.js — Mixtli API PRO (v4)
 // ESM ("type":"module"). Node 18+
-// Endpoints: /salud, /api/presign (PUT/GET), /api/list, /api/object (DELETE), /_envcheck
-// R2 (S3 compatible) with path-style & robust CORS.
+// Features:
+// - API token (x-mixtli-token) via env API_TOKEN
+// - Presign PUT/GET with optional filename + expiresIn
+// - List with pagination (limit, token)
+// - Delete object
+// - Robust CORS (ALLOWED_ORIGINS JSON)
+// - Allowed MIME filtering (ALLOWED_MIME CSV)
+// - Path-style S3 (R2) support
+//
+// Env needed:
+// S3_ENDPOINT, S3_BUCKET, S3_REGION=auto, S3_FORCE_PATH_STYLE=true
+// S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY
+// ALLOWED_ORIGINS='["https://<tu-netlify>.app"]'
+// API_TOKEN=<secreto opcional>
+// ALLOWED_MIME='image/jpeg,image/png,text/plain,application/pdf'
 
 import express from 'express';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
@@ -23,7 +36,7 @@ const parseOrigins = (raw) => {
   raw = raw.trim();
   try { const j = JSON.parse(raw); return Array.isArray(j) ? j : []; } catch {}
   return raw
-    .replace(/^[\[\s]*/, '')
+    .replace(/^\[\s]*/, '')
     .replace(/[\]\s]*$/, '')
     .split(/[\s,]+/)
     .map(s => s.trim().replace(/^"+|"+$/g,''))
@@ -37,22 +50,24 @@ const ENV = {
   KEY: pick('S3_ACCESS_KEY_ID', 'AWS_ACCESS_KEY_ID'),
   SECRET: pick('S3_SECRET_ACCESS_KEY', 'AWS_SECRET_ACCESS_KEY'),
   BUCKET: pick('S3_BUCKET', 'R2_BUCKET', 'BUCKET'),
-  ALLOWED_ORIGINS: parseOrigins(pick('ALLOWED_ORIGINS'))
+  ALLOWED_ORIGINS: parseOrigins(pick('ALLOWED_ORIGINS')),
+  API_TOKEN: pick('API_TOKEN'),
+  ALLOWED_MIME: (pick('ALLOWED_MIME') || 'image/jpeg,image/png,text/plain,application/pdf').split(',').map(s=>s.trim()).filter(Boolean)
 };
 
-// Normaliza endpoint: quita "/<bucket>" si alguien lo pegó así
+// Normaliza endpoint si vino con /<bucket>
 if (ENV.ENDPOINT && ENV.BUCKET && /\/[^/]+\/?$/.test(ENV.ENDPOINT)) {
   const tail = ENV.ENDPOINT.substring(ENV.ENDPOINT.lastIndexOf('/')+1).replace(/\/$/, '');
   if (tail === ENV.BUCKET) ENV.ENDPOINT = ENV.ENDPOINT.replace(/\/+[^/]+\/?$/, '');
 }
 
-// Validaciones claras (sin secretos)
+// Validaciones
 if (!ENV.ENDPOINT) throw new Error('ConfigError: S3_ENDPOINT no está definido');
 if (!ENV.BUCKET)  throw new Error('ConfigError: S3_BUCKET/R2_BUCKET/BUCKET no está definido');
 if (!ENV.KEY)     throw new Error('ConfigError: S3_ACCESS_KEY_ID no está definido');
 if (!ENV.SECRET)  throw new Error('ConfigError: S3_SECRET_ACCESS_KEY no está definido');
 
-// ---------------- S3 client (R2 compatible) ----------------
+// ---------------- S3 client ----------------
 const s3 = new S3Client({
   region: ENV.REGION,
   endpoint: ENV.ENDPOINT,
@@ -62,9 +77,9 @@ const s3 = new S3Client({
 
 // ---------------- App ----------------
 const app = express();
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '10mb' }));
 
-// CORS básico usando la lista permitida
+// CORS
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && ENV.ALLOWED_ORIGINS.includes(origin)) {
@@ -74,6 +89,14 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,x-mixtli-token');
   if (req.method === 'OPTIONS') return res.status(204).end();
+  next();
+});
+
+// Auth middleware (opcional)
+app.use((req, res, next) => {
+  if (!ENV.API_TOKEN) return next();
+  const t = req.headers['x-mixtli-token'];
+  if (t !== ENV.API_TOKEN) return res.status(401).json({ error: 'Unauthorized' });
   next();
 });
 
@@ -88,26 +111,36 @@ app.get('/_envcheck', (_req, res) => {
     S3_REGION: ENV.REGION,
     S3_FORCE_PATH_STYLE: ENV.FORCE_PATH,
     KEY_ID_present: !!ENV.KEY,
-    ALLOWED_ORIGINS: ENV.ALLOWED_ORIGINS
+    ALLOWED_ORIGINS: ENV.ALLOWED_ORIGINS,
+    ALLOWED_MIME: ENV.ALLOWED_MIME,
+    AUTH: !!ENV.API_TOKEN
   });
 });
 
 // -------- Presign (PUT/GET) --------
 app.post('/api/presign', async (req, res) => {
   try {
-    const { key, contentType = 'application/octet-stream', method = 'PUT', expiresIn = 300 } = req.body || {};
+    const { key, contentType = 'application/octet-stream', method = 'PUT', expiresIn = 300, filename } = req.body || {};
     if (!key || typeof key !== 'string') return res.status(400).json({ error: 'BadRequest', message: 'key requerido' });
 
     if (method === 'PUT') {
+      // Validar mime
+      if (ENV.ALLOWED_MIME.length && contentType && !ENV.ALLOWED_MIME.includes(contentType)) {
+        return res.status(400).json({ error: 'BadRequest', message: 'tipo no permitido' });
+      }
       const cmd = new PutObjectCommand({ Bucket: ENV.BUCKET, Key: key, ContentType: contentType });
       const url = await getSignedUrl(s3, cmd, { expiresIn });
-      return res.json({ url, key, method: 'PUT' });
+      return res.json({ url, key, method: 'PUT', expiresIn });
     }
 
     if (method === 'GET') {
-      const cmd = new GetObjectCommand({ Bucket: ENV.BUCKET, Key: key });
+      const cmd = new GetObjectCommand({
+        Bucket: ENV.BUCKET,
+        Key: key,
+        ...(filename ? { ResponseContentDisposition: `attachment; filename="${filename}"` } : {})
+      });
       const url = await getSignedUrl(s3, cmd, { expiresIn });
-      return res.json({ url, key, method: 'GET' });
+      return res.json({ url, key, method: 'GET', expiresIn });
     }
 
     return res.status(400).json({ error: 'BadRequest', message: 'método soportado: PUT o GET' });
@@ -117,15 +150,18 @@ app.post('/api/presign', async (req, res) => {
   }
 });
 
-// -------- List --------
+// -------- List (paginado) --------
 app.get('/api/list', async (req, res) => {
   try {
     const prefix = (req.query.prefix || '').toString();
-    const out = await s3.send(new ListObjectsV2Command({ Bucket: ENV.BUCKET, Prefix: prefix || undefined }));
-    const objects = (out.Contents || []).map(o => ({
-      key: o.Key, size: o.Size, lastModified: o.LastModified
-    }));
-    res.json(objects);
+    const MaxKeys = Math.min(parseInt(req.query.limit || '50', 10), 1000);
+    const ContinuationToken = req.query.token ? decodeURIComponent(req.query.token.toString()) : undefined;
+
+    const out = await s3.send(new ListObjectsV2Command({ Bucket: ENV.BUCKET, Prefix: prefix || undefined, MaxKeys, ContinuationToken }));
+    res.json({
+      items: (out.Contents || []).map(o => ({ key: o.Key, size: o.Size, lastModified: o.LastModified })),
+      nextToken: out.IsTruncated ? encodeURIComponent(out.NextContinuationToken) : null
+    });
   } catch (e) {
     console.error('list error:', e);
     res.status(500).json({ error: 'ServerError', message: e.message });
@@ -146,4 +182,4 @@ app.delete('/api/object', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Mixtli API FINAL on :${PORT}`));
+app.listen(PORT, () => console.log(`Mixtli API PRO v4 on :${PORT}`));

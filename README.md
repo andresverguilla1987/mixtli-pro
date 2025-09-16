@@ -1,30 +1,29 @@
-# Mixtli Backend FINAL (2025-09-16)
+# Mixtli Backend PRO (v4) — 2025-09-16
 
-**Qué es**  
-`server.js` listo con:
-- Presign **PUT/GET** (`/api/presign`)
-- List (`/api/list`)
-- Delete (`/api/object?key=...`)
-- Salud (`/salud`) y `_envcheck`
+## Novedades
+- Token de API (`x-mixtli-token`) — activa con `API_TOKEN` en Render.
+- Presign **PUT/GET** con `expiresIn` y `filename` (para descarga amigable).
+- Listado paginado: `GET /api/list?prefix=&limit=50&token=...`.
+- Filtro de MIME por env `ALLOWED_MIME` (CSV).
+- CORS robusto con `ALLOWED_ORIGINS` (JSON).
 
-**Dependencias necesarias**
+## Dependencias
 ```
-npm i @aws-sdk/client-s3 @aws-sdk/s3-request-presigner express
+npm i express @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
 ```
 
-**Variables en Render**
+## Vars Render
 ```
-S3_ENDPOINT=https://8351c372dedf0e354a3196aff085f0ae.r2.cloudflarestorage.com
+S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
 S3_BUCKET=mixtli
 S3_REGION=auto
 S3_FORCE_PATH_STYLE=true
-S3_ACCESS_KEY_ID=<key>
-S3_SECRET_ACCESS_KEY=<secret>
+S3_ACCESS_KEY_ID=***
+S3_SECRET_ACCESS_KEY=***
 ALLOWED_ORIGINS=["https://tu-netlify.app"]
+API_TOKEN=<opcional>
+ALLOWED_MIME=image/jpeg,image/png,text/plain,application/pdf
 ```
 
-**Deploy**
-1) Reemplaza tu `server.js` por el de este zip (raíz del repo `mixtli-pro`).  
-2) Haz commit y push a GitHub.  
-3) En Render: Manual Deploy → **Clear build cache & deploy**.  
-4) Verifica: `https://mixtli-pro.onrender.com/_envcheck` y `.../salud`.
+## Start
+`node server.js`
