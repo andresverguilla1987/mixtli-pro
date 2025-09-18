@@ -1,21 +1,33 @@
-# Mixtli Backend PRO (v6) — 2025-09-16
+# Mixtli Mini v1.10.1
 
-**Nuevo:** carpetas (list2), crear carpeta, acciones masivas, multipart upload, ROOT_PREFIX por token, rate limit y auditoría opcional.
+**Objetivo:** servidor ultra-minimal para generar prefirmas (PUT) directas a Cloudflare R2 (S3-compatible), con CORS estricto y endpoint de salud.
 
-## Env
-```
-S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
-S3_BUCKET=mixtli
-S3_REGION=auto
-S3_FORCE_PATH_STYLE=true
-S3_ACCESS_KEY_ID=***
-S3_SECRET_ACCESS_KEY=***
-ALLOWED_ORIGINS=["https://lovely-bienenstitch-6344a1.netlify.app"]
-API_TOKEN=<opcional único>           # o usa TOKEN_PREFIX_MAP para varios
-TOKEN_PREFIX_MAP={"secretoA":"tenantA/","secretoB":"tenantB/"}
-ALLOWED_MIME=image/jpeg,image/png,text/plain,application/pdf
-ROOT_PREFIX=postman/                  # opcional (global)
-RATE_LIMIT_PER_MIN=120                # opcional
-AUDIT=true                            # opcional (log a consola)
-```
-**Start:** `node server.js`
+## Deploy rápido (Render)
+1) Crear *Web Service* en Render (Node 22+).
+2) Variables de entorno:
+   - `PORT` = `10000`
+   - `S3_ENDPOINT` = `https://<tu-accountid>.r2.cloudflarestorage.com`
+   - `S3_BUCKET` = `<tu-bucket>`
+   - `S3_REGION` = `auto`
+   - `S3_FORCE_PATH_STYLE` = `true`
+   - `S3_ACCESS_KEY_ID` = `<R2 Access Key ID>`
+   - `S3_SECRET_ACCESS_KEY` = `<R2 Secret Access Key>`
+   - `ALLOWED_ORIGINS` = `["https://<tu-netlify>.netlify.app"]`
+3) Build Command: `npm install --no-audit --no-fund`
+4) Start Command: `node server.js`
+
+## Endpoints
+- `GET /salud` (alias: `/api/health`) → estado + verificación ligera de bucket.
+- `GET /api/list` → lista 50 objetos (para diagnóstico).
+- `POST /api/presign` → body `{ "filename":"a.png", "contentType":"image/png" }` → regresa `url` (PUT), `key`, `expiresIn`.
+
+## Notas de CORS
+- Sólo permite `ALLOWED_ORIGINS`. Si recibes 403 CORS, agrega el dominio correcto (incluye https y subdominio).
+- Preflight: `Access-Control-Allow-Headers: Content-Type, x-mixtli-token`.
+
+## Demo Frontend (Netlify)
+Carga `public/` en Netlify. Asegúrate de que `_redirects` haga proxy de `/api` a tu Render.
+
+## Seguridad
+- No subas tus llaves al cliente.
+- `expiresIn` corto (5 min). Revoca llaves si sospechas exposición.
