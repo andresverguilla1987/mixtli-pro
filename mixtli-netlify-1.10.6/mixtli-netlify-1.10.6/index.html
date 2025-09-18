@@ -1,0 +1,189 @@
+
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mixtli Mini Uploader v1.10.6</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b0f14; color:#e6edf3; margin:0; }
+    .wrap { max-width: 760px; margin: 48px auto; padding: 24px; background:#0e141b; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    .zone { margin-top: 18px; padding: 36px; border: 2px dashed #2b3b52; border-radius: 16px; text-align: center; }
+    .zone.drag { background: #0b1725; }
+    button { border:0; padding:12px 18px; font-weight:600; border-radius: 12px; cursor:pointer; background:#1f6feb; color:white; }
+    input[type=file]{ display:none; }
+    .row { display:flex; gap:12px; justify-content:center; margin-top:12px; flex-wrap: wrap; }
+    .log { margin-top:18px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#0b0f14; border:1px solid #1b2838; padding:12px; border-radius:10px; max-height:260px; overflow:auto; white-space:pre-wrap; }
+    .link { margin-top: 12px; display:flex; gap:8px; align-items:center; }
+    input[type=text].url { width:100%; padding:10px; border-radius:10px; border:1px solid #1b2838; background:#0b0f14; color:#e6edf3; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Mixtli Mini — Subir (v1.10.6)</h1>
+    <p>Si <code>/api/readlink</code> no existe, intenta link público automáticamente (si el bucket es público).</p>
+    <div id="zone" class="zone">
+      <strong>Arrastra y suelta</strong> o
+      <label><button>Elegir archivo</button><input id="file" type="file" /></label>
+    </div>
+    <div class="row">
+      <input id="ct" placeholder="Content-Type (opcional)" style="padding:10px;border-radius:10px;border:1px solid #1b2838;background:#0b0f14;color:#e6edf3;min-width:260px;"/>
+      <button id="upload">Subir</button>
+      <button id="getlink" disabled>Obtener link</button>
+      <button id="copy" disabled>Copiar link</button>
+    </div>
+    <div class="link">
+      <input id="url" class="url" placeholder="Link aparecerá aquí..." readonly />
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+  <script>
+    const log = (...a)=>{ const el=document.getElementById('log'); el.textContent += a.map(x=>typeof x==='string'?x:JSON.stringify(x,null,2)).join(' ') + "\\n"; el.scrollTop=el.scrollHeight; };
+    const fileInput = document.getElementById('file');
+    const zone = document.getElementById('zone');
+    const uploadBtn = document.getElementById('upload');
+    const getLinkBtn = document.getElementById('getlink');
+    const copyBtn = document.getElementById('copy');
+    const urlInput = document.getElementById('url');
+    let picked, lastKey = null, lastPublicCandidate = null;
+
+    const safeKey = (s)=> s.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const genKey = (name)=> `${Date.now()}_${Math.random().toString(16).slice(2,8)}_${safeKey(name)}`;
+
+    zone.addEventListener('dragover', (e)=>{ e.preventDefault(); zone.classList.add('drag'); });
+    zone.addEventListener('dragleave', ()=> zone.classList.remove('drag'));
+    zone.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      zone.classList.remove('drag');
+      picked = e.dataTransfer.files?.[0];
+      if (picked) log("Archivo seleccionado:", picked.name, picked.size+" bytes");
+    });
+
+    document.querySelector('label').addEventListener('click', ()=> fileInput.click());
+    fileInput.addEventListener('change', (e)=>{
+      picked = e.target.files?.[0];
+      if (picked) log("Archivo seleccionado:", picked.name, picked.size+" bytes");
+    });
+
+    async function parseMaybeJSON(resp) {
+      const text = await resp.text();
+      try { return { kind:"json", data: JSON.parse(text), raw:text }; }
+      catch { return { kind:"text", data: text, raw:text }; }
+    }
+
+    async function presignDual(picked, contentType) {
+      const presignURL = "/api/presign";
+      log("→ POST", presignURL, "(modo filename)");
+      let resp = await fetch(presignURL, {
+        method:"POST",
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify({ filename: picked.name, contentType })
+      });
+      let parsed = await parseMaybeJSON(resp);
+      if (resp.ok && parsed.kind==="json" && parsed.data.ok) return parsed.data;
+
+      const needsKey = (!resp.ok && parsed.kind==="json" && /key/i.test(parsed.data?.message||"")) ||
+                       (!resp.ok && parsed.kind==="text" && /key/i.test(parsed.data));
+      if (needsKey) {
+        const key = genKey(picked.name);
+        log("⚙️ Backend pide 'key'. Reintentando con key:", key);
+        resp = await fetch(presignURL, {
+          method:"POST",
+          headers: { "Content-Type":"application/json" },
+          body: JSON.stringify({ key, contentType })
+        });
+        parsed = await parseMaybeJSON(resp);
+        if (resp.ok && parsed.kind==="json") return parsed.data;
+      }
+      throw new Error(`Presign fallo (${resp.status}): ${parsed.raw.slice(0,400)}`);
+    }
+
+    uploadBtn.addEventListener('click', async ()=>{
+      try {
+        if (!picked) { alert("Elige un archivo primero"); return; }
+        if (picked.size > 50*1024*1024) { alert("Máximo 50 MB"); return; }
+        const contentType = document.getElementById('ct').value || picked.type || "application/octet-stream";
+
+        const pres = await presignDual(picked, contentType);
+        if (!pres || !pres.url) { log("❌ Presign sin url:", pres); return; }
+        log("Presign OK. Subiendo a:", pres.url);
+
+        // Parse origin + bucket from the PUT url to guess a public URL in case bucket is public
+        try {
+          const u = new URL(pres.url);
+          const parts = u.pathname.split("/").filter(Boolean); // ["mixtli", "<key...>"]
+          if (parts.length >= 2) {
+            const bucket = parts[0];
+            const keyPath = parts.slice(1).join("/").split("?")[0];
+            lastPublicCandidate = `${u.origin}/${bucket}/${keyPath}`;
+            log("↪ posible link público:", lastPublicCandidate);
+          }
+        } catch {}
+
+        const putRes = await fetch(pres.url, { method:"PUT", headers:{ "Content-Type": contentType }, body: picked });
+        if (!putRes.ok) {
+          log("❌ Error PUT:", putRes.status, putRes.statusText);
+          const body = await putRes.text();
+          log("Respuesta PUT:", body.slice(0,400));
+          return;
+        }
+        lastKey = pres.key || lastKey;
+        log("✅ Subida completa.", "key:", lastKey);
+        getLinkBtn.disabled = false;
+        copyBtn.disabled = true;
+        urlInput.value = "";
+      } catch (e) {
+        log("Excepción:", String(e));
+      }
+    });
+
+    getLinkBtn.addEventListener('click', async ()=>{
+      try {
+        if (!lastKey) { alert("No hay key de un archivo subido aún"); return; }
+        const u = "/api/readlink?key=" + encodeURIComponent(lastKey);
+        log("→ GET", u);
+        const resp = await fetch(u);
+        const parsed = await parseMaybeJSON(resp);
+        if (resp.ok && parsed.kind==="json" && parsed.data.ok) {
+          urlInput.value = parsed.data.url;
+          copyBtn.disabled = false;
+          log("🔗 Link firmado listo (expira ~5 min).");
+          return;
+        }
+        // If 404, try public candidate (if any)
+        if (resp.status === 404 && lastPublicCandidate) {
+          log("ℹ️ /api/readlink no existe. Probando link público…");
+          try {
+            const head = await fetch(lastPublicCandidate, { method: "HEAD" });
+            if (head.ok) {
+              urlInput.value = lastPublicCandidate;
+              copyBtn.disabled = false;
+              log("🌎 Bucket parece público. Link directo listo.");
+              return;
+            } else {
+              log("No es público (HEAD:", head.status, head.statusText, "). Sube backend v1.10.3 para readlink.");
+            }
+          } catch (e) {
+            log("Error al probar link público:", String(e));
+          }
+        } else {
+          log("❌ readlink fallo:", resp.status, parsed.raw.slice(0,200));
+        }
+      } catch (e) {
+        log("Excepción:", String(e));
+      }
+    });
+
+    copyBtn.addEventListener('click', async ()=>{
+      try {
+        if (!urlInput.value) return;
+        await navigator.clipboard.writeText(urlInput.value);
+        log("📋 Copiado al portapapeles.");
+      } catch (e) {
+        log("Error al copiar:", String(e));
+      }
+    });
+  </script>
+</body>
+</html>

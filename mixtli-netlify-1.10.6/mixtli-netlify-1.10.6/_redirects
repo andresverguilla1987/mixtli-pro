@@ -1,0 +1,4 @@
+
+# Proxy API to Render (preserva /api)
+/api/*   https://mixtli-pro.onrender.com/api/:splat   200
+/salud   https://mixtli-pro.onrender.com/salud        200
