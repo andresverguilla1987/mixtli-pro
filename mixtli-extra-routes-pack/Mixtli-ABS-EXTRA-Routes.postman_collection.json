@@ -1,0 +1,170 @@
+{
+  "info": {
+    "name": "Mixtli – ABS + EXTRA Routes",
+    "_postman_id": "mixtli-extra-2025-09-18T01:49:44.969438",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "08) Crear link público",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "https://mixtli-pro.onrender.com/api/share/create",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"clave\": \"postman/demo.txt\", \"expiresSec\": 900, \"contraseña\": \"\", \"maxDownloads\": 0}"
+        }
+      }
+    },
+    {
+      "name": "09) Enlace de resolución (SIN pw)",
+      "request": {
+        "method": "GET",
+        "url": "https://mixtli-pro.onrender.com/api/share/{{shareId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200',()=>pm.response.to.have.status(200));",
+              "var data = pm.response.json();",
+              "pm.collectionVariables.set('resolvedUrl', data.url || '');"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10) Enlace de resolución (CON pw)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "https://mixtli-pro.onrender.com/api/share/{{shareId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"contrase\\u00f1a\": \"\"}"
+        }
+      }
+    },
+    {
+      "name": "11) Enlaces listar",
+      "request": {
+        "method": "GET",
+        "url": "https://mixtli-pro.onrender.com/api/share/list"
+      }
+    },
+    {
+      "name": "12) Enlace revocar",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "https://mixtli-pro.onrender.com/api/share/revoke",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"id\": \"{{shareId}}\"}"
+        }
+      }
+    },
+    {
+      "name": "16) Mover/Renombrar",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "https://mixtli-pro.onrender.com/api/move",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"fromKey\": \"postman/demo.txt\", \"toKey\": \"postman/demo-movido.txt\"}"
+        }
+      }
+    },
+    {
+      "name": "17) Enviar a papelera (borrar objeto)",
+      "request": {
+        "method": "DELETE",
+        "url": "https://mixtli-pro.onrender.com/api/object",
+        "urlEncoded": [],
+        "body": {
+          "mode": "raw",
+          "raw": ""
+        },
+        "description": "Usa query key"
+      },
+      "url": {
+        "raw": "https://mixtli-pro.onrender.com/api/object?key=postman/demo-movido.txt",
+        "host": [
+          "https://mixtli-pro.onrender.com"
+        ],
+        "path": [
+          "api",
+          "object"
+        ],
+        "query": [
+          {
+            "key": "key",
+            "value": "postman/demo-movido.txt"
+          }
+        ]
+      }
+    },
+    {
+      "name": "18) Restaurar desde papelera (stub trash/)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "https://mixtli-pro.onrender.com/api/trash/restore",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"key\": \"trash/postman/demo-movido.txt\"}"
+        }
+      }
+    },
+    {
+      "name": "19) Vaciar papelera (stub)",
+      "request": {
+        "method": "POST",
+        "url": "https://mixtli-pro.onrender.com/api/trash/empty"
+      }
+    },
+    {
+      "name": "20) Backup (stub)",
+      "request": {
+        "method": "POST",
+        "url": "https://mixtli-pro.onrender.com/api/backup/run"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "shareId",
+      "value": ""
+    }
+  ]
+}
