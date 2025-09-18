@@ -1,0 +1,155 @@
+{
+  "info": {
+    "name": "Mixtli – FeaturePack A (ABSOLUTE)",
+    "_postman_id": "mixtli-featurepack-a-2025-09-18T03:00:38.792314",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "prefix",
+      "value": "postman/"
+    },
+    {
+      "key": "key",
+      "value": "postman/demo-fpa.txt"
+    },
+    {
+      "key": "shareId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01) mkdir",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "https://mixtli-pro.onrender.com/api/mkdir",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"key\": \"{{prefix}}carpeta/\"}"
+        }
+      }
+    },
+    {
+      "name": "02) presign PUT (core)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "https://mixtli-pro.onrender.com/api/presign",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"key\": \"{{key}}\", \"method\": \"PUT\", \"contentType\": \"text/plain\"}"
+        }
+      }
+    },
+    {
+      "name": "03) share/create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "https://mixtli-pro.onrender.com/api/share/create",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"key\": \"{{key}}\", \"expiresSec\": 900, \"password\": \"\", \"maxDownloads\": 0}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const o = pm.response.json(); pm.collectionVariables.set('shareId', o.id || '');",
+              "pm.test('shareId asignado',()=>pm.expect(pm.collectionVariables.get('shareId')).to.be.a('string').and.not.empty);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04) share GET (resolver)",
+      "request": {
+        "method": "GET",
+        "url": "https://mixtli-pro.onrender.com/api/share/{shareId}"
+      }
+    },
+    {
+      "name": "05) move",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "https://mixtli-pro.onrender.com/api/move",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"from\": \"{{key}}\", \"to\": \"{{prefix}}demo-fpa-movido.txt\"}"
+        }
+      }
+    },
+    {
+      "name": "06) delete (object)",
+      "request": {
+        "method": "DELETE",
+        "url": "https://mixtli-pro.onrender.com/api/object?key={prefix}demo-fpa-movido.txt"
+      }
+    },
+    {
+      "name": "07) trash restore (stub)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "https://mixtli-pro.onrender.com/api/trash/restore",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"key\": \"trash/{{prefix}}demo-fpa-movido.txt\"}"
+        }
+      }
+    },
+    {
+      "name": "08) trash empty (stub)",
+      "request": {
+        "method": "POST",
+        "url": "https://mixtli-pro.onrender.com/api/trash/empty"
+      }
+    },
+    {
+      "name": "09) stats recalc (stub)",
+      "request": {
+        "method": "POST",
+        "url": "https://mixtli-pro.onrender.com/api/stats/recalc"
+      }
+    },
+    {
+      "name": "10) backup run (stub)",
+      "request": {
+        "method": "POST",
+        "url": "https://mixtli-pro.onrender.com/api/backup/run"
+      }
+    }
+  ]
+}
