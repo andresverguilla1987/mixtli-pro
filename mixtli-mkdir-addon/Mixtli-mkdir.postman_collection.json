@@ -1,0 +1,41 @@
+{
+  "info": {
+    "name": "Mixtli – mkdir (crear carpeta)",
+    "_postman_id": "b9c0f3f9-8a2e-4b2f-9f77-zip-addon",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "03) Crear carpeta (mkdir)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "name": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"key\": \"postman/pruebas/\"\n}"
+        },
+        "url": {
+          "raw": "https://mixtli-pro.onrender.com/api/mkdir",
+          "protocol": "https",
+          "host": [
+            "mixtli-pro",
+            "onrender",
+            "com"
+          ],
+          "path": [
+            "api",
+            "mkdir"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
