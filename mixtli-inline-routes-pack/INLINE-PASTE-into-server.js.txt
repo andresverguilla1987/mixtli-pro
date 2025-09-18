@@ -1,0 +1,134 @@
+/**
+ * >>> START: MIXTLI INLINE ROUTES – GUARANTEED <<<
+ * Pega ESTE BLOQUE DIRECTO en tu server.js (después de crear `app`, `s3`, `bucket`, `getSignedUrl`).
+ * No depende de require/import externos: sin CJS/ESM dramas.
+ */
+const { PutObjectCommand, HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+
+if (!app._mixtliInlineMounted) {
+  app.use(require("express").json());
+
+  // 00) ping
+  app.get("/featurepack/ping", (req, res) => res.json({ ok: true, pack: "INLINE" }));
+
+  // 01) mkdir
+  app.post("/api/mkdir", async (req, res) => {
+    try {
+      let { key } = req.body || {};
+      if (!key || typeof key !== "string" || !key.trim()) return res.status(400).json({ ok:false, error:"Falta 'key'" });
+      if (!key.endsWith("/")) key += "/";
+      const placeholder = `${key}.keep`;
+      await s3.send(new PutObjectCommand({ Bucket: bucket, Key: placeholder, Body: "", ContentType: "application/octet-stream" }));
+      res.json({ ok:true, folder:key, placeholder });
+    } catch (err) {
+      console.error("mkdir error:", err);
+      res.status(500).json({ ok:false, error:String(err.message||err) });
+    }
+  });
+
+  // SHARES (memoria)
+  const crypto = require("crypto");
+  const shares = new Map();
+  const sha256 = (t) => crypto.createHash("sha256").update(String(t)).digest("hex");
+
+  // 03) share/create
+  app.post("/api/share/create", async (req, res) => {
+    try {
+      const { key, expiresSec=900, password="", maxDownloads=0 } = req.body || {};
+      if (!key) return res.status(400).json({ ok:false, error:"Falta 'key'" });
+      await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+      const id = crypto.randomBytes(8).toString("hex");
+      shares.set(id, { key, expiresSec:Number(expiresSec)||900, passwordHash: password? sha256(password):"", maxDownloads:Number(maxDownloads)||0, downloads:0, createdAt:Date.now() });
+      res.json({ ok:true, id });
+    } catch (err) {
+      console.error("share/create error:", err);
+      res.status(500).json({ ok:false, error:String(err.message||err) });
+    }
+  });
+
+  // 04) share GET
+  app.get("/api/share/:id", async (req, res) => {
+    try {
+      const sh = shares.get(req.params.id);
+      if (!sh) return res.status(404).json({ ok:false, error:"ShareNotFound" });
+      const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket, Key: sh.key }), { expiresIn: sh.expiresSec });
+      res.json({ ok:true, id:req.params.id, key: sh.key, url });
+    } catch (err) {
+      res.status(500).json({ ok:false, error:String(err.message||err) });
+    }
+  });
+
+  // 05) share POST (con password)
+  app.post("/api/share/:id", async (req, res) => {
+    try {
+      const sh = shares.get(req.params.id);
+      if (!sh) return res.status(404).json({ ok:false, error:"ShareNotFound" });
+      const password = (req.body && req.body.password) || "";
+      const hash = password ? sha256(password) : "";
+      if (sh.passwordHash && sh.passwordHash !== hash) return res.status(401).json({ ok:false, error:"PasswordMismatch" });
+      if (sh.maxDownloads>0 && sh.downloads>=sh.maxDownloads) return res.status(429).json({ ok:false, error:"MaxDownloadsReached" });
+      const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket, Key: sh.key }), { expiresIn: sh.expiresSec });
+      sh.downloads++;
+      res.json({ ok:true, id:req.params.id, key: sh.key, url });
+    } catch (err) {
+      res.status(500).json({ ok:false, error:String(err.message||err) });
+    }
+  });
+
+  // 06) move
+  app.post("/api/move", async (req, res) => {
+    try {
+      const { from, to } = req.body || {};
+      if (!from || !to) return res.status(400).json({ ok:false, error:"Faltan 'from' y/o 'to'" });
+      await s3.send(new CopyObjectCommand({ Bucket: bucket, CopySource: `/${bucket}/${encodeURIComponent(from)}`, Key: to }));
+      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: from }));
+      res.json({ ok:true, from, to });
+    } catch (err) {
+      console.error("move error:", err);
+      res.status(500).json({ ok:false, error:String(err.message||err) });
+    }
+  });
+
+  // 07) delete (ya la tienes — se deja inline por si acaso)
+  app.delete("/api/object", async (req, res) => {
+    try {
+      const key = req.query.key;
+      if (!key) return res.status(400).json({ ok:false, error:"Falta 'key'" });
+      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+      res.json({ ok:true, key });
+    } catch (err) {
+      res.status(500).json({ ok:false, error:String(err.message||err) });
+    }
+  });
+
+  // 08) trash restore (stub con prefijo trash/)
+  app.post("/api/trash/restore", async (req, res) => {
+    try {
+      let { key } = req.body || {};
+      if (!key) return res.status(400).json({ ok:false, error:"Falta 'key'" });
+      if (!key.startsWith("trash/")) key = `trash/${key}`;
+      const to = key.replace(/^trash\//, "");
+      await s3.send(new CopyObjectCommand({ Bucket: bucket, CopySource: `/${bucket}/${encodeURIComponent(key)}`, Key: to }));
+      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+      res.json({ ok:true, restored: to });
+    } catch (err) {
+      res.status(500).json({ ok:false, error:String(err.message||err) });
+    }
+  });
+
+  // 09) trash empty (stub 200 OK)
+  app.post("/api/trash/empty", (req, res) => res.json({ ok:true, note:"Stub: implementa borrado masivo en trash/" }));
+
+  // 10) stats recalc (stub)
+  app.post("/api/stats/recalc", (req, res) => res.json({ ok:true }));
+
+  // 11) backup run (stub)
+  app.post("/api/backup/run", (req, res) => res.json({ ok:true }));
+
+  app._mixtliInlineMounted = true;
+  console.log(">> MIXTLI INLINE ROUTES montadas");
+}
+
+/**
+ * >>> END: MIXTLI INLINE ROUTES – GUARANTEED <<<
+ */
