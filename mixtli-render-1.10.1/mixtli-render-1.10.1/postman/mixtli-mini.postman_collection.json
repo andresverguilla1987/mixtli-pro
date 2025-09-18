@@ -1,0 +1,54 @@
+{
+  "info": {
+    "name": "Mixtli Mini v1.10.1",
+    "_postman_id": "2b9ac7e4-1052-44de-9f1c-6b2fa0b0dd11",
+    "description": "Colección mínima para Mixtli Mini (salud, lista, presign)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET /salud",
+      "request": {
+        "method": "GET",
+        "url": "{{BASE_URL}}/salud"
+      }
+    },
+    {
+      "name": "GET /api/health",
+      "request": {
+        "method": "GET",
+        "url": "{{BASE_URL}}/api/health"
+      }
+    },
+    {
+      "name": "GET /api/list",
+      "request": {
+        "method": "GET",
+        "url": "{{BASE_URL}}/api/list"
+      }
+    },
+    {
+      "name": "POST /api/presign",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"filename\": \"demo.txt\", \"contentType\": \"text/plain\"}"
+        },
+        "url": "{{BASE_URL}}/api/presign"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "https://mixtli-pro.onrender.com"
+    }
+  ]
+}
