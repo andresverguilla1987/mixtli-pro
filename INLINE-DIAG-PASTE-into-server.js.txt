@@ -1,0 +1,195 @@
+/**
+ * >>> START: MIXTLI INLINE – DIAG & SAFE MOUNT <<<
+ * Pega este bloque en server.js **después** de crear `app`
+ * (no importa cómo se llamen tus variables s3/bucket: se auto-resuelve).
+ */
+const express = require("express");
+const {
+  S3Client, PutObjectCommand, HeadObjectCommand,
+  CopyObjectCommand, DeleteObjectCommand, GetObjectCommand
+} = require("@aws-sdk/client-s3");
+const { getSignedUrl: __mixtli_getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+
+(function MIXTLI_INLINE_SAFE() {
+  try {
+    if (!global.__mixtliMounted) {
+      // 1) Resolver app
+      if (!app || typeof app.use !== "function") {
+        console.error("Mixtli INLINE: 'app' no está listo. Pega el bloque DESPUÉS de crear app = express().");
+        return;
+      }
+      app.use(express.json());
+
+      // 2) Resolver s3 y bucket aunque usen otros nombres
+      const s3i = (typeof s3 !== "undefined" && s3) ? s3 :
+                  new S3Client({
+                    region: process.env.S3_REGION || "auto",
+                    endpoint: process.env.S3_ENDPOINT,
+                    forcePathStyle: String(process.env.S3_FORCE_PATH_STYLE||"true") === "true",
+                    credentials: process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY ? {
+                      accessKeyId: process.env.S3_ACCESS_KEY_ID,
+                      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY
+                    } : undefined
+                  });
+      const bucketi = (typeof bucket !== "undefined" && bucket) ? bucket : process.env.S3_BUCKET;
+      const getSU = (typeof getSignedUrl === "function") ? getSignedUrl : __mixtli_getSignedUrl;
+
+      if (!bucketi) {
+        console.error("Mixtli INLINE: S3_BUCKET indefinido. Define la env var en Render.");
+      }
+
+      // 3) DIAG endpoints
+      app.get("/__env", (req,res)=>{
+        res.json({
+          ok:true,
+          hasApp:true,
+          hasS3: !!s3i,
+          bucket: bucketi || null,
+          env: {
+            S3_ENDPOINT: process.env.S3_ENDPOINT || null,
+            S3_BUCKET: process.env.S3_BUCKET || null,
+            S3_REGION: process.env.S3_REGION || null,
+            S3_FORCE_PATH_STYLE: process.env.S3_FORCE_PATH_STYLE || null
+          }
+        });
+      });
+
+      app.get("/__routes", (req,res)=>{
+        try {
+          const out = [];
+          const stack = (app._router && app._router.stack) || [];
+          stack.forEach((l)=>{
+            if (l.route && l.route.path) {
+              out.push({ method: Object.keys(l.route.methods)[0]?.toUpperCase() || "GET", path: l.route.path });
+            } else if (l.name === 'router' && l.handle && l.handle.stack) {
+              l.handle.stack.forEach((r)=>{
+                if (r.route && r.route.path) {
+                  out.push({ method: Object.keys(r.route.methods)[0]?.toUpperCase() || "GET", path: r.route.path });
+                }
+              });
+            }
+          });
+          res.json({ ok:true, routes: out });
+        } catch (e) {
+          res.json({ ok:true, note:"no se pudieron listar rutas", err:String(e) });
+        }
+      });
+
+      // 4) Verificación
+      app.get("/featurepack/ping", (req, res) => res.json({ ok: true, pack: "INLINE-DIAG" }));
+
+      // 5) Funciones helper
+      const need = (v, name) => {
+        if (!v || typeof v !== "string" || !v.trim()) throw new Error(`Falta '${name}'`);
+      };
+
+      // 6) Rutas: mkdir/share/move/delete/trash
+      app.post("/api/mkdir", async (req, res) => {
+        try {
+          let { key } = req.body || {};
+          need(key, "key");
+          if (!key.endsWith("/")) key += "/";
+          const placeholder = `${key}.keep`;
+          await s3i.send(new PutObjectCommand({ Bucket: bucketi, Key: placeholder, Body: "", ContentType: "application/octet-stream" }));
+          res.json({ ok:true, folder:key, placeholder });
+        } catch (err) {
+          res.status(500).json({ ok:false, error:String(err.message||err) });
+        }
+      });
+
+      const shares = new Map();
+      const crypto = require("crypto");
+      const sha256 = (t) => crypto.createHash("sha256").update(String(t)).digest("hex");
+
+      app.post("/api/share/create", async (req, res) => {
+        try {
+          const { key, expiresSec=900, password="", maxDownloads=0 } = req.body || {};
+          need(key, "key");
+          await s3i.send(new HeadObjectCommand({ Bucket: bucketi, Key: key }));
+          const id = crypto.randomBytes(8).toString("hex");
+          shares.set(id, { key, expiresSec:Number(expiresSec)||900, passwordHash: password? sha256(password):"", maxDownloads:Number(maxDownloads)||0, downloads:0, createdAt:Date.now() });
+          res.json({ ok:true, id });
+        } catch (err) {
+          res.status(500).json({ ok:false, error:String(err.message||err) });
+        }
+      });
+
+      app.get("/api/share/:id", async (req, res) => {
+        try {
+          const sh = shares.get(req.params.id);
+          if (!sh) return res.status(404).json({ ok:false, error:"ShareNotFound" });
+          const url = await getSU(s3i, new GetObjectCommand({ Bucket: bucketi, Key: sh.key }), { expiresIn: sh.expiresSec });
+          res.json({ ok:true, id:req.params.id, key: sh.key, url });
+        } catch (err) {
+          res.status(500).json({ ok:false, error:String(err.message||err) });
+        }
+      });
+
+      app.post("/api/share/:id", async (req, res) => {
+        try {
+          const sh = shares.get(req.params.id);
+          if (!sh) return res.status(404).json({ ok:false, error:"ShareNotFound" });
+          const password = (req.body && req.body.password) || "";
+          const hash = password ? sha256(password) : "";
+          if (sh.passwordHash && sh.passwordHash !== hash) return res.status(401).json({ ok:false, error:"PasswordMismatch" });
+          if (sh.maxDownloads>0 && sh.downloads>=sh.maxDownloads) return res.status(429).json({ ok:false, error:"MaxDownloadsReached" });
+          const url = await getSU(s3i, new GetObjectCommand({ Bucket: bucketi, Key: sh.key }), { expiresIn: sh.expiresSec });
+          sh.downloads++;
+          res.json({ ok:true, id:req.params.id, key: sh.key, url });
+        } catch (err) {
+          res.status(500).json({ ok:false, error:String(err.message||err) });
+        }
+      });
+
+      app.post("/api/move", async (req, res) => {
+        try {
+          const { from, to } = req.body || {};
+          need(from, "from"); need(to, "to");
+          await s3i.send(new CopyObjectCommand({ Bucket: bucketi, CopySource: `/${bucketi}/${encodeURIComponent(from)}`, Key: to }));
+          await s3i.send(new DeleteObjectCommand({ Bucket: bucketi, Key: from }));
+          res.json({ ok:true, from, to });
+        } catch (err) {
+          res.status(500).json({ ok:false, error:String(err.message||err) });
+        }
+      });
+
+      app.delete("/api/object", async (req, res) => {
+        try {
+          const key = req.query.key;
+          need(key, "key");
+          await s3i.send(new DeleteObjectCommand({ Bucket: bucketi, Key: key }));
+          res.json({ ok:true, key });
+        } catch (err) {
+          res.status(500).json({ ok:false, error:String(err.message||err) });
+        }
+      });
+
+      app.post("/api/trash/restore", async (req, res) => {
+        try {
+          let { key } = req.body || {};
+          need(key, "key");
+          if (!key.startsWith("trash/")) key = `trash/${key}`;
+          const to = key.replace(/^trash\//, "");
+          await s3i.send(new CopyObjectCommand({ Bucket: bucketi, CopySource: `/${bucketi}/${encodeURIComponent(key)}`, Key: to }));
+          await s3i.send(new DeleteObjectCommand({ Bucket: bucketi, Key: key }));
+          res.json({ ok:true, restored: to });
+        } catch (err) {
+          res.status(500).json({ ok:false, error:String(err.message||err) });
+        }
+      });
+
+      app.post("/api/trash/empty", (req, res) => res.json({ ok:true, note:"Stub" }));
+      app.post("/api/stats/recalc", (req, res) => res.json({ ok:true }));
+      app.post("/api/backup/run", (req, res) => res.json({ ok:true }));
+
+      global.__mixtliMounted = true;
+      console.log(">> MIXTLI INLINE SAFE montado");
+    }
+  } catch (e) {
+    console.error("Mixtli INLINE SAFE error:", e);
+  }
+})();
+
+/**
+ * >>> END: MIXTLI INLINE – DIAG & SAFE MOUNT <<<
+ */

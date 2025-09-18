@@ -1,0 +1,29 @@
+{
+  "info": {
+    "name": "Mixtli – INLINE DIAG (ABSOLUTE)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "00) ping",
+      "request": {
+        "method": "GET",
+        "url": "https://mixtli-pro.onrender.com/featurepack/ping"
+      }
+    },
+    {
+      "name": "00b) __env",
+      "request": {
+        "method": "GET",
+        "url": "https://mixtli-pro.onrender.com/__env"
+      }
+    },
+    {
+      "name": "00c) __routes",
+      "request": {
+        "method": "GET",
+        "url": "https://mixtli-pro.onrender.com/__routes"
+      }
+    }
+  ]
+}
