@@ -1,30 +1,30 @@
-Mixtli fix: ALLOWED_ORIGINS + S3/R2
-===================================
+Mixtli – FeaturePack A
+======================
+Este add-on agrega endpoints comunes (mkdir/share/move/trash) SIN tocar tu código actual.
+Se montan como un router Express adicional.
 
-Qué corrige
------------
-- Error al parsear ALLOWED_ORIGINS cuando no estaba en JSON válido.
-- Error de AWS SDK: "Resolved credential object is not valid" debido a credenciales ausentes o mal leídas.
-- Compatibilidad con Cloudflare R2 (path-style=true) y AWS S3 (path-style=false).
+1) Copia `routes/mixtli-featurepack-a.js` a tu repo.
+2) En `server.js`, después de iniciar `s3`, `bucket` y tener `getSignedUrl`:
+   const featurePack = require("./routes/mixtli-featurepack-a")(s3, bucket, getSignedUrl);
+   app.use(featurePack);
+3) Deploy en Render.
 
-Archivos
---------
-- utils/s3.js
-- src-snippets/server.allowed-origins.snippet.js
-- patches/allowed-origins-and-s3.patch
-- env/.env.example.append
+Endpoints
+---------
+POST /api/mkdir                    { key }
+POST /api/share/create             { key, expiresSec, password, maxDownloads }
+GET  /api/share/:id
+POST /api/share/:id                { password }
+GET  /api/share/list
+POST /api/share/revoke             { id }
+POST /api/move                     { from, to }
+DELETE /api/object?key=...        
+POST /api/trash/restore            { key }              // usa prefijo trash/
+POST /api/trash/empty                                  // stub (200)
+POST /api/stats/recalc                                 // stub (200)
+POST /api/backup/run                                   // stub (200)
 
-Cómo aplicar
-------------
-1) Sustituye `utils/s3.js` por el de este ZIP.
-2) Abre tu `server.js` y usa el contenido de `src-snippets/server.allowed-origins.snippet.js`
-   para definir `ALLOWED_ORIGINS` y el callback de CORS.
-3) En Render → **Environment**, pega lo de `env/.env.example.append` y ajusta valores reales.
-4) Redeploy.
-
-Notas
------
-- Para R2: `S3_FORCE_PATH_STYLE=true` y `S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com`
-- Para AWS S3: `S3_FORCE_PATH_STYLE=false` y no pongas endpoint (o el de S3 nativo).
-
-Generado: 2025-09-15T03:20:59.668287Z
+Notas:
+- "Compartir" está en MEMORIA (se borra al redeploy). Para persistencia, usar DB/KV.
+- Trash/backup/stats están como stubs para no romper pruebas (podemos implementarlos luego).
+- `move` usa CopyObject+DeleteObject para evitar fallas de `NoSuchKey` típicas.
