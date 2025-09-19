@@ -11,6 +11,7 @@ import { open } from "sqlite";
 import rateLimit from "express-rate-limit";
 import sharp from "sharp";
 import archiver from "archiver";
+import bcrypt from "bcryptjs";
 
 import {
   S3Client, HeadBucketCommand, ListObjectsV2Command,
@@ -71,6 +72,14 @@ app.options("*", (req,res)=>{
 const db = await open({ filename: process.env.SQLITE_FILE || "./mixtli.db", driver: sqlite3.Database });
 await db.exec(`
   PRAGMA journal_mode=WAL;
+  CREATE TABLE IF NOT EXISTS users(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    pass_hash TEXT NOT NULL,
+    roles TEXT NOT NULL DEFAULT '["viewer"]',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE TABLE IF NOT EXISTS files(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uid TEXT NOT NULL,
@@ -110,7 +119,6 @@ await db.exec(`
     revoked_at DATETIME
   );
 
-  -- v1.14 extra
   CREATE TABLE IF NOT EXISTS albums(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uid TEXT NOT NULL,
@@ -154,7 +162,11 @@ const safe = s => String(s||"").replace(/[^a-zA-Z0-9._/-]/g,"_");
 function ymd(d=new Date()){ const y=d.getUTCFullYear(); const m=String(d.getUTCMonth()+1).padStart(2,"0"); const dd=String(d.getUTCDate()).padStart(2,"0"); return {y,m,d:dd}; }
 function buildKey(uid, filename){ const {y,m,d}=ymd(); const id=crypto.randomBytes(6).toString("hex"); return `users/${safe(uid||"anon")}/${y}/${m}/${d}/${Date.now()}_${id}_${safe(filename)}`; }
 
-// Auth / Roles
+// Auth helpers
+function issueToken(uid, roles){
+  if(!JWT_SECRET) return null;
+  return jwt.sign({ uid, roles }, JWT_SECRET, { expiresIn: "180d" });
+}
 function requireAuth(req,res,next){
   if(!JWT_SECRET){ req.user={ uid:"anon", roles:["admin","uploader","viewer"] }; return next(); }
   const h = req.headers.authorization || "";
@@ -184,11 +196,41 @@ async function getMonthlyUsage(uid){
 }
 
 // Base routes
-app.get(["/","/version"], (_req,res)=> res.json({ ok:true, name:"Mixtli Mini", version:"1.14.0" }));
+app.get(["/","/version"], (_req,res)=> res.json({ ok:true, name:"Mixtli Mini", version:"1.15.0" }));
 app.get(["/salud","/api/health"], async (_req,res)=>{
   try{ await s3.send(new HeadBucketCommand({ Bucket:S3_BUCKET })); }catch{}
-  res.json({ ok:true, version:"1.14.0", env:{ s3:Boolean(S3_BUCKET), auth:Boolean(JWT_SECRET), quotas:{ bytes:QUOTA_BYTES_PER_MONTH, files:QUOTA_FILES_PER_MONTH }}});
+  res.json({ ok:true, version:"1.15.0", env:{ s3:Boolean(S3_BUCKET), auth:Boolean(JWT_SECRET), quotas:{ bytes:QUOTA_BYTES_PER_MONTH, files:QUOTA_FILES_PER_MONTH }}});
 });
+
+// ---------- Auth (nuevo) ----------
+app.post("/api/auth/register", async (req,res)=>{
+  try{
+    const { email, password } = req.body||{};
+    if(!email || !password) return res.status(400).json({ ok:false, error:"BadRequest" });
+    const hash = await bcrypt.hash(String(password), 10);
+    const roles = JSON.stringify(["admin","uploader","viewer"]); // primer usuario será admin
+    await db.run("INSERT INTO users(email,pass_hash,roles) VALUES(?,?,?)", String(email).toLowerCase(), hash, roles);
+    const token = issueToken(String(email).toLowerCase(), ["admin","uploader","viewer"]);
+    res.json({ ok:true, token });
+  }catch(e){
+    if(String(e).includes("UNIQUE")) return res.status(409).json({ ok:false, error:"EmailExists" });
+    res.status(500).json({ ok:false, error:String(e) });
+  }
+});
+app.post("/api/auth/login", async (req,res)=>{
+  try{
+    const { email, password } = req.body||{};
+    if(!email || !password) return res.status(400).json({ ok:false, error:"BadRequest" });
+    const row = await db.get("SELECT email,pass_hash,roles FROM users WHERE email=?", String(email).toLowerCase());
+    if(!row) return res.status(401).json({ ok:false, error:"InvalidCredentials" });
+    const ok = await bcrypt.compare(String(password), row.pass_hash);
+    if(!ok) return res.status(401).json({ ok:false, error:"InvalidCredentials" });
+    const roles = JSON.parse(row.roles||'["viewer"]');
+    const token = issueToken(row.email, roles);
+    res.json({ ok:true, token, roles });
+  }catch(e){ res.status(500).json({ ok:false, error:String(e) }); }
+});
+app.get("/api/auth/me", requireAuth, (req,res)=> res.json({ ok:true, uid:req.user.uid, roles:req.user.roles }));
 
 // Presign
 app.post("/api/presign", requireAuth, needRole("uploader"), async (req,res)=>{
@@ -371,8 +413,8 @@ app.post("/api/notes", requireAuth, async (req,res)=>{
 app.get("/api/search", requireAuth, async (req,res)=>{
   try{
     const { q="", tag, from, to, ct } = req.query;
-    let where = "f.deleted_at IS NULL";
-    const params = [];
+    let where = "f.deleted_at IS NULL AND f.uid=?";
+    const params = [req.user.uid];
     if(q){ where += " AND f.key LIKE ?"; params.push(`%${q}%`); }
     if(ct){ where += " AND f.content_type LIKE ?"; params.push(`${ct}%`); }
     if(from){ where += " AND COALESCE(f.capture_at,f.created_at) >= ?"; params.push(from); }
@@ -410,16 +452,14 @@ app.post("/api/thumbnail", requireAuth, async (req,res)=>{
           <style>
             .wm{ fill: white; font-size:48px; font-family: Arial, Helvetica, sans-serif; opacity:${opacity}; }
           </style>
-          <text x="0" y="60" class="wm">${watermark.text}</text>
+          <text x="0" y="60" class="wm">${String(watermark.text).slice(0,64)}</text>
         </svg>`);
-        const mark = sharp(svg);
-        const resized = await mark.png().toBuffer();
+        const mark = await sharp(svg).png().toBuffer();
         const meta = await img.metadata();
-        const wmMeta = await sharp(resized).metadata();
+        const wmMeta = await sharp(mark).metadata();
         const { x, y } = wmPosition(pos, meta.width, meta.height, wmMeta.width, wmMeta.height);
-        compos.push({ input: resized, top: y, left: x });
+        compos.push({ input: mark, top: y, left: x });
       }
-      // Nota: logoUrl no se soporta sin fetch externo por CORS; se puede agregar si se hospeda en el bucket mismo.
     }
     let out = await (compos.length ? img.composite(compos) : img).jpeg({ quality:80 }).toBuffer();
     const tkey = `thumbs/${key}.jpg`;
@@ -429,7 +469,7 @@ app.post("/api/thumbnail", requireAuth, async (req,res)=>{
   }catch(e){ res.status(500).json({ ok:false, error:String(e) }); }
 });
 
-// Multipart (igual que 1.13)
+// Multipart
 app.post("/api/multipart/init", requireAuth, needRole("uploader"), async (req,res)=>{
   try{
     const { filename, contentType } = req.body||{};
@@ -465,7 +505,7 @@ app.post("/api/multipart/abort", requireAuth, needRole("uploader"), async (req,r
   }catch(e){ res.status(500).json({ ok:false, error:String(e) }); }
 });
 
-// ZIP multiple
+// ZIP
 function uuidv4(){ return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c => (c ^ crypto.randomBytes(1)[0] & 15 >> c / 4).toString(16) ); }
 app.post("/api/zip", requireAuth, async (req,res)=>{
   try{
@@ -495,7 +535,7 @@ app.post("/api/zip", requireAuth, async (req,res)=>{
   }catch(e){ res.status(500).json({ ok:false, error:String(e) }); }
 });
 
-// Shares (file) igual que 1.13
+// Shares
 app.post("/api/share", requireAuth, async (req,res)=>{
   try{
     const { key, ttl=300, password, maxDownloads=0 } = req.body||{};
@@ -562,7 +602,7 @@ app.get("/api/albums/:id/items", requireAuth, async (req,res)=>{
   }catch(e){ res.status(500).json({ ok:false, error:String(e) }); }
 });
 
-// Admin: usage & stats & events & rules & retention
+// Admin
 app.get("/api/usage", requireAuth, async (req,res)=>{
   try{ const u = await getMonthlyUsage(req.user.uid); res.json({ ok:true, month: new Date().toISOString().slice(0,7), usage: u, limits:{ bytes:QUOTA_BYTES_PER_MONTH, files:QUOTA_FILES_PER_MONTH } }); }
   catch(e){ res.status(500).json({ ok:false, error:String(e) }); }
@@ -593,7 +633,6 @@ app.post("/api/admin/retention/run", requireAuth, needRole("admin"), async (req,
     const { prefix, days } = req.body||{};
     const d = Number(days || RETENTION_DAYS_DEFAULT);
     if(!prefix || !d) return res.status(400).json({ ok:false, error:"BadRequest" });
-    // Simple: lista S3 por prefix y borra si LastModified supera días
     const cutoff = Date.now() - d*24*3600*1000;
     let token=undefined, deleted=0;
     do{
@@ -616,4 +655,4 @@ app.post("/api/admin/retention/run", requireAuth, needRole("admin"), async (req,
 // 404
 app.use((req,res)=> res.status(404).json({ ok:false, error:"Not Found", path:req.path }));
 
-app.listen(PORT, ()=> console.log(`Mixtli Mini 1.14.0 on :${PORT}`));
+app.listen(PORT, ()=> console.log(`Mixtli Mini 1.15.0 on :${PORT}`));
