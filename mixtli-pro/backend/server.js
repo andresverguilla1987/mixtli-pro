@@ -9,11 +9,7 @@ import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
 import sharp from 'sharp';
 import fetch from 'node-fetch';
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand
-} from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // ====== Config ======
@@ -23,6 +19,7 @@ const DEFAULT_READ_TTL = Math.min(Number(process.env.DEFAULT_READ_TTL || 300), 8
 const SQLITE_FILE = process.env.SQLITE_FILE || './mixtli.db';
 
 const S3_ENDPOINT = process.env.S3_ENDPOINT;
+the
 const S3_REGION = process.env.S3_REGION || 'auto';
 const S3_BUCKET = process.env.S3_BUCKET;
 const S3_FORCE_PATH_STYLE = (process.env.S3_FORCE_PATH_STYLE || 'true') === 'true';
